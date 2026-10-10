@@ -48,6 +48,23 @@ def _fmt_obs(entry: dict) -> str:
             f"{age_bar(age, _THRESHOLD)} {age_txt}  {color}{a['freshness']}{C['x']}{flag}")
 
 
+def _secs(value) -> str:
+    """Seconds for display; 'n/a' when the event never happened (e.g. no stale detected before an emergency stop)."""
+    return "n/a" if value is None else f"{value}s"
+
+
+def _result_lines(rec: dict) -> list[str]:
+    imp, rb, rc = rec["impact"], rec["rollback"], rec["recovery"]
+    return [
+        f"  fault verified: {imp.get('fault_verified')}   stale detected: {imp.get('stale_detected')} "
+        f"(time to detection {_secs(imp.get('time_to_detection_s'))})",
+        f"  during fault: HTTP-200 ratio {imp.get('http_ok_ratio_during_fault')}, max data age {_secs(imp.get('max_data_age_s'))}, "
+        f"{imp.get('healthy_but_stale_observations')} healthy-but-stale observations",
+        f"  rollback: verified={rb['verified']} by={rb['by']}   recovery: verified={rc['verified']} "
+        f"first fresh after {_secs(rc['time_to_first_fresh_s'])}, verified after {_secs(rc['time_to_verified_s'])}",
+    ]
+
+
 def _printer(kind: str, data: dict) -> None:
     if kind == "observation":
         print(_fmt_obs(data), flush=True)
@@ -189,15 +206,9 @@ def main(argv: list[str] | None = None) -> int:
         except SafetyError as exc:
             print(f"{C['r']}REFUSED: {exc}{C['x']}")
             return 2
-        imp, rb, rc = rec["impact"], rec["rollback"], rec["recovery"]
         ok = rec["state"] == "COMPLETED"
         print(f"\n{C['b']}Result: {(C['g'] if ok else C['r'])}{rec['state']}{C['x']}  stop_reason={rec['stop_reason']}")
-        print(f"  fault verified: {imp.get('fault_verified')}   stale detected: {imp.get('stale_detected')} "
-              f"(time to detection {imp.get('time_to_detection_s')}s)")
-        print(f"  during fault: HTTP-200 ratio {imp.get('http_ok_ratio_during_fault')}, max data age {imp.get('max_data_age_s')}s, "
-              f"{imp.get('healthy_but_stale_observations')} healthy-but-stale observations")
-        print(f"  rollback: verified={rb['verified']} by={rb['by']}   recovery: verified={rc['verified']} "
-              f"first fresh after {rc['time_to_first_fresh_s']}s, verified after {rc['time_to_verified_s']}s")
+        print("\n".join(_result_lines(rec)))
         print(f"  evidence: {store.data_dir / 'runs' / (rec['run_id'] + '.json')}")
         print()
         print(render_impact_chart(rec))
