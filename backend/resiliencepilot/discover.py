@@ -4,7 +4,8 @@ Builds a candidate dependency graph of the sandbox compose project from what Doc
 curated `config/dependency_map.json`. Evidence sources, strongest first:
 
   env_reference     : an environment variable of X mentions a host name of Y (e.g. KUKSA_DATABROKER_URI=http://databroker:55556)
-  config_reference  : a text file bind-mounted into X mentions a host name of Y (e.g. zenoh "tcp/fms-zenoh-router:7447")
+  config_reference  : a text file bind-mounted into X mentions Y *as a host* (scheme://, tcp/, @ or host:port),
+                      e.g. zenoh "tcp/fms-zenoh-router:7447"; a bare word such as a datasource type does not count
   command_reference : X's command line mentions a host name of Y
   depends_on        : compose start-order dependency label (com.docker.compose.depends_on)
 
@@ -86,6 +87,15 @@ def _mentions(text: str, alias: str) -> bool:
     return re.search(rf"(?<![A-Za-z0-9_.-]){re.escape(alias)}(?![A-Za-z0-9_-])", text) is not None
 
 
+def _mentions_as_host(text: str, alias: str) -> bool:
+    """Host-shaped mention only: scheme://alias, tcp/alias, @alias or alias:port. A bare word in a file (e.g. a
+    datasource *type* called "influxdb") is not a network reference."""
+    a = re.escape(alias)
+    pattern = (r"(?:[a-z][a-z0-9+.-]*://|\b(?:tcp|udp|tls|quic)/|@)" + a + r"(?![A-Za-z0-9_-])"
+               r"|(?<![A-Za-z0-9_.-])" + a + r":\d{2,5}\b")
+    return re.search(pattern, text, re.IGNORECASE) is not None
+
+
 def _snippet(text: str, alias: str) -> str:
     m = re.search(rf"[^\s\"',]*{re.escape(alias)}[^\s\"',]*", text)
     return m.group(0)[:120] if m else alias
@@ -116,7 +126,8 @@ def discover(infos: list[dict], read_file=None) -> tuple[list[Node], list[Edge]]
                 if hit:
                     add(src, o.name, {"kind": "env_reference", "detail": f"{key}={_snippet(value, hit)}"})
         # 2) command line
-        cmd = " ".join((info.get("Path") or "",) + tuple(info.get("Args") or ()))
+        # arguments only; tokens that are file paths (e.g. "/app/run", "/zenoh-config.json5") are not dependencies
+        cmd = " ".join(a for a in (info.get("Args") or ()) if not a.startswith("/"))
         for o in others:
             hit = next((a for a in sorted(o.aliases, key=len, reverse=True) if _mentions(cmd, a)), None)
             if hit:
@@ -130,7 +141,7 @@ def discover(infos: list[dict], read_file=None) -> tuple[list[Node], list[Edge]]
                 if not text:
                     continue
                 for o in others:
-                    hit = next((a for a in sorted(o.aliases, key=len, reverse=True) if _mentions(text, a)), None)
+                    hit = next((a for a in sorted(o.aliases, key=len, reverse=True) if _mentions_as_host(text, a)), None)
                     if hit:
                         add(src, o.name, {"kind": "config_reference",
                                           "detail": f"{m.get('Destination')}: {_snippet(text, hit)}"})

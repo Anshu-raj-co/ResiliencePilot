@@ -12,6 +12,7 @@
   show-baseline [FILE]       print a stored baseline (default: newest)
   report [--run ID] [--out FILE]  read-only Day-1 explainer HTML (default: latest full-length COMPLETED run)
   serve [--port N]           live dashboard + local API on http://127.0.0.1:N/ (localhost only)
+  discover [--json]          read-only: build a candidate dependency graph from Docker and diff it with the curated map
 """
 from __future__ import annotations
 
@@ -77,6 +78,39 @@ def _load_conditions(docker, cfg, summary: dict, poll_interval_s: float) -> dict
     }
 
 
+def _discover(as_json: bool) -> int:
+    from .discover import diff_against_map, discover, load_map, read_text_file, to_json
+    cfg = load_safety_config()
+    docker = DockerCLI()
+    infos = docker.inspect_raw(docker.project_container_ids(cfg.compose_project))
+    nodes, edges = discover(infos, read_text_file)
+    diff = diff_against_map(edges, load_map(REPO_ROOT))
+    out = to_json(nodes, edges, diff)
+    out["discovered_at"] = utcnow().isoformat()
+    path = cfg.data_dir / "discovery" / utcnow().strftime("discovery-%Y%m%dT%H%M%SZ.json")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(out, indent=2), encoding="utf-8")
+    if as_json:
+        print(json.dumps(out, indent=2))
+        return 0
+    print(f"{C['b']}Discovered {len(edges)} dependencies among {len(nodes)} containers{C['x']} "
+          f"(project {cfg.compose_project}; read-only)")
+    for e in edges:
+        ev = e.evidence[0]
+        print(f"  {e.source:<17} -> {e.target:<17} {e.confidence:<6} [{', '.join(e.kinds)}]  {C['d']}{ev['detail'][:70]}{C['x']}")
+    print(f"{C['b']}Diff vs config/dependency_map.json{C['x']}")
+    print(f"  matched            {len(diff['matched'])}")
+    for x in diff["direction_differs"]:
+        print(f"  direction differs  map {x['map']}  /  discovered {x['discovered']}  ({x['note']})")
+    for x in diff["discovered_only"]:
+        print(f"  {C['y']}discovered only{C['x']}    {x['from']} -> {x['to']} ({x['confidence']}): review and add to the map if real")
+    for x in diff["map_only"]:
+        print(f"  {C['y']}map only{C['x']}           {x['from']} -> {x['to']}: not visible in Docker (check, or keep as source-verified)")
+    print(f"  not discoverable   {', '.join(diff['not_discoverable'])} (not a container)")
+    print(f"{C['d']}saved {path}{C['x']}")
+    return 0
+
+
 def build(on_event=None):
     cfg = load_safety_config()
     catalog = load_experiment_catalog()
@@ -114,9 +148,13 @@ def main(argv: list[str] | None = None) -> int:
     sh = sub.add_parser("show"); sh.add_argument("run_id"); sh.add_argument("--json", action="store_true")
     sub.add_parser("deps")
     sbs = sub.add_parser("show-baseline"); sbs.add_argument("file", nargs="?")
+    dv = sub.add_parser("discover"); dv.add_argument("--json", action="store_true")
     sv = sub.add_parser("serve"); sv.add_argument("--port", type=int, default=8765)
     rp_ = sub.add_parser("report"); rp_.add_argument("--run"); rp_.add_argument("--out", default="reports/day1/explainer.html")
     args = p.parse_args(argv)
+
+    if args.cmd == "discover":  # read-only: no safety-controller object, no startup recovery
+        return _discover(args.json)
 
     if args.cmd == "serve":  # the app performs startup recovery itself, exactly like other commands
         from .api import serve
