@@ -1,0 +1,762 @@
+{
+  "summary": {
+    "samples": 60,
+    "started_at": "2026-10-10T09:39:34.377160+00:00",
+    "ended_at": "2026-10-10T09:40:05.234247+00:00",
+    "http_ok_ratio": 1.0,
+    "vins": [
+      "YV2E4C3A5VB180691"
+    ],
+    "freshness_counts": {
+      "FRESH": 60,
+      "STALE": 0,
+      "NO_DATA": 0,
+      "OBSERVER_ERROR": 0
+    },
+    "healthy_but_stale_count": 0,
+    "data_age_s": {
+      "n": 60,
+      "min": 0.081,
+      "median": 0.577,
+      "p95": 1.036,
+      "max": 1.077
+    },
+    "created_advance_interval_s": {
+      "n": 31,
+      "min": 1.001,
+      "median": 1.002,
+      "p95": 1.003,
+      "max": 1.004
+    },
+    "distinct_created_values": 32,
+    "regressions": 0,
+    "latency_ms": {
+      "n": 60,
+      "min": 19.99,
+      "median": 21.94,
+      "p95": 26.4,
+      "max": 31.51
+    },
+    "stale_threshold_s": 5.0,
+    "unavailable_signals": {
+      "sequence_id": "VehicleStatus carries no sequence number; progression uses strictly increasing createdDateTime",
+      "end_to_end_latency": "createdDateTime is stamped by fms-forwarder, but InfluxDB write time is not exposed by the rFMS API; data_age_s (server_time - createdDateTime) is an upper bound on pipeline delay plus polling offset",
+      "completeness": "no expected-message counter exists in the data; not measured"
+    },
+    "collected_at": "2026-10-10T09:40:05.234645+00:00",
+    "interval_s": 0.5,
+    "load_conditions": {
+      "forwarder_timer_interval": "500ms",
+      "csv_provider_infinite": "1",
+      "csv_rows": 4001,
+      "vehicles": 1,
+      "observer_poll_interval_s": 0.5,
+      "other_clients": "not measured (ResiliencePilot starts no load generator; Grafana polls only while a browser has it open)",
+      "docker_mem_total_gib": 7.68,
+      "stack_stats": [
+        {
+          "name": "fms-forwarder",
+          "cpu": "0.16%",
+          "mem": "4.773MiB / 7.682GiB"
+        },
+        {
+          "name": "grafana",
+          "cpu": "0.07%",
+          "mem": "59.13MiB / 7.682GiB"
+        },
+        {
+          "name": "csv-provider",
+          "cpu": "0.67%",
+          "mem": "26.97MiB / 7.682GiB"
+        },
+        {
+          "name": "fms-consumer",
+          "cpu": "0.13%",
+          "mem": "4.141MiB / 7.682GiB"
+        },
+        {
+          "name": "fms-server",
+          "cpu": "0.00%",
+          "mem": "4.012MiB / 7.682GiB"
+        },
+        {
+          "name": "influxDB",
+          "cpu": "0.29%",
+          "mem": "113.2MiB / 7.682GiB"
+        },
+        {
+          "name": "fms-zenoh-router",
+          "cpu": "0.09%",
+          "mem": "3.953MiB / 7.682GiB"
+        },
+        {
+          "name": "databroker",
+          "cpu": "0.16%",
+          "mem": "5.211MiB / 7.682GiB"
+        }
+      ]
+    }
+  },
+  "observations": [
+    {
+      "observed_at": "2026-10-10T09:39:34.377160+00:00",
+      "http_status": 200,
+      "latency_ms": 30.79,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:33.908000+00:00",
+      "received_at": "2026-10-10T09:39:34.376383+00:00",
+      "server_time": "2026-10-10T09:39:34.376390+00:00",
+      "error": null,
+      "data_age_s": 0.468
+    },
+    {
+      "observed_at": "2026-10-10T09:39:34.899853+00:00",
+      "http_status": 200,
+      "latency_ms": 22.23,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:33.908000+00:00",
+      "received_at": "2026-10-10T09:39:34.899360+00:00",
+      "server_time": "2026-10-10T09:39:34.899362+00:00",
+      "error": null,
+      "data_age_s": 0.991
+    },
+    {
+      "observed_at": "2026-10-10T09:39:35.422321+00:00",
+      "http_status": 200,
+      "latency_ms": 22.2,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:34.911000+00:00",
+      "received_at": "2026-10-10T09:39:35.422149+00:00",
+      "server_time": "2026-10-10T09:39:35.422155+00:00",
+      "error": null,
+      "data_age_s": 0.511
+    },
+    {
+      "observed_at": "2026-10-10T09:39:35.947514+00:00",
+      "http_status": 200,
+      "latency_ms": 24.88,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:34.911000+00:00",
+      "received_at": "2026-10-10T09:39:35.947229+00:00",
+      "server_time": "2026-10-10T09:39:35.947231+00:00",
+      "error": null,
+      "data_age_s": 1.036
+    },
+    {
+      "observed_at": "2026-10-10T09:39:36.469966+00:00",
+      "http_status": 200,
+      "latency_ms": 22.34,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:35.912000+00:00",
+      "received_at": "2026-10-10T09:39:36.468470+00:00",
+      "server_time": "2026-10-10T09:39:36.468477+00:00",
+      "error": null,
+      "data_age_s": 0.556
+    },
+    {
+      "observed_at": "2026-10-10T09:39:36.990752+00:00",
+      "http_status": 200,
+      "latency_ms": 20.5,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:35.912000+00:00",
+      "received_at": "2026-10-10T09:39:36.989412+00:00",
+      "server_time": "2026-10-10T09:39:36.989418+00:00",
+      "error": null,
+      "data_age_s": 1.077
+    },
+    {
+      "observed_at": "2026-10-10T09:39:37.511621+00:00",
+      "http_status": 200,
+      "latency_ms": 20.35,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:36.913000+00:00",
+      "received_at": "2026-10-10T09:39:37.510068+00:00",
+      "server_time": "2026-10-10T09:39:37.510074+00:00",
+      "error": null,
+      "data_age_s": 0.597
+    },
+    {
+      "observed_at": "2026-10-10T09:39:38.037106+00:00",
+      "http_status": 200,
+      "latency_ms": 25.19,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:37.916000+00:00",
+      "received_at": "2026-10-10T09:39:38.035474+00:00",
+      "server_time": "2026-10-10T09:39:38.035480+00:00",
+      "error": null,
+      "data_age_s": 0.119
+    },
+    {
+      "observed_at": "2026-10-10T09:39:38.559333+00:00",
+      "http_status": 200,
+      "latency_ms": 21.69,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:37.916000+00:00",
+      "received_at": "2026-10-10T09:39:38.557903+00:00",
+      "server_time": "2026-10-10T09:39:38.557905+00:00",
+      "error": null,
+      "data_age_s": 0.642
+    },
+    {
+      "observed_at": "2026-10-10T09:39:39.080977+00:00",
+      "http_status": 200,
+      "latency_ms": 20.98,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:38.918000+00:00",
+      "received_at": "2026-10-10T09:39:39.079649+00:00",
+      "server_time": "2026-10-10T09:39:39.079654+00:00",
+      "error": null,
+      "data_age_s": 0.162
+    },
+    {
+      "observed_at": "2026-10-10T09:39:39.603387+00:00",
+      "http_status": 200,
+      "latency_ms": 21.81,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:38.918000+00:00",
+      "received_at": "2026-10-10T09:39:39.602106+00:00",
+      "server_time": "2026-10-10T09:39:39.602112+00:00",
+      "error": null,
+      "data_age_s": 0.684
+    },
+    {
+      "observed_at": "2026-10-10T09:39:40.127504+00:00",
+      "http_status": 200,
+      "latency_ms": 23.38,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:39.921000+00:00",
+      "received_at": "2026-10-10T09:39:40.125980+00:00",
+      "server_time": "2026-10-10T09:39:40.125986+00:00",
+      "error": null,
+      "data_age_s": 0.205
+    },
+    {
+      "observed_at": "2026-10-10T09:39:40.648461+00:00",
+      "http_status": 200,
+      "latency_ms": 20.41,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:39.921000+00:00",
+      "received_at": "2026-10-10T09:39:40.647198+00:00",
+      "server_time": "2026-10-10T09:39:40.647200+00:00",
+      "error": null,
+      "data_age_s": 0.726
+    },
+    {
+      "observed_at": "2026-10-10T09:39:41.170477+00:00",
+      "http_status": 200,
+      "latency_ms": 21.83,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:40.923000+00:00",
+      "received_at": "2026-10-10T09:39:41.169202+00:00",
+      "server_time": "2026-10-10T09:39:41.169204+00:00",
+      "error": null,
+      "data_age_s": 0.246
+    },
+    {
+      "observed_at": "2026-10-10T09:39:41.692639+00:00",
+      "http_status": 200,
+      "latency_ms": 21.9,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:40.923000+00:00",
+      "received_at": "2026-10-10T09:39:41.691395+00:00",
+      "server_time": "2026-10-10T09:39:41.691397+00:00",
+      "error": null,
+      "data_age_s": 0.768
+    },
+    {
+      "observed_at": "2026-10-10T09:39:42.216248+00:00",
+      "http_status": 200,
+      "latency_ms": 23.46,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:41.925000+00:00",
+      "received_at": "2026-10-10T09:39:42.215245+00:00",
+      "server_time": "2026-10-10T09:39:42.215247+00:00",
+      "error": null,
+      "data_age_s": 0.29
+    },
+    {
+      "observed_at": "2026-10-10T09:39:42.737455+00:00",
+      "http_status": 200,
+      "latency_ms": 20.66,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:41.925000+00:00",
+      "received_at": "2026-10-10T09:39:42.736357+00:00",
+      "server_time": "2026-10-10T09:39:42.736363+00:00",
+      "error": null,
+      "data_age_s": 0.811
+    },
+    {
+      "observed_at": "2026-10-10T09:39:43.259100+00:00",
+      "http_status": 200,
+      "latency_ms": 21.34,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:42.929000+00:00",
+      "received_at": "2026-10-10T09:39:43.258008+00:00",
+      "server_time": "2026-10-10T09:39:43.258014+00:00",
+      "error": null,
+      "data_age_s": 0.329
+    },
+    {
+      "observed_at": "2026-10-10T09:39:43.782337+00:00",
+      "http_status": 200,
+      "latency_ms": 22.72,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:42.929000+00:00",
+      "received_at": "2026-10-10T09:39:43.781204+00:00",
+      "server_time": "2026-10-10T09:39:43.781208+00:00",
+      "error": null,
+      "data_age_s": 0.852
+    },
+    {
+      "observed_at": "2026-10-10T09:39:44.307108+00:00",
+      "http_status": 200,
+      "latency_ms": 24.17,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:43.932000+00:00",
+      "received_at": "2026-10-10T09:39:44.305618+00:00",
+      "server_time": "2026-10-10T09:39:44.305620+00:00",
+      "error": null,
+      "data_age_s": 0.374
+    },
+    {
+      "observed_at": "2026-10-10T09:39:44.828528+00:00",
+      "http_status": 200,
+      "latency_ms": 20.91,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:43.932000+00:00",
+      "received_at": "2026-10-10T09:39:44.827399+00:00",
+      "server_time": "2026-10-10T09:39:44.827416+00:00",
+      "error": null,
+      "data_age_s": 0.895
+    },
+    {
+      "observed_at": "2026-10-10T09:39:45.350696+00:00",
+      "http_status": 200,
+      "latency_ms": 22.05,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:44.934000+00:00",
+      "received_at": "2026-10-10T09:39:45.349647+00:00",
+      "server_time": "2026-10-10T09:39:45.349649+00:00",
+      "error": null,
+      "data_age_s": 0.416
+    },
+    {
+      "observed_at": "2026-10-10T09:39:45.870896+00:00",
+      "http_status": 200,
+      "latency_ms": 19.99,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:44.934000+00:00",
+      "received_at": "2026-10-10T09:39:45.869575+00:00",
+      "server_time": "2026-10-10T09:39:45.869580+00:00",
+      "error": null,
+      "data_age_s": 0.936
+    },
+    {
+      "observed_at": "2026-10-10T09:39:46.396757+00:00",
+      "http_status": 200,
+      "latency_ms": 25.3,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:45.936000+00:00",
+      "received_at": "2026-10-10T09:39:46.395710+00:00",
+      "server_time": "2026-10-10T09:39:46.395712+00:00",
+      "error": null,
+      "data_age_s": 0.46
+    },
+    {
+      "observed_at": "2026-10-10T09:39:46.920640+00:00",
+      "http_status": 200,
+      "latency_ms": 23.17,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:45.936000+00:00",
+      "received_at": "2026-10-10T09:39:46.919562+00:00",
+      "server_time": "2026-10-10T09:39:46.919568+00:00",
+      "error": null,
+      "data_age_s": 0.984
+    },
+    {
+      "observed_at": "2026-10-10T09:39:47.442207+00:00",
+      "http_status": 200,
+      "latency_ms": 21.22,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:46.938000+00:00",
+      "received_at": "2026-10-10T09:39:47.441027+00:00",
+      "server_time": "2026-10-10T09:39:47.441036+00:00",
+      "error": null,
+      "data_age_s": 0.503
+    },
+    {
+      "observed_at": "2026-10-10T09:39:47.963824+00:00",
+      "http_status": 200,
+      "latency_ms": 21.22,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:46.938000+00:00",
+      "received_at": "2026-10-10T09:39:47.962783+00:00",
+      "server_time": "2026-10-10T09:39:47.962786+00:00",
+      "error": null,
+      "data_age_s": 1.025
+    },
+    {
+      "observed_at": "2026-10-10T09:39:48.488582+00:00",
+      "http_status": 200,
+      "latency_ms": 24.42,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:47.940000+00:00",
+      "received_at": "2026-10-10T09:39:48.487646+00:00",
+      "server_time": "2026-10-10T09:39:48.487653+00:00",
+      "error": null,
+      "data_age_s": 0.548
+    },
+    {
+      "observed_at": "2026-10-10T09:39:49.011411+00:00",
+      "http_status": 200,
+      "latency_ms": 22.23,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:47.940000+00:00",
+      "received_at": "2026-10-10T09:39:49.010428+00:00",
+      "server_time": "2026-10-10T09:39:49.010434+00:00",
+      "error": null,
+      "data_age_s": 1.07
+    },
+    {
+      "observed_at": "2026-10-10T09:39:49.534279+00:00",
+      "http_status": 200,
+      "latency_ms": 22.19,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:48.942000+00:00",
+      "received_at": "2026-10-10T09:39:49.533342+00:00",
+      "server_time": "2026-10-10T09:39:49.533349+00:00",
+      "error": null,
+      "data_age_s": 0.591
+    },
+    {
+      "observed_at": "2026-10-10T09:39:50.056143+00:00",
+      "http_status": 200,
+      "latency_ms": 21.61,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:49.944000+00:00",
+      "received_at": "2026-10-10T09:39:50.055020+00:00",
+      "server_time": "2026-10-10T09:39:50.055026+00:00",
+      "error": null,
+      "data_age_s": 0.111
+    },
+    {
+      "observed_at": "2026-10-10T09:39:50.583661+00:00",
+      "http_status": 200,
+      "latency_ms": 27.2,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:49.944000+00:00",
+      "received_at": "2026-10-10T09:39:50.582740+00:00",
+      "server_time": "2026-10-10T09:39:50.582742+00:00",
+      "error": null,
+      "data_age_s": 0.639
+    },
+    {
+      "observed_at": "2026-10-10T09:39:51.106938+00:00",
+      "http_status": 200,
+      "latency_ms": 22.82,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:50.947000+00:00",
+      "received_at": "2026-10-10T09:39:51.106037+00:00",
+      "server_time": "2026-10-10T09:39:51.106043+00:00",
+      "error": null,
+      "data_age_s": 0.159
+    },
+    {
+      "observed_at": "2026-10-10T09:39:51.629139+00:00",
+      "http_status": 200,
+      "latency_ms": 21.94,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:50.947000+00:00",
+      "received_at": "2026-10-10T09:39:51.628310+00:00",
+      "server_time": "2026-10-10T09:39:51.628312+00:00",
+      "error": null,
+      "data_age_s": 0.681
+    },
+    {
+      "observed_at": "2026-10-10T09:39:52.160803+00:00",
+      "http_status": 200,
+      "latency_ms": 31.51,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:51.949000+00:00",
+      "received_at": "2026-10-10T09:39:52.159806+00:00",
+      "server_time": "2026-10-10T09:39:52.159810+00:00",
+      "error": null,
+      "data_age_s": 0.211
+    },
+    {
+      "observed_at": "2026-10-10T09:39:52.682566+00:00",
+      "http_status": 200,
+      "latency_ms": 21.59,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:51.949000+00:00",
+      "received_at": "2026-10-10T09:39:52.681727+00:00",
+      "server_time": "2026-10-10T09:39:52.681729+00:00",
+      "error": null,
+      "data_age_s": 0.733
+    },
+    {
+      "observed_at": "2026-10-10T09:39:53.208703+00:00",
+      "http_status": 200,
+      "latency_ms": 25.9,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:52.952000+00:00",
+      "received_at": "2026-10-10T09:39:53.208077+00:00",
+      "server_time": "2026-10-10T09:39:53.208079+00:00",
+      "error": null,
+      "data_age_s": 0.256
+    },
+    {
+      "observed_at": "2026-10-10T09:39:53.730022+00:00",
+      "http_status": 200,
+      "latency_ms": 20.89,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:52.952000+00:00",
+      "received_at": "2026-10-10T09:39:53.729344+00:00",
+      "server_time": "2026-10-10T09:39:53.729350+00:00",
+      "error": null,
+      "data_age_s": 0.777
+    },
+    {
+      "observed_at": "2026-10-10T09:39:54.256322+00:00",
+      "http_status": 200,
+      "latency_ms": 25.86,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:53.954000+00:00",
+      "received_at": "2026-10-10T09:39:54.255755+00:00",
+      "server_time": "2026-10-10T09:39:54.255758+00:00",
+      "error": null,
+      "data_age_s": 0.302
+    },
+    {
+      "observed_at": "2026-10-10T09:39:54.778793+00:00",
+      "http_status": 200,
+      "latency_ms": 21.53,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:53.954000+00:00",
+      "received_at": "2026-10-10T09:39:54.778208+00:00",
+      "server_time": "2026-10-10T09:39:54.778215+00:00",
+      "error": null,
+      "data_age_s": 0.824
+    },
+    {
+      "observed_at": "2026-10-10T09:39:55.300400+00:00",
+      "http_status": 200,
+      "latency_ms": 20.88,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:54.956000+00:00",
+      "received_at": "2026-10-10T09:39:55.299444+00:00",
+      "server_time": "2026-10-10T09:39:55.299450+00:00",
+      "error": null,
+      "data_age_s": 0.343
+    },
+    {
+      "observed_at": "2026-10-10T09:39:55.824820+00:00",
+      "http_status": 200,
+      "latency_ms": 24.24,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:54.956000+00:00",
+      "received_at": "2026-10-10T09:39:55.824188+00:00",
+      "server_time": "2026-10-10T09:39:55.824190+00:00",
+      "error": null,
+      "data_age_s": 0.868
+    },
+    {
+      "observed_at": "2026-10-10T09:39:56.351366+00:00",
+      "http_status": 200,
+      "latency_ms": 26.4,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:55.959000+00:00",
+      "received_at": "2026-10-10T09:39:56.350789+00:00",
+      "server_time": "2026-10-10T09:39:56.350796+00:00",
+      "error": null,
+      "data_age_s": 0.392
+    },
+    {
+      "observed_at": "2026-10-10T09:39:56.874244+00:00",
+      "http_status": 200,
+      "latency_ms": 22.62,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:55.959000+00:00",
+      "received_at": "2026-10-10T09:39:56.873456+00:00",
+      "server_time": "2026-10-10T09:39:56.873459+00:00",
+      "error": null,
+      "data_age_s": 0.914
+    },
+    {
+      "observed_at": "2026-10-10T09:39:57.396055+00:00",
+      "http_status": 200,
+      "latency_ms": 21.15,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:56.962000+00:00",
+      "received_at": "2026-10-10T09:39:57.395545+00:00",
+      "server_time": "2026-10-10T09:39:57.395551+00:00",
+      "error": null,
+      "data_age_s": 0.434
+    },
+    {
+      "observed_at": "2026-10-10T09:39:57.917080+00:00",
+      "http_status": 200,
+      "latency_ms": 20.4,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:56.962000+00:00",
+      "received_at": "2026-10-10T09:39:57.916677+00:00",
+      "server_time": "2026-10-10T09:39:57.916683+00:00",
+      "error": null,
+      "data_age_s": 0.955
+    },
+    {
+      "observed_at": "2026-10-10T09:39:58.440715+00:00",
+      "http_status": 200,
+      "latency_ms": 23.19,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:57.964000+00:00",
+      "received_at": "2026-10-10T09:39:58.440233+00:00",
+      "server_time": "2026-10-10T09:39:58.440239+00:00",
+      "error": null,
+      "data_age_s": 0.476
+    },
+    {
+      "observed_at": "2026-10-10T09:39:58.963405+00:00",
+      "http_status": 200,
+      "latency_ms": 22.38,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:57.964000+00:00",
+      "received_at": "2026-10-10T09:39:58.962998+00:00",
+      "server_time": "2026-10-10T09:39:58.963000+00:00",
+      "error": null,
+      "data_age_s": 0.999
+    },
+    {
+      "observed_at": "2026-10-10T09:39:59.485369+00:00",
+      "http_status": 200,
+      "latency_ms": 21.54,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:58.967000+00:00",
+      "received_at": "2026-10-10T09:39:59.484942+00:00",
+      "server_time": "2026-10-10T09:39:59.484949+00:00",
+      "error": null,
+      "data_age_s": 0.518
+    },
+    {
+      "observed_at": "2026-10-10T09:40:00.010771+00:00",
+      "http_status": 200,
+      "latency_ms": 24.84,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:58.967000+00:00",
+      "received_at": "2026-10-10T09:40:00.009922+00:00",
+      "server_time": "2026-10-10T09:40:00.009928+00:00",
+      "error": null,
+      "data_age_s": 1.043
+    },
+    {
+      "observed_at": "2026-10-10T09:40:00.532046+00:00",
+      "http_status": 200,
+      "latency_ms": 20.82,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:39:59.970000+00:00",
+      "received_at": "2026-10-10T09:40:00.531699+00:00",
+      "server_time": "2026-10-10T09:40:00.531701+00:00",
+      "error": null,
+      "data_age_s": 0.562
+    },
+    {
+      "observed_at": "2026-10-10T09:40:01.054483+00:00",
+      "http_status": 200,
+      "latency_ms": 21.93,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:40:00.973000+00:00",
+      "received_at": "2026-10-10T09:40:01.054030+00:00",
+      "server_time": "2026-10-10T09:40:01.054036+00:00",
+      "error": null,
+      "data_age_s": 0.081
+    },
+    {
+      "observed_at": "2026-10-10T09:40:01.575733+00:00",
+      "http_status": 200,
+      "latency_ms": 20.49,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:40:00.973000+00:00",
+      "received_at": "2026-10-10T09:40:01.575341+00:00",
+      "server_time": "2026-10-10T09:40:01.575347+00:00",
+      "error": null,
+      "data_age_s": 0.602
+    },
+    {
+      "observed_at": "2026-10-10T09:40:02.100932+00:00",
+      "http_status": 200,
+      "latency_ms": 24.97,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:40:01.976000+00:00",
+      "received_at": "2026-10-10T09:40:02.100606+00:00",
+      "server_time": "2026-10-10T09:40:02.100608+00:00",
+      "error": null,
+      "data_age_s": 0.125
+    },
+    {
+      "observed_at": "2026-10-10T09:40:02.623619+00:00",
+      "http_status": 200,
+      "latency_ms": 21.94,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:40:01.976000+00:00",
+      "received_at": "2026-10-10T09:40:02.623276+00:00",
+      "server_time": "2026-10-10T09:40:02.623278+00:00",
+      "error": null,
+      "data_age_s": 0.647
+    },
+    {
+      "observed_at": "2026-10-10T09:40:03.145824+00:00",
+      "http_status": 200,
+      "latency_ms": 21.72,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:40:02.978000+00:00",
+      "received_at": "2026-10-10T09:40:03.145366+00:00",
+      "server_time": "2026-10-10T09:40:03.145368+00:00",
+      "error": null,
+      "data_age_s": 0.167
+    },
+    {
+      "observed_at": "2026-10-10T09:40:03.667100+00:00",
+      "http_status": 200,
+      "latency_ms": 20.66,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:40:02.978000+00:00",
+      "received_at": "2026-10-10T09:40:03.666937+00:00",
+      "server_time": "2026-10-10T09:40:03.666939+00:00",
+      "error": null,
+      "data_age_s": 0.689
+    },
+    {
+      "observed_at": "2026-10-10T09:40:04.191356+00:00",
+      "http_status": 200,
+      "latency_ms": 23.65,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:40:03.981000+00:00",
+      "received_at": "2026-10-10T09:40:04.191144+00:00",
+      "server_time": "2026-10-10T09:40:04.191146+00:00",
+      "error": null,
+      "data_age_s": 0.21
+    },
+    {
+      "observed_at": "2026-10-10T09:40:04.712990+00:00",
+      "http_status": 200,
+      "latency_ms": 21.32,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:40:03.981000+00:00",
+      "received_at": "2026-10-10T09:40:04.712940+00:00",
+      "server_time": "2026-10-10T09:40:04.712942+00:00",
+      "error": null,
+      "data_age_s": 0.732
+    },
+    {
+      "observed_at": "2026-10-10T09:40:05.234247+00:00",
+      "http_status": 200,
+      "latency_ms": 20.61,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T09:40:04.984000+00:00",
+      "received_at": "2026-10-10T09:40:05.234173+00:00",
+      "server_time": "2026-10-10T09:40:05.234175+00:00",
+      "error": null,
+      "data_age_s": 0.25
+    }
+  ]
+}

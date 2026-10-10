@@ -1,12 +1,23 @@
 # Handoff
 
-_Updated: 2026-10-10 ~14:35 IST, end of Day 1_
+_Updated: 2026-10-10 ~15:20 IST, Day-1 wrap-up (presentation + judge report)_
 
 ## Where things are
 - Branch `wip/day1-recon` (pushed). `main` untouched (`38588a5`). No PR yet.
 - Phases 0–2 done and verified live; see `CURRENT_STATUS.md` for the acceptance checklist and `docs/recon.md` §8 for numbers.
 - Safety review done and fixed (`docs/testing/SAFETY_REVIEW.md`). Demo: `docs/demo/DAY1_DEMO.md`, `scripts/demo-day1.sh`.
-- PR open: `wip/day1-recon` → `main` (see `gh pr list`). Merge is left to the engineering lead.
+- PR #1 open: `wip/day1-recon` → `main`. Merge is left to the engineering lead.
+
+## Where the evidence lives
+| What | Where |
+|---|---|
+| Dependency map (data) | `config/dependency_map.json` (edges, protocols, file:line evidence, confidence); prose in `docs/recon.md` §3–4 |
+| Show it | `python -m resiliencepilot deps` (adds a live shared-network check) |
+| Baselines (all) | `backend/data/baselines/*.json` (gitignored, local) |
+| Baselines (committed) | `reports/day1/baseline-20261010T094007Z.json` (reference, with `load_conditions`), `reports/day1/baseline-20261010T084740Z.json` (first, no load conditions) |
+| Show one | `python -m resiliencepilot show-baseline [FILE]` |
+| Run records | `backend/data/runs/` (local); 12 real runs copied to `reports/day1/`; `python -m resiliencepilot show <run_id>` draws the impact chart |
+| Judge report | `docs/demo/DAY1_REPORT.md` (every number taken from the files above) |
 
 ## How to resume
 ```bash

@@ -1,0 +1,528 @@
+{
+  "run_id": "20261010T092215Z-a107b5",
+  "request": {
+    "experiment_type": "telemetry_stall",
+    "target": "fms-forwarder",
+    "duration_s": 25,
+    "approved_by": "demo-operator",
+    "hypothesis": "Kill switch rolls back well before 25 s"
+  },
+  "state": "ABORTED",
+  "spec": {
+    "mechanism": "docker_pause",
+    "expected_symptoms": [
+      "fms-server keeps returning HTTP 200",
+      "receivedDateTime keeps tracking request time",
+      "createdDateTime stops advancing; data age grows past stale_threshold_s"
+    ],
+    "risks": [
+      "Zenoh session lease may expire during a long pause and require reconnect on unpause",
+      "Telemetry for the paused window is not produced (no backfill)"
+    ]
+  },
+  "limits": {
+    "stale_threshold_s": 5.0,
+    "poll_interval_s": 0.5,
+    "watchdog_grace_s": 5.0,
+    "recovery_timeout_s": 30.0
+  },
+  "timeline": [
+    {
+      "at": "2026-10-10T09:22:15.860736+00:00",
+      "t_s": 0.0,
+      "event": "validated",
+      "detail": {
+        "approved_by": "demo-operator",
+        "hypothesis": "Kill switch rolls back well before 25 s"
+      },
+      "state": "VALIDATED"
+    },
+    {
+      "at": "2026-10-10T09:22:15.862279+00:00",
+      "t_s": 0.002,
+      "event": "precheck_start",
+      "detail": null,
+      "state": "PRECHECK"
+    },
+    {
+      "at": "2026-10-10T09:22:17.483152+00:00",
+      "t_s": 1.622,
+      "event": "precheck_passed",
+      "detail": {
+        "fresh_samples": 3
+      },
+      "state": "PRECHECK"
+    },
+    {
+      "at": "2026-10-10T09:22:17.486392+00:00",
+      "t_s": 1.626,
+      "event": "injecting",
+      "detail": {
+        "target": "fms-forwarder",
+        "mechanism": "docker_pause"
+      },
+      "state": "INJECTING"
+    },
+    {
+      "at": "2026-10-10T09:22:17.626245+00:00",
+      "t_s": 1.766,
+      "event": "fault_active",
+      "detail": {
+        "verified_by": "docker inspect State.Paused == true"
+      },
+      "state": "ACTIVE"
+    },
+    {
+      "at": "2026-10-10T09:22:21.784552+00:00",
+      "t_s": 5.924,
+      "event": "fault_window_closed",
+      "detail": {
+        "stop_reason": "emergency_stop"
+      },
+      "state": "ACTIVE"
+    },
+    {
+      "at": "2026-10-10T09:22:21.785967+00:00",
+      "t_s": 5.925,
+      "event": "rolling_back",
+      "detail": null,
+      "state": "ROLLING_BACK"
+    },
+    {
+      "at": "2026-10-10T09:22:22.156363+00:00",
+      "t_s": 6.296,
+      "event": "rollback_result",
+      "detail": {
+        "attempted": true,
+        "verified": true,
+        "by": "orchestrator",
+        "detail": "target running and unpaused"
+      },
+      "state": "ROLLING_BACK"
+    },
+    {
+      "at": "2026-10-10T09:22:22.158104+00:00",
+      "t_s": 6.297,
+      "event": "verifying_recovery",
+      "detail": null,
+      "state": "VERIFYING_RECOVERY"
+    },
+    {
+      "at": "2026-10-10T09:22:24.312468+00:00",
+      "t_s": 8.452,
+      "event": "recovery_verified",
+      "detail": {
+        "verified": true,
+        "time_to_first_fresh_s": 0.02,
+        "time_to_verified_s": 2.154,
+        "criteria": "rollback verified by docker inspect (running, not paused) AND 3 successive advances of createdDateTime beyond both the last pre-rollback value and the fms-server time of the last fault-window poll, each with HTTP 200 and data_age_s <= 5.0s",
+        "detail": "3 fresh advances observed"
+      },
+      "state": "VERIFYING_RECOVERY"
+    },
+    {
+      "at": "2026-10-10T09:22:24.314310+00:00",
+      "t_s": 8.454,
+      "event": "finished",
+      "detail": {
+        "stop_reason": "emergency_stop"
+      },
+      "state": "ABORTED"
+    }
+  ],
+  "observations": [
+    {
+      "phase": "precheck",
+      "t_s": 0.081,
+      "observation": {
+        "observed_at": "2026-10-10T09:22:15.942142+00:00",
+        "http_status": 200,
+        "latency_ms": 23.49,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T09:22:14.817000+00:00",
+        "received_at": "2026-10-10T09:22:15.940723+00:00",
+        "server_time": "2026-10-10T09:22:15.940725+00:00",
+        "error": null,
+        "data_age_s": 1.124
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 1.124,
+        "stalled_for_s": 0.0,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "precheck",
+      "t_s": 0.601,
+      "observation": {
+        "observed_at": "2026-10-10T09:22:16.461837+00:00",
+        "http_status": 200,
+        "latency_ms": 18.53,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T09:22:15.819000+00:00",
+        "received_at": "2026-10-10T09:22:16.460774+00:00",
+        "server_time": "2026-10-10T09:22:16.460776+00:00",
+        "error": null,
+        "data_age_s": 0.642
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 0.642,
+        "stalled_for_s": 0.0,
+        "advanced": true,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "precheck",
+      "t_s": 1.122,
+      "observation": {
+        "observed_at": "2026-10-10T09:22:16.982701+00:00",
+        "http_status": 200,
+        "latency_ms": 20.17,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T09:22:15.819000+00:00",
+        "received_at": "2026-10-10T09:22:16.981356+00:00",
+        "server_time": "2026-10-10T09:22:16.981357+00:00",
+        "error": null,
+        "data_age_s": 1.162
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 1.162,
+        "stalled_for_s": 0.521,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "fault",
+      "t_s": 1.787,
+      "observation": {
+        "observed_at": "2026-10-10T09:22:17.647707+00:00",
+        "http_status": 200,
+        "latency_ms": 19.69,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T09:22:16.822000+00:00",
+        "received_at": "2026-10-10T09:22:17.646581+00:00",
+        "server_time": "2026-10-10T09:22:17.646584+00:00",
+        "error": null,
+        "data_age_s": 0.825
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 0.825,
+        "stalled_for_s": 0.0,
+        "advanced": true,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "fault",
+      "t_s": 2.309,
+      "observation": {
+        "observed_at": "2026-10-10T09:22:18.169648+00:00",
+        "http_status": 200,
+        "latency_ms": 21.16,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T09:22:17.324000+00:00",
+        "received_at": "2026-10-10T09:22:18.168700+00:00",
+        "server_time": "2026-10-10T09:22:18.168702+00:00",
+        "error": null,
+        "data_age_s": 0.845
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 0.845,
+        "stalled_for_s": 0.0,
+        "advanced": true,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "fault",
+      "t_s": 2.828,
+      "observation": {
+        "observed_at": "2026-10-10T09:22:18.688222+00:00",
+        "http_status": 200,
+        "latency_ms": 17.77,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T09:22:17.324000+00:00",
+        "received_at": "2026-10-10T09:22:18.687483+00:00",
+        "server_time": "2026-10-10T09:22:18.687485+00:00",
+        "error": null,
+        "data_age_s": 1.363
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 1.363,
+        "stalled_for_s": 0.519,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "fault",
+      "t_s": 3.347,
+      "observation": {
+        "observed_at": "2026-10-10T09:22:19.207478+00:00",
+        "http_status": 200,
+        "latency_ms": 18.76,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T09:22:17.324000+00:00",
+        "received_at": "2026-10-10T09:22:19.206558+00:00",
+        "server_time": "2026-10-10T09:22:19.206561+00:00",
+        "error": null,
+        "data_age_s": 1.883
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 1.883,
+        "stalled_for_s": 1.038,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "fault",
+      "t_s": 3.867,
+      "observation": {
+        "observed_at": "2026-10-10T09:22:19.727292+00:00",
+        "http_status": 200,
+        "latency_ms": 19.23,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T09:22:17.324000+00:00",
+        "received_at": "2026-10-10T09:22:19.726464+00:00",
+        "server_time": "2026-10-10T09:22:19.726466+00:00",
+        "error": null,
+        "data_age_s": 2.402
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 2.402,
+        "stalled_for_s": 1.558,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "fault",
+      "t_s": 4.385,
+      "observation": {
+        "observed_at": "2026-10-10T09:22:20.245576+00:00",
+        "http_status": 200,
+        "latency_ms": 17.68,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T09:22:17.324000+00:00",
+        "received_at": "2026-10-10T09:22:20.244632+00:00",
+        "server_time": "2026-10-10T09:22:20.244635+00:00",
+        "error": null,
+        "data_age_s": 2.921
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 2.921,
+        "stalled_for_s": 2.076,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "fault",
+      "t_s": 4.905,
+      "observation": {
+        "observed_at": "2026-10-10T09:22:20.765778+00:00",
+        "http_status": 200,
+        "latency_ms": 19.61,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T09:22:17.324000+00:00",
+        "received_at": "2026-10-10T09:22:20.764999+00:00",
+        "server_time": "2026-10-10T09:22:20.765001+00:00",
+        "error": null,
+        "data_age_s": 3.441
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 3.441,
+        "stalled_for_s": 2.596,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "fault",
+      "t_s": 5.424,
+      "observation": {
+        "observed_at": "2026-10-10T09:22:21.284237+00:00",
+        "http_status": 200,
+        "latency_ms": 17.62,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T09:22:17.324000+00:00",
+        "received_at": "2026-10-10T09:22:21.283574+00:00",
+        "server_time": "2026-10-10T09:22:21.283576+00:00",
+        "error": null,
+        "data_age_s": 3.96
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 3.96,
+        "stalled_for_s": 3.115,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 6.317,
+      "observation": {
+        "observed_at": "2026-10-10T09:22:22.177892+00:00",
+        "http_status": 200,
+        "latency_ms": 18.65,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T09:22:21.891000+00:00",
+        "received_at": "2026-10-10T09:22:22.177129+00:00",
+        "server_time": "2026-10-10T09:22:22.177132+00:00",
+        "error": null,
+        "data_age_s": 0.286
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 0.286,
+        "stalled_for_s": 0.0,
+        "advanced": true,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 6.838,
+      "observation": {
+        "observed_at": "2026-10-10T09:22:22.698647+00:00",
+        "http_status": 200,
+        "latency_ms": 20.42,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T09:22:21.891000+00:00",
+        "received_at": "2026-10-10T09:22:22.698066+00:00",
+        "server_time": "2026-10-10T09:22:22.698068+00:00",
+        "error": null,
+        "data_age_s": 0.807
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 0.807,
+        "stalled_for_s": 0.521,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 7.359,
+      "observation": {
+        "observed_at": "2026-10-10T09:22:23.219634+00:00",
+        "http_status": 200,
+        "latency_ms": 20.56,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T09:22:22.893000+00:00",
+        "received_at": "2026-10-10T09:22:23.219070+00:00",
+        "server_time": "2026-10-10T09:22:23.219072+00:00",
+        "error": null,
+        "data_age_s": 0.326
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 0.326,
+        "stalled_for_s": 0.0,
+        "advanced": true,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 7.88,
+      "observation": {
+        "observed_at": "2026-10-10T09:22:23.740843+00:00",
+        "http_status": 200,
+        "latency_ms": 20.88,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T09:22:22.893000+00:00",
+        "received_at": "2026-10-10T09:22:23.740093+00:00",
+        "server_time": "2026-10-10T09:22:23.740095+00:00",
+        "error": null,
+        "data_age_s": 0.847
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 0.847,
+        "stalled_for_s": 0.521,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 8.398,
+      "observation": {
+        "observed_at": "2026-10-10T09:22:24.258979+00:00",
+        "http_status": 200,
+        "latency_ms": 17.62,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T09:22:23.895000+00:00",
+        "received_at": "2026-10-10T09:22:24.258424+00:00",
+        "server_time": "2026-10-10T09:22:24.258426+00:00",
+        "error": null,
+        "data_age_s": 0.363
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 0.363,
+        "stalled_for_s": 0.0,
+        "advanced": true,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    }
+  ],
+  "stop_reason": "emergency_stop",
+  "rollback": {
+    "attempted": true,
+    "verified": true,
+    "by": "orchestrator",
+    "detail": "target running and unpaused"
+  },
+  "recovery": {
+    "verified": true,
+    "time_to_first_fresh_s": 0.02,
+    "time_to_verified_s": 2.154,
+    "criteria": "rollback verified by docker inspect (running, not paused) AND 3 successive advances of createdDateTime beyond both the last pre-rollback value and the fms-server time of the last fault-window poll, each with HTTP 200 and data_age_s <= 5.0s",
+    "detail": "3 fresh advances observed"
+  },
+  "impact": {
+    "fault_verified": true,
+    "fault_observations": 8,
+    "stale_detected": false,
+    "time_to_detection_s": null,
+    "precheck_max_data_age_s": 1.162,
+    "max_data_age_s": 3.96,
+    "max_stalled_for_s": 3.115,
+    "http_ok_ratio_during_fault": 1.0,
+    "healthy_but_stale_observations": 0
+  }
+}

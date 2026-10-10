@@ -7,19 +7,20 @@
                              run the telemetry_stall experiment (asks for approval unless --yes)
   stop                       emergency stop (works from another terminal)
   reset --operator NAME --note TEXT
-  runs | show RUN_ID
+  runs | show RUN_ID [--json]   list runs / impact chart + timeline of one run
+  deps                       verified dependency map with a live shared-network check
+  show-baseline [FILE]       print a stored baseline (default: newest)
 """
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import signal
 import sys
 import time
 
 from .baseline import collect_baseline
-from .config import load_experiment_catalog, load_safety_config
+from .config import REPO_ROOT, load_experiment_catalog, load_safety_config
 from .docker_cli import DockerCLI
 from .evidence import EvidenceStore
 from .observation import utcnow
@@ -27,10 +28,9 @@ from .orchestrator import ExperimentRunner
 from .safety import SafetyController, SafetyError
 from .sdv_adapter import RfmsObserver
 from .telemetry import FreshnessTracker
+from .views import C, age_bar, load_dependency_map, render_baseline, render_dependency_map, render_impact_chart
 
-_COLOR = sys.stdout.isatty() and "NO_COLOR" not in os.environ
-C = {k: (v if _COLOR else "") for k, v in
-     {"g": "\033[32m", "r": "\033[31m", "y": "\033[33m", "b": "\033[1m", "d": "\033[2m", "x": "\033[0m"}.items()}
+_THRESHOLD = load_safety_config().stale_threshold_s
 
 
 def _fmt_obs(entry: dict) -> str:
@@ -40,8 +40,10 @@ def _fmt_obs(entry: dict) -> str:
     created = (o["created_at"] or "-")[11:23]
     received = (o["received_at"] or "-")[11:23]
     flag = f"  {C['r']}{C['b']}<- HTTP 200 but STALE{C['x']}" if a["healthy_but_stale"] else ""
-    return (f"  [{entry['phase']:>8} t={entry['t_s']:6.2f}s] HTTP {http}  createdDateTime={created}  "
-            f"receivedDateTime={received}  age={a['data_age_s']}s  {color}{a['freshness']}{C['x']}{flag}")
+    age = a["data_age_s"]
+    age_txt = "" if age is None else f"{age:5.2f}s"
+    return (f"  [{entry['phase']:>8} t={entry['t_s']:6.2f}s] HTTP {http}  created={created}  received={received}  "
+            f"{age_bar(age, _THRESHOLD)} {age_txt}  {color}{a['freshness']}{C['x']}{flag}")
 
 
 def _printer(kind: str, data: dict) -> None:
@@ -50,6 +52,27 @@ def _printer(kind: str, data: dict) -> None:
     elif kind == "event":
         detail = "" if data["detail"] in (None, {}) else f"  {C['d']}{json.dumps(data['detail'], default=str)}{C['x']}"
         print(f"{C['b']}» {data['event']}{C['x']}  [{data['state']}]{detail}", flush=True)
+
+
+def _load_conditions(docker, cfg, summary: dict, poll_interval_s: float) -> dict:
+    """What the system was doing while the baseline was taken. All values read live from Docker/config."""
+    fwd, csv = docker.env("fms-forwarder"), docker.env("csv-provider")
+    csv_file = REPO_ROOT / "Fleet Management" / "fleet-management" / "csv-provider" / "signalsFmsRecording.csv"
+    rows = None
+    if csv_file.exists():
+        with csv_file.open(encoding="utf-8") as f:
+            rows = sum(1 for _ in f) - 1  # minus header
+    mem = docker.mem_total_bytes()
+    return {
+        "forwarder_timer_interval": fwd.get("TIMER_INTERVAL"),
+        "csv_provider_infinite": csv.get("PROVIDER_INFINITE"),
+        "csv_rows": rows,
+        "vehicles": len(summary.get("vins", [])),
+        "observer_poll_interval_s": poll_interval_s,
+        "other_clients": "not measured (ResiliencePilot starts no load generator; Grafana polls only while a browser has it open)",
+        "docker_mem_total_gib": round(mem / 2**30, 2) if mem else None,
+        "stack_stats": docker.stats(cfg.compose_project),
+    }
 
 
 def build(on_event=None):
@@ -75,7 +98,9 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("stop")
     rs = sub.add_parser("reset"); rs.add_argument("--operator", required=True); rs.add_argument("--note", required=True)
     sub.add_parser("runs")
-    sh = sub.add_parser("show"); sh.add_argument("run_id")
+    sh = sub.add_parser("show"); sh.add_argument("run_id"); sh.add_argument("--json", action="store_true")
+    sub.add_parser("deps")
+    sbs = sub.add_parser("show-baseline"); sbs.add_argument("file", nargs="?")
     args = p.parse_args(argv)
 
     cfg, catalog, docker, ctl, observer, store, runner = build(_printer)
@@ -116,9 +141,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "baseline":
         print(f"Collecting {args.n} samples every {args.i}s from {cfg.rfms_base_url} ...")
         summary, observations = collect_baseline(observer, args.n, args.i, cfg.stale_threshold_s)
+        summary["load_conditions"] = _load_conditions(docker, cfg, summary, args.i)
         name = utcnow().strftime("baseline-%Y%m%dT%H%M%SZ")
         path = store.save_baseline(name, {"summary": summary, "observations": [o.to_dict() for o in observations]})
-        print(json.dumps(summary, indent=2))
+        print(render_baseline(summary))
         print(f"saved {path}")
         return 0
 
@@ -156,6 +182,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  rollback: verified={rb['verified']} by={rb['by']}   recovery: verified={rc['verified']} "
               f"first fresh after {rc['time_to_first_fresh_s']}s, verified after {rc['time_to_verified_s']}s")
         print(f"  evidence: {store.data_dir / 'runs' / (rec['run_id'] + '.json')}")
+        print()
+        print(render_impact_chart(rec))
         return 0 if ok else 3
 
     if args.cmd == "reset":
@@ -174,8 +202,26 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "show":
         rec = store.load_run(args.run_id)
-        print(json.dumps(rec, indent=2) if rec else "not found")
-        return 0 if rec else 1
+        if rec is None:
+            print("not found")
+            return 1
+        print(json.dumps(rec, indent=2) if args.json else render_impact_chart(rec))
+        return 0
+
+    if args.cmd == "deps":
+        print(render_dependency_map(load_dependency_map(REPO_ROOT), docker))
+        return 0
+
+    if args.cmd == "show-baseline":
+        files = sorted((store.data_dir / "baselines").glob("*.json"))
+        path = args.file or (str(files[-1]) if files else None)
+        if path is None:
+            print("no baselines stored")
+            return 1
+        with open(path, encoding="utf-8") as f:
+            print(render_baseline(json.load(f)["summary"]))
+        print(f"{C['d']}source: {path}{C['x']}")
+        return 0
     return 1
 
 

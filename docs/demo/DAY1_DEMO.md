@@ -9,13 +9,17 @@ A real recorded run is in `day1-demo-run.log`. Nothing in the demo is simulated.
 
 | Time | On screen (script step) | Say |
 |---|---|---|
-| 0:00 | **1/5** 8 containers of the Eclipse SDV Fleet Management blueprint; controller `READY` | "This is the real Eclipse SDV blueprint running locally: CSV vehicle replay → KUKSA databroker → FMS forwarder → Zenoh → consumer → InfluxDB → rFMS API." |
-| 0:15 | **2/5** `observe`: `createdDateTime` advances; `receivedDateTime` = request time | "Two timestamps. `receivedDateTime` is just the server's clock at request time, so it always looks fresh. `createdDateTime` is stamped by the vehicle-side forwarder. That one is the truth." |
-| 0:30 | **3/5** baseline (16 samples) | "Normal behaviour: HTTP 200 every time, data age about 1 s, a new reading every 1.0 s. Our stale threshold is 5 s, about 4× the worst age we saw." |
-| 0:45 | **4/5** `run --duration 12` | "A human approves an allowlisted experiment: freeze the forwarder. Watch: HTTP stays **200** and `receivedDateTime` keeps moving, but `createdDateTime` is frozen. A plain health check says healthy. We flag **HTTP 200 but STALE** after about 5 s." |
-| 1:10 | rollback + recovery lines | "Rollback is checked with `docker inspect`. Recovery is *not* 'container running'. We need three new vehicle timestamps, all fresh. Across Day-1 runs: data flowing again 0.5–1.6 s after unpause, recovery verified in 2.6–3.7 s; stale flagged 4.8–5.3 s after injection." |
-| 1:25 | **5/5** 25 s run, **KILL SWITCH** fired from a separate process | "Emergency stop from outside the backend. It works even if the backend is dead. Rolled back within a second. Recovery is still verified, and the run is honestly recorded as ABORTED." |
-| 1:45 | new run **REFUSED** → reset → `READY` | "After a stop, nothing runs until a human checks the stack and resets. Every run leaves a JSON evidence record." |
+| 0:00 | **1/6** 8 containers + `deps`: telemetry path and edges with confidence labels | "This is the real Eclipse SDV blueprint. Every edge comes from a file:line in its source, is checked live on the Docker network, and the telemetry path was confirmed by experiment." |
+| 0:15 | **2/6** `observe`: `created` advances; `received` = request time; green age bar | "`received` is just the server's clock, so it always looks fresh. `created` is stamped by the vehicle-side forwarder. That one is the truth." |
+| 0:25 | **3/6** reference baseline (60 samples) + a fresh 16-sample one, both with load conditions | "Normal: HTTP 200 every time, data age about 1 s, a new reading every 1.0 s. One vehicle, CSV replay, about 220 MiB for the whole stack. Our stale threshold is 5 s, about 4× the worst age we saw." |
+| 0:40 | **4/6** `run --duration 12`: the age bar grows past the `|` threshold, turns red, **HTTP 200 but STALE** | "A human approves an allowlisted fault: freeze the forwarder. HTTP stays 200 on every poll. A health check would say healthy. We flag stale at about 5 s." |
+| 1:05 | Impact chart + timeline printed after the run | "Here's the whole experiment as a picture: the age climbs, HTTP stays 2 the whole time, then rollback. Recovery is only declared after three new vehicle timestamps, about 3–4 s after rollback." |
+| 1:25 | **5/6** 25 s run, **KILL SWITCH** from a separate process | "Emergency stop from outside the backend; it works even if the backend is dead. In our timed run, rollback was verified 0.6 s after the switch, then recovery was verified, recorded honestly as ABORTED." |
+| 1:45 | **6/6** new run **REFUSED** → reset → `READY` | "After a stop nothing runs until a human checks and resets. Full numbers are in the judge report." |
+
+Optional second screen: Grafana `http://127.0.0.1:3000/d/OwEBnb1Vd/fms-fleet` (sdv/sdv), the blueprint's own dashboard
+(the endpoint was verified reachable; how its panels look during a stall has not been checked yet). Run the demo
+slower with `RP_DEMO_PAUSE=3`.
 
 ## Talking points if asked
 - **Safety:** allowlist + compose-project label check, strict schema, one run at a time across processes, total fault time ≤ 30 s
