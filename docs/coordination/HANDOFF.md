@@ -1,6 +1,34 @@
 # Handoff
 
-_Updated: 2026-10-11 ~01:05 IST, Day 2: envelope + telemetry-checked reset (PR open); next Phase C/D_failure (PR open, decisions pending)_
+_Updated: 2026-10-11, Phase C (discovery) done on macOS; next: Phase D scoring_
+
+## RESUME HERE
+- PR #17 was already MERGED (`050f860`); `main` merged into `feat/day2-discover-planner-score` (merge, no rebase).
+- Phase C done: `rp discover [--json] [--out FILE]` (read-only: `docker ps` + `docker inspect` + bind-mounted config
+  files; runs before any safety object is built). Live on macOS: 8 containers, 8 edges, 6 match the map, 1 direction
+  differs (consumer <-> zenoh router), 1 discovered-only (forwarder -> csv-provider, depends_on, low). Evidence:
+  `reports/day2/discovery.json` (scanned: no tokens/passwords/host paths).
+- Fix found by the new tests: evidence snippets now redact URL credentials (`//user:pass@` -> `//***@`).
+- Tests: 194 unit pass on macOS (176 + 18 discovery; 8 Windows-only file-retry tests skip on macOS, 3 live skip).
+- Phase D (score) done: `docs/SCORING.md` (D-019), `backend/resiliencepilot/scoring.py`, `rp score [--dir] [--run]
+  [--json] [--out]`. Day-2 full-window medians: telemetry_stall 62.2 (n=2), service_crash 65.1 (n=5),
+  dependency_failure 61.6 (n=1); lowest = partial run 179795 (14.3, silent after recovery). `reports/day2/scores.json`.
+  Tests: 211 unit pass on macOS (+17 scoring).
+- Planner + findings done: `rp plan [--dir] [--json]` (planner.py: priority = 0.6 info + 0.4 risk, allowlist-only,
+  every entry needs a human approver) and `rp findings [--dir] [--out]` (findings.py: 6 rules, severity-ordered,
+  run ids cited; optional `annotations.json` for human notes, never scored). `reports/day2/findings.md` generated
+  from the 17 committed runs; `reports/day2/annotations.json` marks the 4 deliberate crash/guard tests (from README).
+  Tests: 220 unit pass on macOS (+9).
+- AI layer done: `rp advise [--dir] [--offline] [--json] [--out]` (ai.py, D-020, `docs/AI_LAYER.md`). Local Ollama
+  0.40.2 + `qwen2.5:7b` (pulled 2026-10-11). Live: planner valid (same order as rules); analyst 1/7 accepted after the
+  grounding check, 6/7 fell back to rules (reasons + model text in `reports/day2/ai_advice_qwen2.5-7b.md`).
+  Tests: 257 unit pass on macOS (+37 AI).
+- Possible next: try `qwen2.5-coder:14b`; dashboard panel for score/plan; more full-window dependency_failure runs
+  (planner rank 1; only n=1).
+- (done) the AI provider
+  layer (local Ollama `qwen2.5:7b` / `qwen2.5-coder:14b`, advisory only, deterministic fallback when unreachable).
+- Mac notes: PR #7 (databroker host port 55557, scripts executable) and PR #8 (CLI "Nones") are open. `main` already
+  prints "not detected" for detection time, so #8 only still adds `n/a` for unverified recovery timings.
 
 ## Day 2 milestone 3: response envelope + telemetry-checked reset (branch `feat/day2-envelope-and-reset`, PR open)
 - D-017 envelope (dependency_failure: 5 s timeout, 4.5 s latency cap, fault window only); D-018 reset needs 3 fresh,

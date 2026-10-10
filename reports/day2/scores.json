@@ -1,0 +1,694 @@
+{
+  "formula": "docs/SCORING.md",
+  "source": "/Users/nishanttripathi/Desktop/ResiliencePilot/reports/day2",
+  "runs": [
+    {
+      "run_id": "20261010T181417Z-c1ab0d",
+      "experiment_type": "telemetry_stall",
+      "target": "fms-forwarder",
+      "state": "COMPLETED",
+      "stop_reason": "duration_elapsed",
+      "scorable": true,
+      "partial": false,
+      "score": 63.5,
+      "weighted_mean": 0.811,
+      "components": {
+        "detection": {
+          "measured": true,
+          "ttd_s": 4.807,
+          "kind": "silent",
+          "score": 0.519
+        },
+        "recovery": {
+          "measured": true,
+          "ttr_s": 3.062,
+          "score": 0.898
+        },
+        "data_integrity": {
+          "measured": false,
+          "note": "no stored-data-gap evidence in this record"
+        },
+        "blast_radius": {
+          "measured": true,
+          "changed": [],
+          "others": 7,
+          "score": 1.0
+        }
+      },
+      "silent": {
+        "polls": 23,
+        "silent_polls": 10,
+        "by_phase": {
+          "fault": 9,
+          "recovery": 1
+        },
+        "ratio": 0.435
+      },
+      "not_measured": [
+        "data_integrity"
+      ]
+    },
+    {
+      "run_id": "20261010T181441Z-920732",
+      "experiment_type": "service_crash",
+      "target": "fms-forwarder",
+      "state": "COMPLETED",
+      "stop_reason": "duration_elapsed",
+      "scorable": true,
+      "partial": false,
+      "score": 65.3,
+      "weighted_mean": 0.835,
+      "components": {
+        "detection": {
+          "measured": true,
+          "ttd_s": 4.845,
+          "kind": "silent",
+          "score": 0.596
+        },
+        "recovery": {
+          "measured": true,
+          "ttr_s": 3.092,
+          "score": 0.897
+        },
+        "data_integrity": {
+          "measured": false,
+          "note": "no stored-data-gap evidence in this record"
+        },
+        "blast_radius": {
+          "measured": true,
+          "changed": [],
+          "others": 7,
+          "score": 1.0
+        }
+      },
+      "silent": {
+        "polls": 23,
+        "silent_polls": 10,
+        "by_phase": {
+          "fault": 9,
+          "recovery": 1
+        },
+        "ratio": 0.435
+      },
+      "not_measured": [
+        "data_integrity"
+      ]
+    },
+    {
+      "run_id": "20261010T181503Z-31eafe",
+      "experiment_type": "service_crash",
+      "target": "fms-forwarder",
+      "state": "COMPLETED",
+      "stop_reason": "duration_elapsed",
+      "scorable": true,
+      "partial": false,
+      "score": 62.1,
+      "weighted_mean": 0.829,
+      "components": {
+        "detection": {
+          "measured": true,
+          "ttd_s": 4.812,
+          "kind": "silent",
+          "score": 0.599
+        },
+        "recovery": {
+          "measured": true,
+          "ttr_s": 3.695,
+          "score": 0.877
+        },
+        "data_integrity": {
+          "measured": false,
+          "note": "no stored-data-gap evidence in this record"
+        },
+        "blast_radius": {
+          "measured": true,
+          "changed": [],
+          "others": 7,
+          "score": 1.0
+        }
+      },
+      "silent": {
+        "polls": 24,
+        "silent_polls": 12,
+        "by_phase": {
+          "fault": 9,
+          "recovery": 3
+        },
+        "ratio": 0.5
+      },
+      "not_measured": [
+        "data_integrity"
+      ]
+    },
+    {
+      "run_id": "20261010T181525Z-8fa234",
+      "experiment_type": "service_crash",
+      "target": "fms-forwarder",
+      "state": "COMPLETED",
+      "stop_reason": "duration_elapsed",
+      "scorable": true,
+      "partial": false,
+      "score": 65.1,
+      "weighted_mean": 0.843,
+      "components": {
+        "detection": {
+          "measured": true,
+          "ttd_s": 4.848,
+          "kind": "silent",
+          "score": 0.596
+        },
+        "recovery": {
+          "measured": true,
+          "ttr_s": 2.49,
+          "score": 0.917
+        },
+        "data_integrity": {
+          "measured": false,
+          "note": "no stored-data-gap evidence in this record"
+        },
+        "blast_radius": {
+          "measured": true,
+          "changed": [],
+          "others": 7,
+          "score": 1.0
+        }
+      },
+      "silent": {
+        "polls": 22,
+        "silent_polls": 10,
+        "by_phase": {
+          "fault": 9,
+          "recovery": 1
+        },
+        "ratio": 0.455
+      },
+      "not_measured": [
+        "data_integrity"
+      ]
+    },
+    {
+      "run_id": "20261010T182331Z-b89ae0",
+      "experiment_type": "service_crash",
+      "target": "fms-forwarder",
+      "state": "COMPLETED",
+      "stop_reason": "duration_elapsed",
+      "scorable": true,
+      "partial": false,
+      "score": 61.9,
+      "weighted_mean": 0.826,
+      "components": {
+        "detection": {
+          "measured": true,
+          "ttd_s": 4.918,
+          "kind": "silent",
+          "score": 0.59
+        },
+        "recovery": {
+          "measured": true,
+          "ttr_s": 3.675,
+          "score": 0.877
+        },
+        "data_integrity": {
+          "measured": false,
+          "note": "no stored-data-gap evidence in this record"
+        },
+        "blast_radius": {
+          "measured": true,
+          "changed": [],
+          "others": 7,
+          "score": 1.0
+        }
+      },
+      "silent": {
+        "polls": 24,
+        "silent_polls": 12,
+        "by_phase": {
+          "fault": 9,
+          "recovery": 3
+        },
+        "ratio": 0.5
+      },
+      "not_measured": [
+        "data_integrity"
+      ]
+    },
+    {
+      "run_id": "20261010T182400Z-6f6559",
+      "experiment_type": "service_crash",
+      "target": "fms-forwarder",
+      "state": "LATCHED_UNSAFE",
+      "stop_reason": "error",
+      "scorable": false,
+      "reason": "rollback not verified (system state unknown)"
+    },
+    {
+      "run_id": "20261010T182429Z-b10eff",
+      "experiment_type": "service_crash",
+      "target": "fms-forwarder",
+      "state": "LATCHED_UNSAFE",
+      "stop_reason": "error",
+      "scorable": false,
+      "reason": "rollback not verified (system state unknown)"
+    },
+    {
+      "run_id": "20261010T182500Z-4aa9f7",
+      "experiment_type": "service_crash",
+      "target": "fms-forwarder",
+      "state": "LATCHED_UNSAFE",
+      "stop_reason": "guardrail_blast_radius",
+      "scorable": true,
+      "partial": true,
+      "score": 59.6,
+      "weighted_mean": 0.596,
+      "components": {
+        "detection": {
+          "measured": true,
+          "ttd_s": null,
+          "kind": "not detected during the fault window",
+          "score": 0.0
+        },
+        "recovery": {
+          "measured": true,
+          "ttr_s": 3.723,
+          "score": 0.876
+        },
+        "data_integrity": {
+          "measured": false,
+          "note": "no stored-data-gap evidence in this record"
+        },
+        "blast_radius": {
+          "measured": true,
+          "changed": [
+            "grafana"
+          ],
+          "others": 7,
+          "score": 0.857
+        }
+      },
+      "silent": {
+        "polls": 11,
+        "silent_polls": 0,
+        "by_phase": {
+          "fault": 0,
+          "recovery": 0
+        },
+        "ratio": 0.0
+      },
+      "not_measured": [
+        "data_integrity"
+      ]
+    },
+    {
+      "run_id": "20261010T183644Z-8941cc",
+      "experiment_type": "service_crash",
+      "target": "fms-forwarder",
+      "state": "COMPLETED",
+      "stop_reason": "duration_elapsed",
+      "scorable": true,
+      "partial": false,
+      "score": 65.2,
+      "weighted_mean": 0.856,
+      "components": {
+        "detection": {
+          "measured": true,
+          "ttd_s": 4.32,
+          "kind": "silent",
+          "score": 0.64
+        },
+        "recovery": {
+          "measured": true,
+          "ttr_s": 2.555,
+          "score": 0.915
+        },
+        "data_integrity": {
+          "measured": false,
+          "note": "no stored-data-gap evidence in this record"
+        },
+        "blast_radius": {
+          "measured": true,
+          "changed": [],
+          "others": 7,
+          "score": 1.0
+        }
+      },
+      "silent": {
+        "polls": 21,
+        "silent_polls": 10,
+        "by_phase": {
+          "fault": 9,
+          "recovery": 1
+        },
+        "ratio": 0.476
+      },
+      "not_measured": [
+        "data_integrity"
+      ]
+    },
+    {
+      "run_id": "20261010T183702Z-21c920",
+      "experiment_type": "telemetry_stall",
+      "target": "fms-forwarder",
+      "state": "COMPLETED",
+      "stop_reason": "duration_elapsed",
+      "scorable": true,
+      "partial": false,
+      "score": 60.9,
+      "weighted_mean": 0.832,
+      "components": {
+        "detection": {
+          "measured": true,
+          "ttd_s": 4.91,
+          "kind": "silent",
+          "score": 0.591
+        },
+        "recovery": {
+          "measured": true,
+          "ttr_s": 3.19,
+          "score": 0.894
+        },
+        "data_integrity": {
+          "measured": false,
+          "note": "no stored-data-gap evidence in this record"
+        },
+        "blast_radius": {
+          "measured": true,
+          "changed": [],
+          "others": 7,
+          "score": 1.0
+        }
+      },
+      "silent": {
+        "polls": 26,
+        "silent_polls": 14,
+        "by_phase": {
+          "fault": 12,
+          "recovery": 2
+        },
+        "ratio": 0.538
+      },
+      "not_measured": [
+        "data_integrity"
+      ]
+    },
+    {
+      "run_id": "20261010T185355Z-540224",
+      "experiment_type": "dependency_failure",
+      "target": "influxDB",
+      "state": "ABORTED",
+      "stop_reason": "observer_lost",
+      "scorable": true,
+      "partial": true,
+      "score": 80.1,
+      "weighted_mean": 0.843,
+      "components": {
+        "detection": {
+          "measured": true,
+          "ttd_s": 2.005,
+          "kind": "visible",
+          "score": 0.833
+        },
+        "recovery": {
+          "measured": true,
+          "ttr_s": 4.8,
+          "score": 0.84
+        },
+        "data_integrity": {
+          "measured": true,
+          "lost_s": 4.011,
+          "score": 0.666
+        },
+        "blast_radius": {
+          "measured": true,
+          "changed": [],
+          "others": 7,
+          "score": 1.0
+        }
+      },
+      "silent": {
+        "polls": 10,
+        "silent_polls": 1,
+        "by_phase": {
+          "fault": 0,
+          "recovery": 1
+        },
+        "ratio": 0.1
+      },
+      "not_measured": []
+    },
+    {
+      "run_id": "20261010T185440Z-2f33aa",
+      "experiment_type": "dependency_failure",
+      "target": "influxDB",
+      "state": "ABORTED",
+      "stop_reason": "observer_lost",
+      "scorable": true,
+      "partial": true,
+      "score": 91.4,
+      "weighted_mean": 0.914,
+      "components": {
+        "detection": {
+          "measured": true,
+          "ttd_s": 2.009,
+          "kind": "visible",
+          "score": 0.833
+        },
+        "recovery": {
+          "measured": true,
+          "ttr_s": 1.941,
+          "score": 0.935
+        },
+        "data_integrity": {
+          "measured": true,
+          "lost_s": 1.504,
+          "score": 0.875
+        },
+        "blast_radius": {
+          "measured": true,
+          "changed": [],
+          "others": 7,
+          "score": 1.0
+        }
+      },
+      "silent": {
+        "polls": 5,
+        "silent_polls": 0,
+        "by_phase": {
+          "fault": 0,
+          "recovery": 0
+        },
+        "ratio": 0.0
+      },
+      "not_measured": []
+    },
+    {
+      "run_id": "20261010T185448Z-595a16",
+      "experiment_type": "dependency_failure",
+      "target": "influxDB",
+      "state": "ABORTED",
+      "stop_reason": "observer_lost",
+      "scorable": true,
+      "partial": true,
+      "score": 87.4,
+      "weighted_mean": 0.874,
+      "components": {
+        "detection": {
+          "measured": true,
+          "ttd_s": 2.01,
+          "kind": "visible",
+          "score": 0.833
+        },
+        "recovery": {
+          "measured": true,
+          "ttr_s": 2.535,
+          "score": 0.915
+        },
+        "data_integrity": {
+          "measured": true,
+          "lost_s": 3.508,
+          "score": 0.708
+        },
+        "blast_radius": {
+          "measured": true,
+          "changed": [],
+          "others": 7,
+          "score": 1.0
+        }
+      },
+      "silent": {
+        "polls": 6,
+        "silent_polls": 0,
+        "by_phase": {
+          "fault": 0,
+          "recovery": 0
+        },
+        "ratio": 0.0
+      },
+      "not_measured": []
+    },
+    {
+      "run_id": "20261010T185518Z-219f1c",
+      "experiment_type": "dependency_failure",
+      "target": "influxDB",
+      "state": "LATCHED_UNSAFE",
+      "stop_reason": "error",
+      "scorable": false,
+      "reason": "rollback not verified (system state unknown)"
+    },
+    {
+      "run_id": "20261010T191733Z-7123d9",
+      "experiment_type": "dependency_failure",
+      "target": "influxDB",
+      "state": "ABORTED",
+      "stop_reason": "observer_lost",
+      "scorable": true,
+      "partial": true,
+      "score": 88.6,
+      "weighted_mean": 0.886,
+      "components": {
+        "detection": {
+          "measured": true,
+          "ttd_s": 2.006,
+          "kind": "visible",
+          "score": 0.833
+        },
+        "recovery": {
+          "measured": true,
+          "ttr_s": 3.027,
+          "score": 0.899
+        },
+        "data_integrity": {
+          "measured": true,
+          "lost_s": 2.503,
+          "score": 0.791
+        },
+        "blast_radius": {
+          "measured": true,
+          "changed": [],
+          "others": 7,
+          "score": 1.0
+        }
+      },
+      "silent": {
+        "polls": 7,
+        "silent_polls": 0,
+        "by_phase": {
+          "fault": 0,
+          "recovery": 0
+        },
+        "ratio": 0.0
+      },
+      "not_measured": []
+    },
+    {
+      "run_id": "20261010T192839Z-179795",
+      "experiment_type": "dependency_failure",
+      "target": "influxDB",
+      "state": "LATCHED_UNSAFE",
+      "stop_reason": "observer_lost",
+      "scorable": true,
+      "partial": true,
+      "score": 14.3,
+      "weighted_mean": 0.265,
+      "components": {
+        "detection": {
+          "measured": true,
+          "ttd_s": 5.006,
+          "kind": "visible",
+          "score": 0.583
+        },
+        "recovery": {
+          "measured": true,
+          "ttr_s": null,
+          "score": 0.0,
+          "note": "not recovered within 30 s (criteria not met within 30.0s (advances=1))"
+        },
+        "data_integrity": {
+          "measured": false,
+          "note": "no stored-data-gap evidence in this record"
+        },
+        "blast_radius": {
+          "measured": false,
+          "note": "no blast-radius check recorded"
+        }
+      },
+      "silent": {
+        "polls": 51,
+        "silent_polls": 47,
+        "by_phase": {
+          "fault": 0,
+          "recovery": 47
+        },
+        "ratio": 0.922
+      },
+      "not_measured": [
+        "blast_radius",
+        "data_integrity"
+      ]
+    },
+    {
+      "run_id": "20261010T193003Z-e2eacd",
+      "experiment_type": "dependency_failure",
+      "target": "influxDB",
+      "state": "COMPLETED",
+      "stop_reason": "duration_elapsed",
+      "scorable": true,
+      "partial": false,
+      "score": 61.6,
+      "weighted_mean": 0.616,
+      "components": {
+        "detection": {
+          "measured": true,
+          "ttd_s": 3.968,
+          "kind": "visible",
+          "score": 0.669
+        },
+        "recovery": {
+          "measured": true,
+          "ttr_s": 24.247,
+          "score": 0.192
+        },
+        "data_integrity": {
+          "measured": true,
+          "lost_s": 3.511,
+          "score": 0.707
+        },
+        "blast_radius": {
+          "measured": true,
+          "changed": [],
+          "others": 7,
+          "score": 1.0
+        }
+      },
+      "silent": {
+        "polls": 54,
+        "silent_polls": 0,
+        "by_phase": {
+          "fault": 0,
+          "recovery": 0
+        },
+        "ratio": 0.0
+      },
+      "not_measured": []
+    }
+  ],
+  "summary": {
+    "dependency_failure": {
+      "n": 1,
+      "median": 61.6,
+      "min": 61.6,
+      "max": 61.6
+    },
+    "service_crash": {
+      "n": 5,
+      "median": 65.1,
+      "min": 61.9,
+      "max": 65.3
+    },
+    "telemetry_stall": {
+      "n": 2,
+      "median": 62.2,
+      "min": 60.9,
+      "max": 63.5
+    }
+  }
+}

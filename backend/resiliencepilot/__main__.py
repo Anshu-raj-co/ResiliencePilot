@@ -113,6 +113,22 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("runs")
     sh = sub.add_parser("show"); sh.add_argument("run_id"); sh.add_argument("--json", action="store_true")
     sub.add_parser("deps")
+    sc = sub.add_parser("score", help="read-only: Resilience Score of stored runs (docs/SCORING.md)")
+    sc.add_argument("--dir", help="run-record directory (default: the evidence store's runs/)")
+    sc.add_argument("--run", help="score only this run id"); sc.add_argument("--json", action="store_true")
+    sc.add_argument("--out", help="also write the JSON result here")
+    spl = sub.add_parser("plan", help="read-only: rank allowlisted experiments (rule-based)")
+    spl.add_argument("--dir", help="run-record directory (default: the evidence store's runs/)")
+    spl.add_argument("--json", action="store_true")
+    sfi = sub.add_parser("findings", help="read-only: write a findings report from stored runs")
+    sfi.add_argument("--dir", help="run-record directory (default: the evidence store's runs/)")
+    sfi.add_argument("--out", default="reports/generated/findings.md")
+    sad = sub.add_parser("advise", help="advisory AI planner + analyst (local Ollama; rule-based fallback)")
+    sad.add_argument("--dir", help="run-record directory (default: the evidence store's runs/)")
+    sad.add_argument("--offline", action="store_true", help="skip the AI; deterministic rule-based answers only")
+    sad.add_argument("--json", action="store_true"); sad.add_argument("--out", help="also write a Markdown report here")
+    sd = sub.add_parser("discover", help="read-only: derive the dependency graph from docker inspect, diff vs the map")
+    sd.add_argument("--json", action="store_true"); sd.add_argument("--out", help="also write the JSON result here")
     sbs = sub.add_parser("show-baseline"); sbs.add_argument("file", nargs="?")
     sv = sub.add_parser("serve"); sv.add_argument("--port", type=int, default=8765)
     rp_ = sub.add_parser("report"); rp_.add_argument("--run"); rp_.add_argument("--out", default="reports/day1/explainer.html")
@@ -129,6 +145,85 @@ def main(argv: list[str] | None = None) -> int:
         out = Path(args.out)
         out = out if out.is_absolute() else REPO_ROOT / out
         print(f"wrote {build_report(REPO_ROOT, args.run, out)}")
+        return 0
+
+    if args.cmd in ("plan", "findings", "advise"):  # read-only: catalog + dependency map + stored runs; no Docker, no safety objects
+        from pathlib import Path
+        from .findings import render_markdown
+        from .planner import plan, render_text as render_plan
+        from .scoring import load_runs
+        d = Path(args.dir) if args.dir else load_safety_config().data_dir / "runs"
+        d = d if d.is_absolute() else REPO_ROOT / d
+        runs = load_runs(d) if d.is_dir() else []
+        catalog = json.loads((REPO_ROOT / "config" / "experiments.json").read_text(encoding="utf-8"))
+        dep_map = json.loads((REPO_ROOT / "config" / "dependency_map.json").read_text(encoding="utf-8"))
+        entries = plan(catalog, dep_map, runs, load_safety_config().max_duration_s)
+        if args.cmd == "plan":
+            print(json.dumps(entries, indent=2) if args.json else render_plan(entries))
+            return 0
+        if args.cmd == "advise":  # the AI sees only derived data; it can reorder candidates, never run them
+            from .ai import OllamaProvider, ai_analyse, ai_plan, load_ai_config, render_markdown as render_ai
+            from .findings import derive_findings
+            findings = derive_findings(runs)
+            ann_file = d / "annotations.json"
+            ann = json.loads(ann_file.read_text(encoding="utf-8")) if ann_file.is_file() else {}
+            for f in findings:
+                for h in f["runs"]:
+                    if h["run"] in ann and not h["run"].startswith("_"):
+                        h["note"] = ann[h["run"]]
+            provider = None if args.offline else OllamaProvider(load_ai_config(REPO_ROOT))
+            result = {"plan": ai_plan(entries, findings, provider), "analysis": ai_analyse(findings, provider)}
+            md = render_ai(result["plan"], result["analysis"])
+            print(json.dumps(result, indent=2) if args.json else md)
+            if args.out:
+                out = Path(args.out)
+                out = out if out.is_absolute() else REPO_ROOT / out
+                out.parent.mkdir(parents=True, exist_ok=True)
+                out.write_text(md, encoding="utf-8")
+                print(f"wrote {out}")
+            return 0
+        out = Path(args.out)
+        out = out if out.is_absolute() else REPO_ROOT / out
+        out.parent.mkdir(parents=True, exist_ok=True)
+        src = d.relative_to(REPO_ROOT).as_posix() if d.is_relative_to(REPO_ROOT) else d.name
+        ann_file = d / "annotations.json"
+        ann = json.loads(ann_file.read_text(encoding="utf-8")) if ann_file.is_file() else {}
+        out.write_text(render_markdown(runs, entries, src, {k: v for k, v in ann.items() if not k.startswith("_")}),
+                       encoding="utf-8")
+        print(f"wrote {out} ({len(runs)} run records)")
+        return 0
+
+    if args.cmd == "score":  # read-only: stored run records only; no Docker, no safety objects
+        from pathlib import Path
+        from .scoring import load_runs, render_text, score_run, summarise
+        d = Path(args.dir) if args.dir else load_safety_config().data_dir / "runs"
+        d = d if d.is_absolute() else REPO_ROOT / d
+        recs = [r for r in load_runs(d) if args.run in (None, r["run_id"])]
+        if not recs:
+            print(f"no run records{' for ' + args.run if args.run else ''} in {d}")
+            return 1
+        scores = [score_run(r) for r in recs]
+        result = {"formula": "docs/SCORING.md", "source": str(d), "runs": scores, "summary": summarise(scores)}
+        print(json.dumps(result, indent=2) if args.json else render_text(scores))
+        if args.out:
+            out = Path(args.out)
+            out = out if out.is_absolute() else REPO_ROOT / out
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+            print(f"wrote {out}")
+        return 0
+
+    if args.cmd == "discover":  # read-only (docker ps/inspect + bind-mounted config files); no safety objects needed
+        from pathlib import Path
+        from .discover import load_map, render_text, run_discovery
+        result = run_discovery(DockerCLI(), load_safety_config().compose_project, load_map(REPO_ROOT))
+        print(json.dumps(result, indent=2) if args.json else render_text(result))
+        if args.out:
+            out = Path(args.out)
+            out = out if out.is_absolute() else REPO_ROOT / out
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+            print(f"wrote {out}")
         return 0
 
     cfg, catalog, docker, ctl, observer, store, runner = build(_printer)

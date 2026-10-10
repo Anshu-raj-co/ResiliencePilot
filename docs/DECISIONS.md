@@ -88,3 +88,15 @@ polls (HTTP 200, age at most 5 s) with at least one advance of `createdDateTime`
 re-checked after polling, the check is recorded in the reset history, and without an observer reset refuses. This
 prevents the 2026-10-10 operator error (reset while the API answered 500).
 
+
+**D-019 — Resilience Score = weighted mean of measured components × silent-failure multiplier (`docs/SCORING.md`).**
+Detection 0.25, recovery 0.30, data integrity 0.20, blast radius 0.25; unmeasured components drop out (never imputed);
+`× (1 − 0.5 · silent ratio)` over fault + recovery polls. Only `duration_elapsed` runs enter the per-type summary;
+runs cut short by the system's response are scored but `partial`; operator/tool stops and unverified rollbacks are
+not scorable. Read-only: computed from stored run records, never fed back into the safety path.
+
+**D-020 — AI layer is advisory, local and evidence-gated (`docs/AI_LAYER.md`).** Local Ollama only (loopback URL
+enforced); `ai.py` may not import anything that reaches Docker, the shell or safety state (test-enforced). The
+planner may only reorder rule-based candidates (exact permutation, else fallback). Analyst items must cite their own
+finding's runs and pass a deterministic grounding check against the verified facts; failures fall back per item to
+the rule-based knowledge base with the reason and the model's text recorded. Rule-based answers are always available.

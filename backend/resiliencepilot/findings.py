@@ -1,0 +1,118 @@
+"""Rule-based findings report (read-only, deterministic): stored run records -> Markdown. Every number is quoted from a
+run record or its score (scoring.py); each finding lists the run ids it rests on.
+
+Rules, most severe first:
+  not_recovered        rollback verified but recovery criteria not met within recovery_timeout_s
+  silent_after_rollback after the fault was removed, HTTP 200 with stale data for longer than the stale threshold
+                        (recovery-phase silent polls x poll interval > stale_threshold_s): a cold start that serves
+                        the last value for a poll or two is normal; staying silently stale past the threshold is not
+  silent_during_fault  fault-window polls answered HTTP 200 with stale data (a plain health check sees nothing)
+  slow_recovery        verified recovery took longer than 10 s
+  data_loss            stored telemetry lost beyond one normal interval
+  blast_radius         a container outside the experiment's blast radius changed state
+"""
+from __future__ import annotations
+
+import statistics
+from collections import defaultdict
+
+from .scoring import score_run
+
+SLOW_RECOVERY_S = 10.0
+SEVERITY = ["not_recovered", "silent_after_rollback", "silent_during_fault", "slow_recovery", "data_loss", "blast_radius"]
+LEVEL = {"not_recovered": "high", "silent_after_rollback": "high", "silent_during_fault": "high",
+         "slow_recovery": "medium", "data_loss": "medium", "blast_radius": "medium"}
+
+
+def _rng(values: list[float], unit: str = " s") -> str:
+    values = [v for v in values if v is not None]
+    if not values:
+        return "n/a"
+    lo, hi = min(values), max(values)
+    return f"{lo:g}{unit}" if lo == hi else f"{lo:g}–{hi:g}{unit}"
+
+
+def derive_findings(runs: list[dict]) -> list[dict]:
+    hits: dict[tuple[str, str], list[dict]] = defaultdict(list)
+    for rec in runs:
+        s = score_run(rec)
+        if not s["scorable"]:
+            continue
+        et, c, sil = s["experiment_type"], s["components"], s["silent"]
+        if c["recovery"]["score"] == 0.0 and c["recovery"]["ttr_s"] is None:
+            hits[("not_recovered", et)].append({"run": s["run_id"], "detail": c["recovery"]["note"]})
+        lim = rec.get("limits", {})
+        silent_after_s = sil["by_phase"]["recovery"] * float(lim.get("poll_interval_s", 0.5))
+        if silent_after_s > float(lim.get("stale_threshold_s", 5.0)):
+            hits[("silent_after_rollback", et)].append(
+                {"run": s["run_id"], "detail": f"{sil['by_phase']['recovery']} recovery polls HTTP 200 but stale "
+                                               f"(~{silent_after_s:g} s at {lim.get('poll_interval_s', 0.5)} s polling)"})
+        if sil["by_phase"]["fault"] > 0:
+            hits[("silent_during_fault", et)].append(
+                {"run": s["run_id"], "detail": f"{sil['by_phase']['fault']} fault polls HTTP 200 but stale",
+                 "ttd_s": c["detection"]["ttd_s"]})
+        if c["recovery"]["ttr_s"] is not None and c["recovery"]["ttr_s"] > SLOW_RECOVERY_S:
+            hits[("slow_recovery", et)].append({"run": s["run_id"], "detail": f"recovery verified after "
+                                                f"{c['recovery']['ttr_s']} s", "ttr_s": c["recovery"]["ttr_s"]})
+        if c["data_integrity"]["measured"] and c["data_integrity"]["lost_s"] > 0:
+            hits[("data_loss", et)].append({"run": s["run_id"], "detail": f"{c['data_integrity']['lost_s']} s of "
+                                            "stored telemetry missing", "lost_s": c["data_integrity"]["lost_s"]})
+        if c["blast_radius"]["measured"] and c["blast_radius"]["changed"]:
+            hits[("blast_radius", et)].append({"run": s["run_id"], "detail": "changed: " +
+                                               ", ".join(c["blast_radius"]["changed"])})
+    out = [{"rule": rule, "level": LEVEL[rule], "experiment_type": et, "runs": v} for (rule, et), v in hits.items()]
+    return sorted(out, key=lambda f: (SEVERITY.index(f["rule"]), f["experiment_type"]))
+
+
+_TITLE = {
+    "not_recovered": "Did not recover within the recovery bound",
+    "silent_after_rollback": "Stale data served as HTTP 200 after the fault was removed",
+    "silent_during_fault": "HTTP 200 while vehicle telemetry was stale",
+    "slow_recovery": "Slow recovery",
+    "data_loss": "Stored telemetry lost during the outage",
+    "blast_radius": "State change outside the blast radius",
+}
+
+
+def render_markdown(runs: list[dict], plan_entries: list[dict], source: str, annotations: dict | None = None) -> str:
+    """`annotations` maps run_id -> a human note (e.g. "deliberate guard test"); shown beside that run, never scored."""
+    notes = annotations or {}
+    tag = lambda run: f" _(note: {notes[run]})_" if run in notes else ""  # noqa: E731
+    scores = [score_run(r) for r in runs]
+    by_type: dict[str, list[dict]] = defaultdict(list)
+    for s in scores:
+        by_type[s["experiment_type"]].append(s)
+    L = ["# Findings", "",
+         f"Generated by `rp findings` from {len(runs)} run records in `{source}`. Deterministic: every number below is "
+         "read from a run record or its Resilience Score (`docs/SCORING.md`); nothing is estimated."
+         + (f" Notes in _italics_ are human annotations from `annotations.json` ({len(notes)})." if notes else ""), "",
+         "## Results by experiment", "",
+         "| Experiment | Runs | Full-window | Score median (range) | TTD | TTR | Silent polls | Not scorable / partial |",
+         "|---|---|---|---|---|---|---|---|"]
+    for et, ss in sorted(by_type.items()):
+        full = [s for s in ss if s["scorable"] and not s["partial"]]
+        med = f"{statistics.median(s['score'] for s in full):.1f} ({_rng([s['score'] for s in full], '')})" if full else "n/a"
+        L.append(f"| {et} | {len(ss)} | {len(full)} | {med} | "
+                 f"{_rng([s['components']['detection']['ttd_s'] for s in full])} | "
+                 f"{_rng([s['components']['recovery']['ttr_s'] for s in full])} | "
+                 f"{_rng([s['silent']['silent_polls'] for s in full], '')} | "
+                 f"{sum(not s['scorable'] for s in ss)} / {sum(s['scorable'] and s['partial'] for s in ss)} |")
+    L += ["", "TTD, TTR and silent polls are over full-window runs only.", "", "## Findings (most severe first)", ""]
+    findings = derive_findings(runs)
+    if not findings:
+        L.append("No rule fired.")
+    for i, f in enumerate(findings, 1):
+        L.append(f"### F{i}. {_TITLE[f['rule']]} — {f['experiment_type']} ({f['level']})")
+        L.append("")
+        L += [f"- `{h['run']}`: {h['detail']}{tag(h['run'])}" for h in f["runs"]]
+        L.append("")
+    excluded = [s for s in scores if not s["scorable"]]
+    if excluded:
+        L += ["## Runs not scored", ""] + [f"- `{s['run_id']}` ({s['experiment_type']}, {s['state']}): {s['reason']}"
+                                           f"{tag(s['run_id'])}" for s in excluded] + [""]
+    L += ["## Next experiments (rule-based planner, `rp plan`)", "",
+          "Ranked most informative / riskiest first. Nothing runs without a human approver.", ""]
+    for e in plan_entries:
+        L.append(f"{e['rank']}. **{e['experiment_type']}** on `{e['target']}`: priority {e['priority']:.3f} "
+                 f"(information {e['information']:.3f}, risk {e['risk']:.3f}). {e['rationale'][0]}; {e['rationale'][2]}.")
+    return "\n".join(L) + "\n"

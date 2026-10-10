@@ -99,6 +99,18 @@ class DockerCLI:
                 for info in infos}
 
     # ---- read-only helpers for evidence/display (never used by fault logic) ----
+    def inspect_raw(self, ids: list[str]) -> list[dict]:
+        """Full `docker inspect` JSON for the given container ids (read-only; used by `rp discover`)."""
+        for i in ids:
+            if not re.fullmatch(r"[0-9a-f]{12,64}", i):
+                raise DockerError(f"refusing invalid container id {i!r}")
+        if not ids:
+            return []
+        proc = self._run("inspect", "--type", "container", *ids)
+        if proc.returncode != 0 and not proc.stdout.strip():
+            raise DockerError(f"docker inspect: {proc.stderr.strip()}")
+        return json.loads(proc.stdout or "[]")
+
     def networks(self, name: str) -> list[str]:
         proc = self._run("inspect", "-f", "{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}", _check_name(name))
         return proc.stdout.split() if proc.returncode == 0 else []
