@@ -106,3 +106,34 @@ InfluxDB stores a status every **0.501 s** (window query: 56 statuses, interval 
 honours `TIMER_INTERVAL=500ms`. The `latestOnly=true` read returns a new `createdDateTime` only about every 1.0 s
 (8 samples at 0.25 s showed 4 distinct values). The 1.0 s cadence is therefore produced by fms-server's
 `latestOnly` read path, not by the data. Exactly why that query skips every other status is not verified.
+
+---
+
+## dependency_failure with the 5 s response envelope (approved option b), 2026-10-10 19:28–19:31 UTC
+
+Envelope for this experiment, fault window only: observer timeout 5 s (precheck/recovery keep 2 s), latency cap
+4.5 s, HTTP 500 expected, any other status or a lost poll aborts. Duration must exceed 5 s.
+
+| Run | Result | Fault-window polls | After rollback (InfluxDB running again) | Stored-data gap |
+|---|---|---|---|---|
+| `20261010T192839Z-179795` | **LATCHED_UNSAFE**: recovery not verified in 30 s | 1: **no answer within 5 s** (`observer_lost`) | HTTP 200 with `createdDateTime` **frozen at the pre-fault value for ~27 s**: fms-consumer logged `failed to resolve host name` until 19:29:15, while fms-server served old data | — (recovery not verified) |
+| `20261010T193003Z-e2eacd` | COMPLETED (`duration_elapsed`) | 6 × **HTTP 500**: the first after 3.97 s, then in ~5 ms each | **HTTP 500 for ~22 s** (fms-server `failed to resolve host name`), then fresh: first fresh +22.4 s, verified +24.2 s | 4.0 s (70 stored) |
+
+### What this shows (measured)
+1. **An InfluxDB outage is not a fast failure.** Requests first block (3.97 s, and over 5 s in run 1), then fail fast
+   (HTTP 500 in ~5 ms) once name resolution fails.
+2. **Recovery takes 20–27 s longer than the dependency's own restart.** After InfluxDB is back, fms components keep
+   failing to resolve its host name for 22–27 s. Run 1 hit the **consumer**: a *silent* failure, HTTP 200 with data
+   frozen. Run 2 hit the **server**: a *visible* failure, HTTP 500.
+3. **ResiliencePilot's recovery rule caught the silent case.** In run 1 every container was running and the API
+   answered 200, yet recovery was not declared and the run latched. A container- or HTTP-based health check would
+   have called it recovered.
+4. **Data loss happens in the fast-fail phase only.** Writes made during the blocking phase were delayed, not
+   dropped (12 s fault → 4.0 s stored gap in run 2).
+5. **Hypothesis, not verified:** the HTTP client (isahc/libcurl) caches failed DNS lookups. This would also explain
+   the earlier incident (fms-server, ~18 s).
+
+### Telemetry-checked reset (approved), verified live
+After run 1 latched, `reset` succeeded only once 3 consecutive FRESH polls with an advance were seen; the check is
+recorded in the reset history. The incident case (containers healthy, API answering 500) is covered by
+`test_reset_refused_while_api_answers_500_with_healthy_containers`.

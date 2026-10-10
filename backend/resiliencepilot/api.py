@@ -245,8 +245,8 @@ def serve(port: int = DEFAULT_PORT) -> None:
     cfg = load_safety_config()
     catalog = load_experiment_catalog()
     docker = DockerCLI()
-    ctl = SafetyController(cfg, catalog, docker)
-    app = create_app(cfg, catalog, ctl, docker, RfmsObserver(cfg.rfms_base_url, cfg.http_timeout_s),
-                     EvidenceStore(cfg.data_dir))
+    observer = RfmsObserver(cfg.rfms_base_url, cfg.http_timeout_s)
+    ctl = SafetyController(cfg, catalog, docker, observer=observer)
+    app = create_app(cfg, catalog, ctl, docker, observer, EvidenceStore(cfg.data_dir))
     print(f"ResiliencePilot dashboard: http://{HOST}:{port}/  (localhost only; Ctrl+C to stop)")
     uvicorn.run(app, host=HOST, port=port, log_level="warning")

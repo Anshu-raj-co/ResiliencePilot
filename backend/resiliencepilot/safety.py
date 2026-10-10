@@ -117,10 +117,14 @@ def _atomic_write(path: Path, payload: dict) -> None:
 
 
 class SafetyController:
-    def __init__(self, cfg: SafetyConfig, catalog: dict[str, ExperimentSpec], docker: Docker) -> None:
+    RESET_FRESH_CONSECUTIVE = 3
+    RESET_TELEMETRY_TIMEOUT_S = 15.0
+
+    def __init__(self, cfg: SafetyConfig, catalog: dict[str, ExperimentSpec], docker: Docker, observer=None) -> None:
         self.cfg = cfg
         self.catalog = catalog
         self.docker = docker
+        self.observer = observer  # read-only rFMS observer; required for reset()
         self._lock = threading.RLock()  # re-entrant: a signal handler or nested call can never self-deadlock
         self._active_run: str | None = None
         self._stop_event: threading.Event | None = None
@@ -222,6 +226,10 @@ class SafetyController:
         limit = min(self.cfg.max_duration_s, spec.max_duration_s, HARD_MAX_DURATION_S)
         if req.duration_s > limit:
             raise RequestRejected(f"duration_s {req.duration_s} exceeds limit {limit}")
+        if spec.fault_observer_timeout_s is not None and req.duration_s <= spec.fault_observer_timeout_s:
+            # no poll may outlive the fault window, so a shorter window could not be observed at all
+            raise RequestRejected(f"duration_s {req.duration_s} must exceed the fault observer timeout "
+                                  f"{spec.fault_observer_timeout_s}s for {req.experiment_type}")
         return req
 
     def verify_target(self, name: str) -> ContainerState:
@@ -336,13 +344,38 @@ class SafetyController:
         _unlink(self._run_lock_path)  # dead holder: lock is meaningless now; latch still blocks
         return {"marker": marker or {"run_id": run_id}, "outcome": outcome}
 
+    def check_fresh_telemetry(self) -> dict:
+        """Read-only: need RESET_FRESH_CONSECUTIVE consecutive FRESH polls (HTTP 200, age <= stale threshold) with at
+        least one advance of createdDateTime, within RESET_TELEMETRY_TIMEOUT_S. Containers running is not enough."""
+        from .telemetry import Freshness, FreshnessTracker
+        if self.observer is None:
+            raise SafetyError("reset requires a live telemetry observer; refusing to reset on container state alone")
+        tracker = FreshnessTracker(self.cfg.stale_threshold_s)
+        streak, advanced, samples = 0, False, []
+        deadline = time.monotonic() + self.RESET_TELEMETRY_TIMEOUT_S
+        while time.monotonic() < deadline:
+            o = self.observer.observe()
+            a = tracker.update(o)
+            samples.append({"http": o.http_status, "age_s": None if a.data_age_s is None else round(a.data_age_s, 3),
+                            "freshness": a.freshness.value})
+            if a.freshness is Freshness.FRESH:
+                streak += 1
+                advanced = advanced or a.advanced
+            else:
+                streak, advanced = 0, False
+            if streak >= self.RESET_FRESH_CONSECUTIVE and advanced:
+                return {"fresh_consecutive": streak, "advanced": True, "samples": samples[-8:]}
+            time.sleep(self.cfg.poll_interval_s)
+        raise SafetyError(f"reset refused: telemetry not fresh and advancing within {self.RESET_TELEMETRY_TIMEOUT_S}s "
+                          f"(last samples: {samples[-4:]})")
+
     def reset(self, operator: str, note: str) -> dict:
-        """Clear a latch only if no run is active anywhere and every allowlisted target is running and unpaused."""
+        """Clear a latch only if no run is active anywhere, every allowlisted target is running and unpaused, AND the
+        rFMS API serves fresh, advancing telemetry (3 consecutive fresh polls with at least one advance)."""
         if not operator.strip():
             raise SafetyError("reset requires an operator name")
-        with self._lock:
-            if self._active_run is not None or self.other_process_active():
-                raise Busy("cannot reset while an experiment is active")
+
+        def containers_clean() -> None:
             problems = []
             for t in self.allowed_targets:
                 try:
@@ -354,12 +387,23 @@ class SafetyController:
                     problems.append(f"{t}: status={st.status}")
             if problems:
                 raise SafetyError(f"reset refused, targets not clean: {problems}")
+
+        with self._lock:
+            if self._active_run is not None or self.other_process_active():
+                raise Busy("cannot reset while an experiment is active")
+            containers_clean()
+        telemetry = self.check_fresh_telemetry()   # polls for a few seconds: done outside the lock
+        with self._lock:
+            if self._active_run is not None or self.other_process_active():
+                raise Busy("cannot reset while an experiment is active")
+            containers_clean()                     # re-check: nothing may have changed while we polled
             st = self._read_state()
             st["history"].append({"at": utcnow().isoformat(), "event": "reset", "operator": operator, "note": note,
-                                  "previous_reason": st["reason"]})
+                                  "previous_reason": st["reason"],
+                                  "telemetry_check": {k: telemetry[k] for k in ("fresh_consecutive", "advanced")}})
             st.update(latched=False, reason=None, since=None)
             _atomic_write(self._state_path, st)
             self.clear_fault_marker()
             _unlink(self._run_lock_path)
             self.stop_file.unlink(missing_ok=True)
-        return {"reset_by": operator, "targets_checked": self.allowed_targets}
+        return {"reset_by": operator, "targets_checked": self.allowed_targets, "telemetry_check": telemetry}

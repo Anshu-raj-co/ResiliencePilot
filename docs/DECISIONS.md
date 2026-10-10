@@ -77,3 +77,14 @@ limit 1, instead of 4). Precheck and recovery are unchanged. Approved by the lea
 records the largest gap between stored `createdDateTime` values around the fault. It is evidence only: a failure here
 is recorded and never changes the run's state.
 
+**D-017: Per-experiment response envelope (approved option b).** An experiment may declare
+`fault_observer_timeout_s` (at most 5 s) and `fault_latency_p95_max_ms` (at most 5000 ms, and below the timeout). Both
+apply to fault-window polls only. Duration plus timeout must be at most 30 s, and a request's duration must exceed the
+timeout. The fault loop never starts a poll that could outlive the window, so the watchdog stays a backstop. Precheck
+and recovery keep the global 2 s timeout. Used by `dependency_failure` (5 s / 4.5 s).
+
+**D-018: `reset` requires fresh, advancing telemetry.** Besides healthy containers, `reset` needs 3 consecutive FRESH
+polls (HTTP 200, age at most 5 s) with at least one advance of `createdDateTime`, within 15 s. Containers are
+re-checked after polling, the check is recorded in the reset history, and without an observer reset refuses. This
+prevents the 2026-10-10 operator error (reset while the API answered 500).
+

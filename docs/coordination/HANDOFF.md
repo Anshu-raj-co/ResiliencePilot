@@ -1,8 +1,14 @@
 # Handoff
 
-_Updated: 2026-10-11 ~00:35 IST, Day 2 milestone 2: dependency_failure (PR open, decisions pending)_
+_Updated: 2026-10-11 ~01:05 IST, Day 2: envelope + telemetry-checked reset (PR open); next Phase C/D_failure (PR open, decisions pending)_
 
-## Day 2 milestone 2: dependency_failure (branch `feat/day2-dependency-failure`, PR open)
+## Day 2 milestone 3: response envelope + telemetry-checked reset (branch `feat/day2-envelope-and-reset`, PR open)
+- D-017 envelope (dependency_failure: 5 s timeout, 4.5 s latency cap, fault window only); D-018 reset needs 3 fresh,
+  advancing polls. 184 unit tests.
+- Live: envelope run 1 LATCHED (consumer DNS failures for ~27 s after influxDB returned → silent stale data);
+  run 2 COMPLETED (500s; server DNS failures for ~22 s after return). Telemetry-checked reset verified live.
+
+## Day 2 milestone 2: dependency_failure (MERGED, PR #16)
 - Implemented the expected-status rule (D-015) and stored-data-gap evidence (D-016); 18 new tests; 158 unit tests.
 - Live: 3 runs all ABORTED with `observer_lost` on the first fault poll. fms-server does not answer within 2 s while
   InfluxDB is down. Data loss verified (2.0–4.5 s gaps). Kill switch started influxDB with the backend dead.

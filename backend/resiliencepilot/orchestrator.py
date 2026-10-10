@@ -112,8 +112,8 @@ class ExperimentRunner:
         tracker = FreshnessTracker(cfg.stale_threshold_s)
         phase_obs: dict[str, list] = {"precheck": [], "fault": [], "recovery": []}
 
-        def observe(phase: str):
-            o = self.observer.observe()
+        def observe(phase: str, timeout_s: float | None = None):
+            o = self.observer.observe() if timeout_s is None else self.observer.observe(timeout_s=timeout_s)
             a = tracker.update(o)
             entry = {"phase": phase, "t_s": round(time.monotonic() - mono0, 3), "observation": o.to_dict(),
                      "assessment": a.to_dict()}
@@ -170,6 +170,9 @@ class ExperimentRunner:
             else:
                 base_p95, base_src = p95(pre_lat), "precheck polls (no stored baseline)"
             thr_ms = latency_threshold(base_p95, g.latency_p95_multiplier, g.latency_p95_floor_ms)
+            thr_src = "baseline"
+            if spec.fault_latency_p95_max_ms is not None:  # declared envelope for a slow-failing dependency
+                thr_ms, thr_src = spec.fault_latency_p95_max_ms, "experiment envelope (fault window only)"
             try:
                 br_ids = self.docker.project_container_ids(cfg.compose_project)
                 br_baseline = self.docker.snapshot(br_ids)
@@ -180,6 +183,7 @@ class ExperimentRunner:
             allowed = set(spec.effective_blast_radius)
             rec["guardrails"].update(
                 latency_baseline_p95_ms=base_p95, latency_baseline_source=base_src, latency_threshold_ms=round(thr_ms, 2),
+                latency_threshold_source=thr_src, fault_observer_timeout_s=spec.fault_observer_timeout_s or cfg.http_timeout_s,
                 blast_radius_baseline={n: e.status for n, e in sorted(br_baseline.items())})
             err_guard = ErrorRateGuard(rec["guardrails"]["config"]["max_error_rate"], g.error_min_samples,
                                        expected=spec.expected_statuses)
@@ -236,7 +240,15 @@ class ExperimentRunner:
                     rec["stop_reason"] = "guardrail_blast_radius"
                     self._trip(rec, monitor.violation, mono0, event)
                     break
-                o, a = observe("fault")
+                poll_timeout = spec.fault_observer_timeout_s
+                if poll_timeout is not None:
+                    # never START a poll that could still be waiting after the fault window: the watchdog is a backstop,
+                    # not the normal end of a run
+                    left = req.duration_s - (time.monotonic() - inject_mono)
+                    if left < poll_timeout:
+                        time.sleep(max(0.0, min(cfg.poll_interval_s, left)))
+                        continue
+                o, a = observe("fault", poll_timeout)
                 tripped = err_guard.update(o.http_status) or lat_guard.update(o.latency_ms)
                 if tripped is not None:
                     rec["stop_reason"] = {"error_rate": "guardrail_error_rate",
