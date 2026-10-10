@@ -113,6 +113,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("runs")
     sh = sub.add_parser("show"); sh.add_argument("run_id"); sh.add_argument("--json", action="store_true")
     sub.add_parser("deps")
+    sd = sub.add_parser("discover", help="read-only: derive the dependency graph from docker inspect, diff vs the map")
+    sd.add_argument("--json", action="store_true"); sd.add_argument("--out", help="also write the JSON result here")
     sbs = sub.add_parser("show-baseline"); sbs.add_argument("file", nargs="?")
     sv = sub.add_parser("serve"); sv.add_argument("--port", type=int, default=8765)
     rp_ = sub.add_parser("report"); rp_.add_argument("--run"); rp_.add_argument("--out", default="reports/day1/explainer.html")
@@ -129,6 +131,19 @@ def main(argv: list[str] | None = None) -> int:
         out = Path(args.out)
         out = out if out.is_absolute() else REPO_ROOT / out
         print(f"wrote {build_report(REPO_ROOT, args.run, out)}")
+        return 0
+
+    if args.cmd == "discover":  # read-only (docker ps/inspect + bind-mounted config files); no safety objects needed
+        from pathlib import Path
+        from .discover import load_map, render_text, run_discovery
+        result = run_discovery(DockerCLI(), load_safety_config().compose_project, load_map(REPO_ROOT))
+        print(json.dumps(result, indent=2) if args.json else render_text(result))
+        if args.out:
+            out = Path(args.out)
+            out = out if out.is_absolute() else REPO_ROOT / out
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+            print(f"wrote {out}")
         return 0
 
     cfg, catalog, docker, ctl, observer, store, runner = build(_printer)

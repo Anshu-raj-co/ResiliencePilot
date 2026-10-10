@@ -1,16 +1,19 @@
 # Handoff
 
-_Updated: 2026-10-11 ~01:15 IST, usage limit reached mid Phase C_failure (PR open, decisions pending)_
+_Updated: 2026-10-11, Phase C (discovery) done on macOS; next: Phase D scoring_
 
-## RESUME HERE (session ended at the usage limit)
-- PR #17 (`feat/day2-envelope-and-reset`) is OPEN. Its safety review was STOPPED before it reported: rerun the review on
-  PR #17, fix the findings, then merge (the lead approved merging once the review is clean).
-- Branch `feat/day2-discover-planner-score` (WIP, based on PR #17): `backend/resiliencepilot/discover.py` and
-  `DockerCLI.inspect_raw` exist. Run live once (read-only): 8 edges found, 6 match the map, 1 direction differs
-  (zenoh router <-> consumer: the map follows data flow, discovery follows who connects to whom), 1 discovered-only
-  (forwarder -> csv-provider, depends_on only, low confidence). No secrets in the evidence (checked).
-  NOT done yet: unit tests for discover.py, the `rp discover` CLI command, the AI planner (no API key or SDK here:
-  build an LLM adapter + deterministic fallback; read the claude-api skill first), `docs/SCORING.md` + `rp score`.
+## RESUME HERE
+- PR #17 was already MERGED (`050f860`); `main` merged into `feat/day2-discover-planner-score` (merge, no rebase).
+- Phase C done: `rp discover [--json] [--out FILE]` (read-only: `docker ps` + `docker inspect` + bind-mounted config
+  files; runs before any safety object is built). Live on macOS: 8 containers, 8 edges, 6 match the map, 1 direction
+  differs (consumer <-> zenoh router), 1 discovered-only (forwarder -> csv-provider, depends_on, low). Evidence:
+  `reports/day2/discovery.json` (scanned: no tokens/passwords/host paths).
+- Fix found by the new tests: evidence snippets now redact URL credentials (`//user:pass@` -> `//***@`).
+- Tests: 194 unit pass on macOS (176 + 18 discovery; 8 Windows-only file-retry tests skip on macOS, 3 live skip).
+- Next: `docs/SCORING.md` + `rp score`, then rule-based planner + `reports/day2/findings.md`, then the AI provider
+  layer (local Ollama `qwen2.5:7b` / `qwen2.5-coder:14b`, advisory only, deterministic fallback when unreachable).
+- Mac notes: PR #7 (databroker host port 55557, scripts executable) and PR #8 (CLI "Nones") are open. `main` already
+  prints "not detected" for detection time, so #8 only still adds `n/a` for unverified recovery timings.
 
 ## Day 2 milestone 3: response envelope + telemetry-checked reset (branch `feat/day2-envelope-and-reset`, PR open)
 - D-017 envelope (dependency_failure: 5 s timeout, 4.5 s latency cap, fault window only); D-018 reset needs 3 fresh,

@@ -86,9 +86,13 @@ def _mentions(text: str, alias: str) -> bool:
     return re.search(rf"(?<![A-Za-z0-9_.-]){re.escape(alias)}(?![A-Za-z0-9_-])", text) is not None
 
 
+_URL_USERINFO = re.compile(r"(//)[^/@\s\"',]+@")
+
+
 def _snippet(text: str, alias: str) -> str:
+    """The token around the matched host name, with any URL credentials (`//user:pass@`) redacted."""
     m = re.search(rf"[^\s\"',]*{re.escape(alias)}[^\s\"',]*", text)
-    return m.group(0)[:120] if m else alias
+    return _URL_USERINFO.sub(r"\1***@", m.group(0))[:120] if m else alias
 
 
 def discover(infos: list[dict], read_file=None) -> tuple[list[Node], list[Edge]]:
@@ -193,3 +197,27 @@ def to_json(nodes: list[Node], edges: list[Edge], diff: dict) -> dict:
 
 def load_map(root: Path) -> dict:
     return json.loads((root / "config" / "dependency_map.json").read_text(encoding="utf-8"))
+
+
+def run_discovery(docker, project: str, dep_map: dict, read_file=read_text_file) -> dict:
+    """Read-only: inspect every container of `project` and diff against the curated map. Uses `docker ps`/`inspect` only."""
+    infos = docker.inspect_raw(docker.project_container_ids(project))
+    infos = [i for i in infos if (i.get("Config", {}).get("Labels") or {}).get(PROJECT_LABEL) == project]
+    nodes, edges = discover(infos, read_file)
+    return to_json(nodes, edges, diff_against_map(edges, dep_map))
+
+
+def render_text(result: dict) -> str:
+    d = result["diff_vs_dependency_map"]
+    lines = [f"Discovered {len(result['nodes'])} containers, {len(result['edges'])} candidate edges (X -> Y: X connects to / needs Y)"]
+    for e in result["edges"]:
+        kinds = ", ".join(sorted({ev["kind"] for ev in e["evidence"]}, key=lambda k: -STRENGTH[k]))
+        lines.append(f"  {e['from']:<16} -> {e['to']:<16} {e['confidence']:<6} [{kinds}]  {e['evidence'][0]['detail']}")
+    lines.append("Compared with config/dependency_map.json")
+    lines.append(f"  matched            {len(d['matched'])}")
+    lines += [f"  direction differs  {x['map']}  (discovered {x['discovered']}; {x['note']})" for x in d["direction_differs"]]
+    lines += [f"  map only           {x['from']} -> {x['to']}  (not visible from Docker metadata)" for x in d["map_only"]]
+    lines += [f"  discovered only    {x['from']} -> {x['to']}  ({x['confidence']} confidence)" for x in d["discovered_only"]]
+    if d["not_discoverable"]:
+        lines.append(f"  not discoverable   {', '.join(d['not_discoverable'])} (host side, not a container)")
+    return "\n".join(lines)
