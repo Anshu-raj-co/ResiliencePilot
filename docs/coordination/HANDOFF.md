@@ -1,12 +1,21 @@
 # Handoff
 
+_Updated: 2026-10-10 ~22:45 IST, Day 2 step 1 cleanup: PRs #9-#13 open for review_
 _Updated: 2026-10-10 ~22:30 IST, Day 2 step 1 cleanup (one PR per item)_
 
 ## Where things are
-- Branch `wip/day1-recon` (pushed). Last known-good on main: `401a23d`.
-- Phases 0–2 done and verified live; see `CURRENT_STATUS.md` for the acceptance checklist and `docs/recon.md` §8 for numbers.
-- Safety review done and fixed (`docs/testing/SAFETY_REVIEW.md`). Demo: `docs/demo/DAY1_DEMO.md`, `scripts/demo-day1.sh`.
-- PR #1 merged into `main` (`401a23d`). Wrap-up (dependency map, load conditions, impact view, judge report) is in PR #2 from `wip/day1-recon`; merge is left to the engineering lead.
+- `main` = `843889a`: Day 1 complete, explainer (PR #4) and dashboard (PR #6) merged. Verified 2026-10-10 22:1x:
+  `RP_LIVE=1 pytest` 70 passed; `scripts/demo-day1.sh` exit 0 (46 s).
+- **Day 2 step 1 (cleanup): one PR per item, all open and awaiting the lead's merge approval:**
+  | PR | Branch | Item |
+  |---|---|---|
+  | #10 | `fix/safety-file-retry` | Bounded PermissionError retry in `safety.py`; 12 tests; stress 40/40 with 87,261 concurrent `status()` calls; safety review: no high findings |
+  | #9 | `fix/cli-utf8` | CLI forces UTF-8 stdout/stderr (piped output no longer crashes) |
+  | #11 | `docs/readme-longpaths` | README `git -c core.longpaths=true submodule update --init` |
+  | #12 | `docs/explained-refresh` | PROJECT_EXPLAINED §5, §6, §11, §12 |
+  | this PR | `docs/day2-plan` | `docs/DAY2_PLAN.md` (plan only) + this handoff |
+- Follow-ups noted by the safety review (pre-existing, fail-closed, not in scope): `latch()` in-memory fallback if
+  its write fails; reorder `reset()` so files are deleted before writing the unlatched state.
 
 ## Day-1 explainer (branch `feat/day1-explainer`, PR pending the lead's approval)
 - `rp report [--run ID] [--out FILE]` → `reports/day1/explainer.html`: a standalone offline HTML page built only from
@@ -66,7 +75,9 @@ RP_LIVE=1 .venv/Scripts/python -m pytest -q    # expect 52 passed
 If `docker info` says "Docker Desktop is unable to start": quit Docker Desktop fully and relaunch it.
 
 ## Next concrete task
-Day 1 is complete. Next session = Phase 3 (`docs/ROADMAP.md`), first task:
+After the lead merges PRs #9-#13: follow `docs/DAY2_PLAN.md`. Decision needed first: the per-experiment
+"expected symptom" rule for `dependency_failure` (HTTP 500 currently trips `safety_threshold`).
+Earlier plan (still valid), Phase 3 first task:
 add `consumer_stall` (pause `fms-consumer`) and `forwarder_restart` (`docker stop`/`start`) to `config/experiments.json`,
 `contracts/experiment_request.schema.json` and `ExperimentRequest`, with a `StopStartFault` adapter, the same
 negative-path tests, and 3 repeated live runs each with TTD/TTR variability reported.
