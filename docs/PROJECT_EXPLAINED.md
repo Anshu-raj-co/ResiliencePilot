@@ -444,7 +444,7 @@ run with a precise timestamp: 0.6 s from switch to verified rollback.
 
 > **Test counts below are for current `main` (`50f1f42`, after PRs #9–#13):** 80 unit tests, 83 with live tests
 > (verified 2026-10-10). The clean-clone re-test described next was done earlier, at `519fff8`, before the dashboard
-> was merged, when the counts were 52 and 55. The clean-clone run has not been repeated on `843889a`.
+> was merged, when the counts were 52 and 55. The clean-clone run has not been repeated on `50f1f42`.
 >
 > **Re-tested from a clean clone on 2026-10-10** (fresh `git clone` of `main` at `519fff8` into a new folder):
 > steps 1–3 and 5–8 all passed: 52 unit tests, 55 with live tests, `deps`, `observe`, a 20-sample baseline, the full
