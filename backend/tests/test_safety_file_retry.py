@@ -107,7 +107,7 @@ def env(tmp_path):
 def test_marker_delete_held_briefly_succeeds(env):
     cfg, _, ctl, _ = env
     ctl.mark_fault_active("r", "fms-forwarder", "docker_pause")
-    t = hold(cfg.data_dir / "active_fault.json", 0.06)
+    t = hold(cfg.data_dir / "active_fault.json", 0.03)
     ctl.clear_fault_marker()
     assert ctl.active_fault_marker() is None
     t.join()
@@ -128,7 +128,7 @@ def test_marker_delete_held_too_long_fails_closed(env):
 def test_latch_write_held_briefly_succeeds(env):
     cfg, _, ctl, _ = env
     ctl.latch("first")
-    t = hold(cfg.data_dir / "safety_state.json", 0.06)
+    t = hold(cfg.data_dir / "safety_state.json", 0.03)
     ctl.latch("second")
     t.join()
     assert ctl.latched
@@ -138,7 +138,7 @@ def test_latch_write_held_briefly_succeeds(env):
 def test_run_lock_release_held_briefly_succeeds(env):
     cfg, _, ctl, _ = env
     ctl.begin("r1")
-    t = hold(cfg.data_dir / "run.lock", 0.06)
+    t = hold(cfg.data_dir / "run.lock", 0.03)
     ctl.end("r1")
     t.join()
     assert not (cfg.data_dir / "run.lock").exists() and ctl.status()["state"] == "READY"
@@ -162,7 +162,7 @@ def test_full_run_marker_held_briefly_completes(env):
     orig = ctl.clear_fault_marker
 
     def held_then_clear():
-        t = hold(cfg.data_dir / "active_fault.json", 0.06)
+        t = hold(cfg.data_dir / "active_fault.json", 0.03)
         orig()
         t.join()
     ctl.clear_fault_marker = held_then_clear
@@ -185,3 +185,16 @@ def test_full_run_marker_held_too_long_latches(env):
     rec = runner.run(GOOD)
     assert rec["state"] == "LATCHED_UNSAFE" and ctl.latched      # fail closed, as before the change
     assert not world.forwarder_paused()                            # rollback itself was not affected
+
+
+@windows_only
+def test_latch_write_held_too_long_raises_and_state_stays_unsafe(env):
+    """Fail closed: the write error propagates (callers treat it as unsafe); nothing reports 'unlatched'."""
+    cfg, _, ctl, _ = env
+    ctl.latch("first")
+    t = hold(cfg.data_dir / "safety_state.json", 1.0)
+    with pytest.raises(PermissionError):
+        ctl.latch("second")
+    assert ctl.latched                     # read during the hold: retries fail -> treated as latched
+    t.join()
+    assert ctl.latched                     # after the hold: the earlier latch is still on disk
