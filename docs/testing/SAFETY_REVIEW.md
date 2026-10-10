@@ -51,7 +51,7 @@ tolerated outside the fault window, cannot be supplied in a request, and other e
 | ID | Sev | Finding | Fix | Test |
 |---|---|---|---|---|
 | B | Med | With `max_error_rate > 0`, mostly-500 runs could hide a few 503s (expected codes are not counted toward `min_samples`). | A declared symptom forces zero tolerance: the orchestrator sets the rate to 0.0, and the catalogue rejects `expected_statuses` together with a tolerance. | `test_B_*` (2) |
-| D | Med | When every fault poll is a 500 (no server time), recovery's lower bound fell back to the pre-fault `createdDateTime`. | Fall back to the verified injection time + 0.5 s skew margin, recorded as `recovery.lower_bound`. Verified live (`20261010T191735Z-…`). | `test_D_*` |
+| D | Med | When every fault poll is a 500 (no server time), recovery's lower bound fell back to the pre-fault `createdDateTime`. | Fall back to the verified injection time + 0.5 s skew margin, recorded as `recovery.lower_bound`. Verified live (`20261010T191733Z-7123d9`). | `test_D_*` |
 | C | Low | Only the data-gap query was guarded; the arithmetic could raise and latch a recovered run. | The whole measurement is wrapped; any failure is recorded in `data_gap.error`. | `test_C_*` (2) |
 | E | Low | `time_to_first_expected_status_s` was lost if the loop raised. | Written at detection time. | `test_E_*` |
 | — | Info | `reset` requires every allowlisted target running, so after any latch InfluxDB must also be up. | Documented. | existing |

@@ -63,6 +63,7 @@ class FakeWorld:
         self.block_observe_s = 0.0
         self.snapshot_fails = False
         self.influx_down_status: int | None = 500   # what the API answers while influxDB is stopped (None = no response)
+        self.influx_down_delay_s = 0.0              # how long the API takes to answer while influxDB is stopped
         self.stored: list[datetime] = []            # statuses the backend actually stored (not produced while influx is down)
         self.calls: list[tuple[float, str, str]] = []
 
@@ -144,8 +145,13 @@ class FakeObserver:
         self.w = world
         self.block_once_when_paused = False
 
-    def observe(self) -> Observation:
+    def observe(self, timeout_s: float | None = None) -> Observation:
         w = self.w
+        timeout = 0.5 if timeout_s is None else timeout_s   # mirrors make_config(http_timeout_s=0.5)
+        if w.influx_down() and w.influx_down_delay_s:
+            time.sleep(min(w.influx_down_delay_s, timeout))
+            if w.influx_down_delay_s > timeout:
+                return Observation(datetime.now(timezone.utc), None, None, None, None, None, None, error="ReadTimeout")
         if self.block_once_when_paused and w.forwarder_down():
             self.block_once_when_paused = False
             time.sleep(w.block_observe_s)
@@ -159,7 +165,8 @@ class FakeObserver:
             if w.influx_down():                       # store unreachable: produced statuses are dropped
                 if w.influx_down_status is None:
                     return Observation(now, None, None, None, None, None, None, error="ReadTimeout")
-                return Observation(now, w.influx_down_status, w.latency_ms, None, None, None, None,
+                lat = w.influx_down_delay_s * 1000 if w.influx_down_delay_s else w.latency_ms
+                return Observation(now, w.influx_down_status, lat, None, None, None, None,
                                    error=f"HTTP {w.influx_down_status}")
             if not frozen:
                 w.last_created = now - timedelta(seconds=0.01)

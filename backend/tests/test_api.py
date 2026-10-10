@@ -22,7 +22,7 @@ def env(tmp_path):
     cfg = make_config(tmp_path)
     world = FakeWorld()
     docker = FakeDocker(world)
-    ctl = SafetyController(cfg, CATALOG, docker)
+    ctl = SafetyController(cfg, CATALOG, docker, observer=FakeObserver(world))
     store = EvidenceStore(cfg.data_dir)
     app = create_app(cfg, CATALOG, ctl, docker, FakeObserver(world), store,
                      run_template={**DASHBOARD_TEMPLATE, "duration_s": 2}, monitor=True)

@@ -22,7 +22,7 @@ def env(tmp_path):
     world = FakeWorld()
     docker = FakeDocker(world)
     observer = FakeObserver(world)
-    ctl = SafetyController(cfg, CATALOG, docker)
+    ctl = SafetyController(cfg, CATALOG, docker, observer=observer)
     runner = ExperimentRunner(cfg, CATALOG, ctl, docker, observer, EvidenceStore(cfg.data_dir))
     return cfg, world, docker, observer, ctl, runner
 
@@ -229,7 +229,7 @@ def test_startup_recovery_unpauses_and_latches_after_crash(env):
     cfg, world, docker, _, ctl, _ = env
     ctl.mark_fault_active("dead-run", "fms-forwarder", "docker_pause")
     docker.pause("fms-forwarder")
-    fresh_ctl = SafetyController(cfg, CATALOG, docker)    # simulates a new process
+    fresh_ctl = SafetyController(cfg, CATALOG, docker, observer=FakeObserver(world))    # a new process
     out = fresh_ctl.startup_recovery()
     assert out["outcome"] == "fms-forwarder: unpaused"
     assert not world.forwarder_paused()

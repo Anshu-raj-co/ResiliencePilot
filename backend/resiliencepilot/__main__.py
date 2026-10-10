@@ -81,8 +81,8 @@ def build(on_event=None):
     cfg = load_safety_config()
     catalog = load_experiment_catalog()
     docker = DockerCLI()
-    ctl = SafetyController(cfg, catalog, docker)
     observer = RfmsObserver(cfg.rfms_base_url, cfg.http_timeout_s)
+    ctl = SafetyController(cfg, catalog, docker, observer=observer)
     store = EvidenceStore(cfg.data_dir)
     return cfg, catalog, docker, ctl, observer, store, ExperimentRunner(cfg, catalog, ctl, docker, observer, store, on_event)
 

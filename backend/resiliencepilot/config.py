@@ -8,7 +8,9 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 HARD_MAX_DURATION_S = 30  # non-negotiable ceiling; config may only lower it
 MAX_WATCHDOG_GRACE_S = 10.0
-MAX_ERROR_RATE = 0.5  # a tolerated error rate above 50 % would let a broken service pass as an experiment symptom
+MAX_ERROR_RATE = 0.5
+MAX_FAULT_OBSERVER_TIMEOUT_S = 5.0      # longest a single fault-window poll may wait for an answer
+MAX_FAULT_LATENCY_P95_MS = 5000.0  # a tolerated error rate above 50 % would let a broken service pass as an experiment symptom
 
 
 SUPPORTED_MECHANISMS = ("docker_pause", "docker_stop")
@@ -90,6 +92,9 @@ class ExperimentSpec:
     stop_timeout_s: int = 2                                        # docker_stop only: SIGTERM -> SIGKILL grace
     max_error_rate: float | None = None                            # per-experiment override of the guardrail
     expected_statuses: tuple[int, ...] = field(default_factory=tuple)  # HTTP codes that ARE the symptom (fault window only)
+    # response envelope for slow-failing dependencies (fault window only; precheck/recovery keep the global timeout)
+    fault_observer_timeout_s: float | None = None
+    fault_latency_p95_max_ms: float | None = None
 
     def __post_init__(self) -> None:
         if self.mechanism not in SUPPORTED_MECHANISMS:
@@ -102,6 +107,16 @@ class ExperimentSpec:
             raise ValueError(f"{self.name}: stop_timeout_s must be within 0..5")
         if any(not 400 <= int(c) <= 599 for c in self.expected_statuses):
             raise ValueError(f"{self.name}: expected_statuses must be HTTP error codes (400..599)")
+        if self.fault_observer_timeout_s is not None:
+            if not 0 < self.fault_observer_timeout_s <= MAX_FAULT_OBSERVER_TIMEOUT_S:
+                raise ValueError(f"{self.name}: fault_observer_timeout_s must be within (0, {MAX_FAULT_OBSERVER_TIMEOUT_S}]")
+            if self.max_duration_s + self.fault_observer_timeout_s > HARD_MAX_DURATION_S:
+                raise ValueError(f"{self.name}: max_duration_s + fault_observer_timeout_s must be <= {HARD_MAX_DURATION_S}")
+        if self.fault_latency_p95_max_ms is not None:
+            if not 0 < self.fault_latency_p95_max_ms <= MAX_FAULT_LATENCY_P95_MS:
+                raise ValueError(f"{self.name}: fault_latency_p95_max_ms must be within (0, {MAX_FAULT_LATENCY_P95_MS}]")
+            if self.fault_observer_timeout_s is None or self.fault_latency_p95_max_ms >= self.fault_observer_timeout_s * 1000:
+                raise ValueError(f"{self.name}: fault_latency_p95_max_ms needs a fault_observer_timeout_s above it")
         if self.expected_statuses and self.max_error_rate not in (None, 0.0):
             raise ValueError(f"{self.name}: a declared expected status requires zero tolerance for any other error")
         if self.max_error_rate is not None and not 0.0 <= self.max_error_rate <= MAX_ERROR_RATE:
@@ -134,6 +149,8 @@ def load_experiment_catalog(root: Path = REPO_ROOT) -> dict[str, ExperimentSpec]
             stop_timeout_s=int(spec.get("stop_timeout_s", 2)),
             max_error_rate=spec.get("max_error_rate"),
             expected_statuses=tuple(int(c) for c in spec.get("expected_statuses", [])),
+            fault_observer_timeout_s=spec.get("fault_observer_timeout_s"),
+            fault_latency_p95_max_ms=spec.get("fault_latency_p95_max_ms"),
         )
         for name, spec in raw.items()
     }

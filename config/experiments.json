@@ -58,13 +58,16 @@
     "expected_symptoms": [
       "HYPOTHESIS: fms-server answers HTTP 500 (source: fms-server/src/lib.rs maps query errors to INTERNAL_SERVER_ERROR), i.e. the failure is VISIBLE to a plain health check",
       "HYPOTHESIS: fms-consumer keeps running but drops the statuses it cannot write (influx-client writer.rs: 'failed to write data to influx'), leaving a gap in stored data after recovery",
-      "HYPOTHESIS: no container other than influxDB changes state (fms-server, fms-consumer, grafana keep running)"
+      "HYPOTHESIS: no container other than influxDB changes state (fms-server, fms-consumer, grafana keep running)",
+      "MEASURED Day 2 (strict 2 s rule): fms-server does not answer within 2 s while influxDB is down (~2 s connect failure, or blocks until influxDB returns); envelope 5 s added to observe the full profile"
     ],
     "risks": [
       "Wider blast radius in effect: InfluxDB is shared by fms-server, fms-consumer and grafana (their container state is watched by the blast-radius guard)",
       "InfluxDB start-up time is unmeasured; recovery waits up to recovery_timeout_s (30 s) for fresh data",
       "Data written while InfluxDB is down is lost unless the consumer buffers it (to be measured as a data gap)",
       "Volumes (influxdb-data, influxdb-auth) persist across stop/start; the adapter never removes containers or volumes"
-    ]
+    ],
+    "fault_observer_timeout_s": 5.0,
+    "fault_latency_p95_max_ms": 4500.0
   }
 }

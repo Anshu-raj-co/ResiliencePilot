@@ -15,10 +15,12 @@ class RfmsObserver:
     def __init__(self, base_url: str, timeout_s: float, client: httpx.Client | None = None) -> None:
         self._client = client or httpx.Client(base_url=base_url, timeout=timeout_s)
 
-    def observe(self) -> Observation:
+    def observe(self, timeout_s: float | None = None) -> Observation:
+        """One poll. `timeout_s` overrides the client timeout for this poll only (fault-window envelope)."""
         start = time.perf_counter()
         try:
-            resp = self._client.get(VEHICLE_STATUS_PATH, params={"latestOnly": "true"})
+            kw = {} if timeout_s is None else {"timeout": timeout_s}
+            resp = self._client.get(VEHICLE_STATUS_PATH, params={"latestOnly": "true"}, **kw)
         except httpx.HTTPError as exc:
             return Observation(utcnow(), None, None, None, None, None, None, error=f"{type(exc).__name__}: {exc}")
         latency_ms = round((time.perf_counter() - start) * 1000, 2)

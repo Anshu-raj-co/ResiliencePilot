@@ -24,7 +24,7 @@ def env(tmp_path):
     world = FakeWorld()
     docker = FakeDocker(world)
     observer = FakeObserver(world)
-    ctl = SafetyController(cfg, CATALOG, docker)
+    ctl = SafetyController(cfg, CATALOG, docker, observer=observer)
     runner = ExperimentRunner(cfg, CATALOG, ctl, docker, observer, EvidenceStore(cfg.data_dir))
     return cfg, world, docker, observer, ctl, runner
 
