@@ -10,6 +10,7 @@
   runs | show RUN_ID [--json]   list runs / impact chart + timeline of one run
   deps                       verified dependency map with a live shared-network check
   show-baseline [FILE]       print a stored baseline (default: newest)
+  report [--run ID] [--out FILE]  read-only Day-1 explainer HTML (default: latest full-length COMPLETED run)
 """
 from __future__ import annotations
 
@@ -101,7 +102,16 @@ def main(argv: list[str] | None = None) -> int:
     sh = sub.add_parser("show"); sh.add_argument("run_id"); sh.add_argument("--json", action="store_true")
     sub.add_parser("deps")
     sbs = sub.add_parser("show-baseline"); sbs.add_argument("file", nargs="?")
+    rp_ = sub.add_parser("report"); rp_.add_argument("--run"); rp_.add_argument("--out", default="reports/day1/explainer.html")
     args = p.parse_args(argv)
+
+    if args.cmd == "report":  # read-only: handled before any Docker / safety-controller object is created
+        from pathlib import Path
+        from .explainer import build_report
+        out = Path(args.out)
+        out = out if out.is_absolute() else REPO_ROOT / out
+        print(f"wrote {build_report(REPO_ROOT, args.run, out)}")
+        return 0
 
     cfg, catalog, docker, ctl, observer, store, runner = build(_printer)
     if args.cmd == "stop":  # first, before anything that reads possibly-corrupt state files
