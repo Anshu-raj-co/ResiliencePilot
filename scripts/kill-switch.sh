@@ -34,9 +34,19 @@ for t in ${TARGETS//,/ }; do
   fi
   for attempt in 1 2 3; do
     paused=$(docker inspect -f '{{.State.Paused}}' "$t" 2>/dev/null || echo "unknown")
-    [ "$paused" = "false" ] && break
+    if [ "$paused" = "false" ]; then
+      [ "$attempt" = 1 ] && echo "$t already restored (not paused)"
+      break
+    fi
     if [ "$paused" = "true" ]; then
-      docker unpause "$t" >/dev/null 2>&1 && echo "unpaused $t" || echo "unpause $t failed (attempt $attempt)" >&2
+      if docker unpause "$t" >/dev/null 2>&1; then
+        echo "unpaused $t"
+      elif [ "$(docker inspect -f '{{.State.Paused}}' "$t" 2>/dev/null)" = "false" ]; then
+        echo "$t already restored (unpaused concurrently, e.g. by the backend's own rollback)"
+        break
+      else
+        echo "unpause $t failed (attempt $attempt)" >&2
+      fi
     fi
     sleep 0.5
   done

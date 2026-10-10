@@ -107,6 +107,22 @@ threshold choice, not a property of the system.
 | Tests | 49 unit tests plus 3 live tests pass. They cover timeout, cancel, invalid or malformed input, concurrency, observer loss, rollback failure, recovery failure, and crash. |
 | Independent review | 1 high and 5 medium issues found, all fixed with regression tests ([SAFETY_REVIEW.md](../testing/SAFETY_REVIEW.md)). |
 
+## Run provenance
+
+All 12 runs come from our own team's Day-1 sessions on 2026-10-10 against the same local stack. None came
+from another team or an external source.
+
+| Runs (`reports/day1/`) | Origin |
+|---|---|
+| `084750Z-2a256d`, `084814Z-b17ca6`, `084842Z-baf896`, `085706Z-db15a3` | Individual manual verification runs: first stall, kill switch, crash test, second-terminal test |
+| `085221Z-98b877` + `085240Z-76d080` | Our demo session (`scripts/demo-day1.sh`) — rehearsal 1 |
+| `085737Z-c9bda7` + `085754Z-05b39e` | Our demo session — rehearsal 2 (after the safety-review fixes) |
+| `092158Z-43ca5b` + `092215Z-a107b5` | Our demo session — rehearsal 3 |
+| `094045Z-3155f1` + `094104Z-25d49e` | Our demo session — rehearsal 4 (with the impact view); this log is in `day1-demo-run.log` |
+
+Each demo-session pair is the script's 12 s stall followed by its 25 s kill-switch run. Both runs carry
+`approved_by: demo-operator` and the script's hypothesis text.
+
 ## Limitations (honest)
 
 - **The fault is a container pause, not a network fault.** There is no proxy anywhere in the stack, so no
