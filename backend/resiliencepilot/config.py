@@ -8,6 +8,47 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 HARD_MAX_DURATION_S = 30  # non-negotiable ceiling; config may only lower it
 MAX_WATCHDOG_GRACE_S = 10.0
+MAX_ERROR_RATE = 0.5
+MAX_FAULT_OBSERVER_TIMEOUT_S = 8.0      # longest a single fault-window poll may wait for an answer (D-022; was 5.0)
+MAX_FAULT_LATENCY_P95_MS = 7500.0       # ceiling for a declared fault-window latency cap; must stay below the timeout (D-022)
+
+
+SUPPORTED_MECHANISMS = ("docker_pause", "docker_stop")
+
+
+@dataclass(frozen=True)
+class Guardrails:
+    """Automatic abort-and-rollback conditions evaluated during the fault window.
+
+    error rate   : share of fault-window polls answered with a non-200 status (no-response polls are counted by
+                   observer-loss instead). max_error_rate 0.0: the first error aborts. Above 0: the rate is judged
+                   once `error_min_samples` responses exist (a single early error is not a 100 % rate).
+    latency p95  : rolling p95 of the last `latency_window` fault-window polls. Abort when it exceeds
+                   max(baseline_p95 * latency_p95_multiplier, latency_p95_floor_ms), once `latency_min_samples` exist.
+    blast radius : every compose-project container outside the experiment's declared blast_radius must keep the same
+                   id, status and start time. Checked by a monitor thread every `blast_radius_interval_s`.
+    """
+    max_error_rate: float = 0.0
+    error_min_samples: int = 5
+    latency_p95_multiplier: float = 5.0
+    latency_p95_floor_ms: float = 250.0
+    latency_window: int = 10
+    latency_min_samples: int = 5
+    blast_radius_interval_s: float = 0.5
+    blast_radius_max_snapshot_failures: int = 3
+
+    def __post_init__(self) -> None:
+        # lower AND upper bounds: config may tighten a guard, never switch it off inside a 30 s window
+        if not 0.0 <= self.max_error_rate <= MAX_ERROR_RATE:
+            raise ValueError(f"max_error_rate must be within [0, {MAX_ERROR_RATE}]")
+        if not 1 <= self.error_min_samples <= 10:
+            raise ValueError("error_min_samples must be within 1..10")
+        if not 1.0 <= self.latency_p95_multiplier <= 20.0 or not 0 < self.latency_p95_floor_ms <= 5000:
+            raise ValueError("latency guard: multiplier within 1..20, floor within (0, 5000] ms")
+        if not 1 <= self.latency_min_samples <= self.latency_window <= 30:
+            raise ValueError("need 1 <= latency_min_samples <= latency_window <= 30")
+        if not 0 < self.blast_radius_interval_s <= 2.0 or not 1 <= self.blast_radius_max_snapshot_failures <= 5:
+            raise ValueError("blast-radius monitor: interval within (0, 2] s, max_snapshot_failures within 1..5")
 
 
 @dataclass(frozen=True)
@@ -24,6 +65,7 @@ class SafetyConfig:
     recovery_consecutive: int
     watchdog_grace_s: float
     data_dir: Path
+    guardrails: Guardrails = field(default_factory=Guardrails)
 
     def __post_init__(self) -> None:
         if not 1 <= self.max_duration_s <= HARD_MAX_DURATION_S:
@@ -46,12 +88,50 @@ class ExperimentSpec:
     description: str = ""
     expected_symptoms: tuple[str, ...] = field(default_factory=tuple)
     risks: tuple[str, ...] = field(default_factory=tuple)
+    blast_radius: tuple[str, ...] = field(default_factory=tuple)  # containers allowed to change state; default = targets
+    stop_timeout_s: int = 2                                        # docker_stop only: SIGTERM -> SIGKILL grace
+    max_error_rate: float | None = None                            # per-experiment override of the guardrail
+    expected_statuses: tuple[int, ...] = field(default_factory=tuple)  # HTTP codes that ARE the symptom (fault window only)
+    # response envelope for slow-failing dependencies (fault window only; precheck/recovery keep the global timeout)
+    fault_observer_timeout_s: float | None = None
+    fault_latency_p95_max_ms: float | None = None
+
+    def __post_init__(self) -> None:
+        if self.mechanism not in SUPPORTED_MECHANISMS:
+            raise ValueError(f"{self.name}: unsupported mechanism {self.mechanism!r}")
+        if not self.allowed_targets:
+            raise ValueError(f"{self.name}: allowed_targets must not be empty")
+        if not set(self.allowed_targets) <= set(self.effective_blast_radius):
+            raise ValueError(f"{self.name}: blast_radius must include every allowed target")
+        if not 0 <= self.stop_timeout_s <= 5:
+            raise ValueError(f"{self.name}: stop_timeout_s must be within 0..5")
+        if any(not 400 <= int(c) <= 599 for c in self.expected_statuses):
+            raise ValueError(f"{self.name}: expected_statuses must be HTTP error codes (400..599)")
+        if self.fault_observer_timeout_s is not None:
+            if not 0 < self.fault_observer_timeout_s <= MAX_FAULT_OBSERVER_TIMEOUT_S:
+                raise ValueError(f"{self.name}: fault_observer_timeout_s must be within (0, {MAX_FAULT_OBSERVER_TIMEOUT_S}]")
+            if self.max_duration_s + self.fault_observer_timeout_s > HARD_MAX_DURATION_S:
+                raise ValueError(f"{self.name}: max_duration_s + fault_observer_timeout_s must be <= {HARD_MAX_DURATION_S}")
+        if self.fault_latency_p95_max_ms is not None:
+            if not 0 < self.fault_latency_p95_max_ms <= MAX_FAULT_LATENCY_P95_MS:
+                raise ValueError(f"{self.name}: fault_latency_p95_max_ms must be within (0, {MAX_FAULT_LATENCY_P95_MS}]")
+            if self.fault_observer_timeout_s is None or self.fault_latency_p95_max_ms >= self.fault_observer_timeout_s * 1000:
+                raise ValueError(f"{self.name}: fault_latency_p95_max_ms needs a fault_observer_timeout_s above it")
+        if self.expected_statuses and self.max_error_rate not in (None, 0.0):
+            raise ValueError(f"{self.name}: a declared expected status requires zero tolerance for any other error")
+        if self.max_error_rate is not None and not 0.0 <= self.max_error_rate <= MAX_ERROR_RATE:
+            raise ValueError(f"{self.name}: max_error_rate must be within [0, {MAX_ERROR_RATE}]")
+
+    @property
+    def effective_blast_radius(self) -> tuple[str, ...]:
+        return self.blast_radius or self.allowed_targets
 
 
 def load_safety_config(root: Path = REPO_ROOT) -> SafetyConfig:
     raw = json.loads((root / "config" / "safety.json").read_text(encoding="utf-8"))
     data_dir = Path(raw.pop("data_dir"))
-    return SafetyConfig(data_dir=data_dir if data_dir.is_absolute() else root / data_dir, **raw)
+    guardrails = Guardrails(**raw.pop("guardrails", {}))
+    return SafetyConfig(data_dir=data_dir if data_dir.is_absolute() else root / data_dir, guardrails=guardrails, **raw)
 
 
 def load_experiment_catalog(root: Path = REPO_ROOT) -> dict[str, ExperimentSpec]:
@@ -65,6 +145,12 @@ def load_experiment_catalog(root: Path = REPO_ROOT) -> dict[str, ExperimentSpec]
             description=spec.get("description", ""),
             expected_symptoms=tuple(spec.get("expected_symptoms", [])),
             risks=tuple(spec.get("risks", [])),
+            blast_radius=tuple(spec.get("blast_radius", [])),
+            stop_timeout_s=int(spec.get("stop_timeout_s", 2)),
+            max_error_rate=spec.get("max_error_rate"),
+            expected_statuses=tuple(int(c) for c in spec.get("expected_statuses", [])),
+            fault_observer_timeout_s=spec.get("fault_observer_timeout_s"),
+            fault_latency_p95_max_ms=spec.get("fault_latency_p95_max_ms"),
         )
         for name, spec in raw.items()
     }

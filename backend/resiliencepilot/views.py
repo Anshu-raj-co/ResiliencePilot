@@ -121,7 +121,13 @@ def render_impact_chart(rec: dict) -> str:
             return None if tl.get(ev) is None else round(tl[ev] - inj, 2)
         imp, rc = rec["impact"], rec["recovery"]
         lines.append(f"{C['b']}Timeline (t=0 at verified injection){C['x']}")
-        lines.append(f"  t={0:6.2f}s  fault active (docker inspect: Paused=true) on {rec['request']['target']}")
+        verified_by = next(((e.get("detail") or {}).get("verified_by") for e in rec["timeline"]
+                            if e["event"] == "fault_active"), None)
+        lines.append(f"  t={0:6.2f}s  fault active ({verified_by or 'verified'}) on {rec['request']['target']} "
+                     f"[{rec['request']['experiment_type']}]")
+        trip = (rec.get("guardrails") or {}).get("triggered")
+        if trip:
+            lines.append(f"  guardrail TRIPPED: {trip['guard']} at run t={trip['t_s']}s -> {rec['stop_reason']}")
         if imp.get("time_to_detection_s") is not None:
             lines.append(f"  t={imp['time_to_detection_s']:6.2f}s  STALE detected while HTTP 200  "
                          f"({imp['healthy_but_stale_observations']} healthy-but-stale polls, max age {imp['max_data_age_s']}s)")

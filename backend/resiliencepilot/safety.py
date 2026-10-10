@@ -16,6 +16,7 @@ import json
 import os
 import sys
 import threading
+import time
 from pathlib import Path
 from typing import Literal
 
@@ -45,7 +46,7 @@ class Latched(SafetyError):
 class ExperimentRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
 
-    experiment_type: Literal["telemetry_stall"]
+    experiment_type: Literal["telemetry_stall", "service_crash", "dependency_failure"]
     target: str = Field(min_length=1, max_length=63, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_.-]*$")
     duration_s: int = Field(ge=1, le=HARD_MAX_DURATION_S)
     approved_by: str = Field(min_length=1, max_length=80)
@@ -86,17 +87,44 @@ def pid_alive(pid: int) -> bool:
     return True
 
 
+# On Windows, replacing/deleting/reading a file fails with PermissionError while another thread or process has it
+# open (e.g. a status poller). Retry ONLY that error, briefly and boundedly; then fail exactly as before (closed).
+# Never used for decisions, lock acquisition (O_EXCL) or anything with a timeout.
+IO_RETRY_DELAYS_S = (0.02, 0.03, 0.04, 0.05)  # 5 attempts in total, 20-50 ms apart (<= 140 ms)
+
+
+def _retry_io(op):
+    for delay in IO_RETRY_DELAYS_S:
+        try:
+            return op()
+        except PermissionError:
+            time.sleep(delay)
+    return op()  # 5th and last attempt: any error propagates unchanged
+
+
+def _unlink(path: Path) -> None:
+    _retry_io(lambda: path.unlink(missing_ok=True))
+
+
+def _read_text(path: Path) -> str:
+    return _retry_io(lambda: path.read_text(encoding="utf-8"))
+
+
 def _atomic_write(path: Path, payload: dict) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    os.replace(tmp, path)
+    _retry_io(lambda: os.replace(tmp, path))
 
 
 class SafetyController:
-    def __init__(self, cfg: SafetyConfig, catalog: dict[str, ExperimentSpec], docker: Docker) -> None:
+    RESET_FRESH_CONSECUTIVE = 3
+    RESET_TELEMETRY_TIMEOUT_S = 15.0
+
+    def __init__(self, cfg: SafetyConfig, catalog: dict[str, ExperimentSpec], docker: Docker, observer=None) -> None:
         self.cfg = cfg
         self.catalog = catalog
         self.docker = docker
+        self.observer = observer  # read-only rFMS observer; required for reset()
         self._lock = threading.RLock()  # re-entrant: a signal handler or nested call can never self-deadlock
         self._active_run: str | None = None
         self._stop_event: threading.Event | None = None
@@ -114,7 +142,7 @@ class SafetyController:
     def _read_state(self) -> dict:
         if self._state_path.exists():
             try:
-                st = json.loads(self._state_path.read_text(encoding="utf-8"))
+                st = json.loads(_read_text(self._state_path))
                 if isinstance(st, dict) and "latched" in st:
                     st.setdefault("history", [])
                     return st
@@ -155,7 +183,7 @@ class SafetyController:
         if not self._run_lock_path.exists():
             return None
         try:
-            info = json.loads(self._run_lock_path.read_text(encoding="utf-8"))
+            info = json.loads(_read_text(self._run_lock_path))
             pid = int(info.get("pid", -1))
         except (OSError, ValueError, TypeError):
             return {"pid": None, "run_id": None, "alive": False, "corrupt": True}
@@ -179,8 +207,8 @@ class SafetyController:
 
     def _release_run_lock(self, run_id: str) -> None:
         h = self.lock_holder()
-        if h is not None and h.get("pid") == os.getpid() and h.get("run_id") == run_id:
-            self._run_lock_path.unlink(missing_ok=True)
+        if h is not None and h.get("pid") == os.getpid() and h.get("run_id") == run_id:  # decided once
+            _unlink(self._run_lock_path)
 
     # ---------- validation ----------
     def validate(self, raw: object) -> ExperimentRequest:
@@ -198,6 +226,10 @@ class SafetyController:
         limit = min(self.cfg.max_duration_s, spec.max_duration_s, HARD_MAX_DURATION_S)
         if req.duration_s > limit:
             raise RequestRejected(f"duration_s {req.duration_s} exceeds limit {limit}")
+        if spec.fault_observer_timeout_s is not None and req.duration_s <= spec.fault_observer_timeout_s:
+            # no poll may outlive the fault window, so a shorter window could not be observed at all
+            raise RequestRejected(f"duration_s {req.duration_s} must exceed the fault observer timeout "
+                                  f"{spec.fault_observer_timeout_s}s for {req.experiment_type}")
         return req
 
     def verify_target(self, name: str) -> ContainerState:
@@ -256,18 +288,18 @@ class SafetyController:
         return {"stopped_run": self._active_run or (holder or {}).get("run_id"), "source": source}
 
     # ---------- active-fault marker ----------
-    def mark_fault_active(self, run_id: str, target: str, mechanism: str) -> None:
+    def mark_fault_active(self, run_id: str, target: str, mechanism: str, container_id: str | None = None) -> None:
         _atomic_write(self._marker_path, {"run_id": run_id, "target": target, "mechanism": mechanism,
-                                          "pid": os.getpid(), "at": utcnow().isoformat()})
+                                          "container_id": container_id, "pid": os.getpid(), "at": utcnow().isoformat()})
 
     def clear_fault_marker(self) -> None:
-        self._marker_path.unlink(missing_ok=True)
+        _unlink(self._marker_path)
 
     def active_fault_marker(self) -> dict | None:
         if not self._marker_path.exists():
             return None
         try:
-            m = json.loads(self._marker_path.read_text(encoding="utf-8"))
+            m = json.loads(_read_text(self._marker_path))
             return m if isinstance(m, dict) else {"corrupt": True}
         except (OSError, ValueError):
             return {"corrupt": True}
@@ -289,9 +321,19 @@ class SafetyController:
         for target in targets:
             try:
                 st = self.docker.inspect(target)
-                if st.exists and st.paused and st.project == self.cfg.compose_project:
+                in_sandbox = st.exists and st.project == self.cfg.compose_project
+                if in_sandbox and st.paused:
                     self.docker.unpause(target)
                     outcomes.append(f"{target}: unpaused")
+                elif in_sandbox and not st.running:
+                    # only undo a stop WE made: marker says docker_stop for this exact container id
+                    ours = (marker is not None and marker.get("mechanism") == "docker_stop"
+                            and marker.get("target") == target and marker.get("container_id") == st.id)
+                    if ours:
+                        self.docker.start(target)
+                        outcomes.append(f"{target}: started")
+                    else:
+                        outcomes.append(f"{target}: stopped, NOT started (no matching docker_stop marker)")
                 else:
                     outcomes.append(f"{target}: state {st.status}")
             except DockerError as exc:
@@ -299,16 +341,41 @@ class SafetyController:
         outcome = "; ".join(outcomes)
         run_id = (marker or {}).get("run_id") or (holder or {}).get("run_id")
         self.latch(f"interrupted run {run_id} found at startup ({outcome})")
-        self._run_lock_path.unlink(missing_ok=True)  # dead holder: lock is meaningless now; latch still blocks
+        _unlink(self._run_lock_path)  # dead holder: lock is meaningless now; latch still blocks
         return {"marker": marker or {"run_id": run_id}, "outcome": outcome}
 
+    def check_fresh_telemetry(self) -> dict:
+        """Read-only: need RESET_FRESH_CONSECUTIVE consecutive FRESH polls (HTTP 200, age <= stale threshold) with at
+        least one advance of createdDateTime, within RESET_TELEMETRY_TIMEOUT_S. Containers running is not enough."""
+        from .telemetry import Freshness, FreshnessTracker
+        if self.observer is None:
+            raise SafetyError("reset requires a live telemetry observer; refusing to reset on container state alone")
+        tracker = FreshnessTracker(self.cfg.stale_threshold_s)
+        streak, advanced, samples = 0, False, []
+        deadline = time.monotonic() + self.RESET_TELEMETRY_TIMEOUT_S
+        while time.monotonic() < deadline:
+            o = self.observer.observe()
+            a = tracker.update(o)
+            samples.append({"http": o.http_status, "age_s": None if a.data_age_s is None else round(a.data_age_s, 3),
+                            "freshness": a.freshness.value})
+            if a.freshness is Freshness.FRESH:
+                streak += 1
+                advanced = advanced or a.advanced
+            else:
+                streak, advanced = 0, False
+            if streak >= self.RESET_FRESH_CONSECUTIVE and advanced:
+                return {"fresh_consecutive": streak, "advanced": True, "samples": samples[-8:]}
+            time.sleep(self.cfg.poll_interval_s)
+        raise SafetyError(f"reset refused: telemetry not fresh and advancing within {self.RESET_TELEMETRY_TIMEOUT_S}s "
+                          f"(last samples: {samples[-4:]})")
+
     def reset(self, operator: str, note: str) -> dict:
-        """Clear a latch only if no run is active anywhere and every allowlisted target is running and unpaused."""
+        """Clear a latch only if no run is active anywhere, every allowlisted target is running and unpaused, AND the
+        rFMS API serves fresh, advancing telemetry (3 consecutive fresh polls with at least one advance)."""
         if not operator.strip():
             raise SafetyError("reset requires an operator name")
-        with self._lock:
-            if self._active_run is not None or self.other_process_active():
-                raise Busy("cannot reset while an experiment is active")
+
+        def containers_clean() -> None:
             problems = []
             for t in self.allowed_targets:
                 try:
@@ -320,12 +387,23 @@ class SafetyController:
                     problems.append(f"{t}: status={st.status}")
             if problems:
                 raise SafetyError(f"reset refused, targets not clean: {problems}")
+
+        with self._lock:
+            if self._active_run is not None or self.other_process_active():
+                raise Busy("cannot reset while an experiment is active")
+            containers_clean()
+        telemetry = self.check_fresh_telemetry()   # polls for a few seconds: done outside the lock
+        with self._lock:
+            if self._active_run is not None or self.other_process_active():
+                raise Busy("cannot reset while an experiment is active")
+            containers_clean()                     # re-check: nothing may have changed while we polled
             st = self._read_state()
             st["history"].append({"at": utcnow().isoformat(), "event": "reset", "operator": operator, "note": note,
-                                  "previous_reason": st["reason"]})
+                                  "previous_reason": st["reason"],
+                                  "telemetry_check": {k: telemetry[k] for k in ("fresh_consecutive", "advanced")}})
             st.update(latched=False, reason=None, since=None)
             _atomic_write(self._state_path, st)
             self.clear_fault_marker()
-            self._run_lock_path.unlink(missing_ok=True)
+            _unlink(self._run_lock_path)
             self.stop_file.unlink(missing_ok=True)
-        return {"reset_by": operator, "targets_checked": self.allowed_targets}
+        return {"reset_by": operator, "targets_checked": self.allowed_targets, "telemetry_check": telemetry}

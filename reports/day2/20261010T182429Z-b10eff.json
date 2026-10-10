@@ -1,0 +1,218 @@
+{
+  "run_id": "20261010T182429Z-b10eff",
+  "request": {
+    "experiment_type": "service_crash",
+    "target": "fms-forwarder",
+    "duration_s": 15,
+    "approved_by": "Anshu (Day-2 crash test)",
+    "hypothesis": "Startup recovery starts a stopped target"
+  },
+  "state": "LATCHED_UNSAFE",
+  "spec": {
+    "mechanism": "docker_stop",
+    "expected_symptoms": [
+      "HYPOTHESIS: fms-server keeps returning HTTP 200",
+      "HYPOTHESIS: createdDateTime stops advancing; data age grows past stale_threshold_s",
+      "HYPOTHESIS: after docker start, fresh data takes longer to return than after unpause (cold databroker + Zenoh reconnect)"
+    ],
+    "risks": [
+      "fms-forwarder has no restart policy: if docker start fails it stays down (rollback not verified -> LATCHED_UNSAFE)",
+      "Zenoh client may reconnect slowly or not at all after a cold start",
+      "Telemetry for the stopped window is never produced (no backfill)"
+    ]
+  },
+  "limits": {
+    "stale_threshold_s": 5.0,
+    "poll_interval_s": 0.5,
+    "watchdog_grace_s": 5.0,
+    "recovery_timeout_s": 30.0
+  },
+  "timeline": [
+    {
+      "at": "2026-10-10T18:24:29.342472+00:00",
+      "t_s": 0.0,
+      "event": "validated",
+      "detail": {
+        "approved_by": "Anshu (Day-2 crash test)",
+        "hypothesis": "Startup recovery starts a stopped target"
+      },
+      "state": "VALIDATED"
+    },
+    {
+      "at": "2026-10-10T18:24:29.347646+00:00",
+      "t_s": 0.005,
+      "event": "precheck_start",
+      "detail": null,
+      "state": "PRECHECK"
+    },
+    {
+      "at": "2026-10-10T18:24:31.224589+00:00",
+      "t_s": 1.882,
+      "event": "precheck_passed",
+      "detail": {
+        "fresh_samples": 3
+      },
+      "state": "PRECHECK"
+    },
+    {
+      "at": "2026-10-10T18:24:31.376710+00:00",
+      "t_s": 2.034,
+      "event": "guardrails_armed",
+      "detail": {
+        "latency_threshold_ms": 439.35,
+        "latency_baseline": "baseline baseline-20261010T172349Z",
+        "max_error_rate": 0.0,
+        "blast_radius_allowed": [
+          "fms-forwarder"
+        ],
+        "watched_containers": 8
+      },
+      "state": "PRECHECK"
+    },
+    {
+      "at": "2026-10-10T18:24:31.379427+00:00",
+      "t_s": 2.037,
+      "event": "injecting",
+      "detail": {
+        "target": "fms-forwarder",
+        "mechanism": "docker_stop"
+      },
+      "state": "INJECTING"
+    },
+    {
+      "at": "2026-10-10T18:24:33.812446+00:00",
+      "t_s": 4.47,
+      "event": "fault_active",
+      "detail": {
+        "verified_by": "docker inspect State.Running == false",
+        "injection_latency_s": 2.432,
+        "exit_code": 137
+      },
+      "state": "ACTIVE"
+    },
+    {
+      "at": "2026-10-10T18:24:36.295147+00:00",
+      "event": "interrupted_process_recovered",
+      "detail": "fms-forwarder: started",
+      "state": "LATCHED_UNSAFE"
+    }
+  ],
+  "observations": [
+    {
+      "phase": "precheck",
+      "t_s": 0.175,
+      "observation": {
+        "observed_at": "2026-10-10T18:24:29.517595+00:00",
+        "http_status": 200,
+        "latency_ms": 99.25,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T18:24:28.597000+00:00",
+        "received_at": "2026-10-10T18:24:29.515673+00:00",
+        "server_time": "2026-10-10T18:24:29.515676+00:00",
+        "error": null,
+        "data_age_s": 0.919
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 0.919,
+        "stalled_for_s": 0.0,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "precheck",
+      "t_s": 0.782,
+      "observation": {
+        "observed_at": "2026-10-10T18:24:30.124456+00:00",
+        "http_status": 200,
+        "latency_ms": 105.83,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T18:24:29.599000+00:00",
+        "received_at": "2026-10-10T18:24:30.122901+00:00",
+        "server_time": "2026-10-10T18:24:30.122903+00:00",
+        "error": null,
+        "data_age_s": 0.524
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 0.524,
+        "stalled_for_s": 0.0,
+        "advanced": true,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "precheck",
+      "t_s": 1.381,
+      "observation": {
+        "observed_at": "2026-10-10T18:24:30.723613+00:00",
+        "http_status": 200,
+        "latency_ms": 98.51,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T18:24:29.599000+00:00",
+        "received_at": "2026-10-10T18:24:30.721980+00:00",
+        "server_time": "2026-10-10T18:24:30.721986+00:00",
+        "error": null,
+        "data_age_s": 1.123
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 1.123,
+        "stalled_for_s": 0.599,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    }
+  ],
+  "stop_reason": "error",
+  "rollback": {
+    "attempted": true,
+    "verified": false,
+    "by": "startup_recovery",
+    "detail": "fms-forwarder: started"
+  },
+  "recovery": {
+    "verified": false,
+    "time_to_first_fresh_s": null,
+    "time_to_verified_s": null,
+    "criteria": "rollback verified by docker inspect (same container (id unchanged) running and unpaused) AND 3 successive advances of createdDateTime beyond both the last pre-rollback value and the fms-server time of the last fault-window poll, each with HTTP 200 and data_age_s <= 5.0s",
+    "detail": null
+  },
+  "impact": {
+    "fault_verified": true,
+    "injection_latency_s": 2.432
+  },
+  "guardrails": {
+    "config": {
+      "max_error_rate": 0.0,
+      "error_min_samples": 5,
+      "latency_p95_multiplier": 5.0,
+      "latency_p95_floor_ms": 250.0,
+      "latency_window": 10,
+      "latency_min_samples": 5,
+      "blast_radius_interval_s": 0.5,
+      "blast_radius_max_snapshot_failures": 3
+    },
+    "blast_radius_allowed": [
+      "fms-forwarder"
+    ],
+    "triggered": null,
+    "latency_baseline_p95_ms": 87.87,
+    "latency_baseline_source": "baseline baseline-20261010T172349Z",
+    "latency_threshold_ms": 439.35,
+    "blast_radius_baseline": {
+      "csv-provider": "running",
+      "databroker": "running",
+      "fms-consumer": "running",
+      "fms-forwarder": "running",
+      "fms-server": "running",
+      "fms-zenoh-router": "running",
+      "grafana": "running",
+      "influxDB": "running"
+    }
+  }
+}

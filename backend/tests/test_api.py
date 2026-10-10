@@ -22,7 +22,7 @@ def env(tmp_path):
     cfg = make_config(tmp_path)
     world = FakeWorld()
     docker = FakeDocker(world)
-    ctl = SafetyController(cfg, CATALOG, docker)
+    ctl = SafetyController(cfg, CATALOG, docker, observer=FakeObserver(world))
     store = EvidenceStore(cfg.data_dir)
     app = create_app(cfg, CATALOG, ctl, docker, FakeObserver(world), store,
                      run_template={**DASHBOARD_TEMPLATE, "duration_s": 2}, monitor=True)
@@ -147,3 +147,51 @@ def test_last_run_never_shows_an_in_progress_record(env):
     assert s["state"] == "BUSY"
     assert s["last_run"]["run_id"] == first and s["last_run"]["state"] == "COMPLETED"
     wait_idle(env)
+
+
+# ---- Phase E: read-only insights (scores, planner proposals, findings) ----
+@pytest.mark.parametrize("src", ["../../etc", "/tmp", "reports/day2", "LOCAL", ""])
+def test_insights_source_is_a_fixed_name_never_a_path(env, src):
+    r = env["a"].get("/api/insights", params={"source": src})
+    assert r.status_code == 422 and "local" in r.json()["detail"]
+
+
+def test_insights_on_committed_evidence_uses_the_servers_allowlist(env):
+    d = env["a"].get("/api/insights", params={"source": "day2"}).json()
+    assert d["source"] == "day2" and d["runs"] >= 20
+    # the planner only sees the catalog this server enforces (here: telemetry_stall on fms-forwarder only)
+    assert [(e["experiment_type"], e["target"]) for e in d["plan"]] == [("telemetry_stall", "fms-forwarder")]
+    assert all(e["requires_human_approval"] for e in d["plan"])
+    assert {"dependency_failure", "service_crash", "telemetry_stall"} <= set(d["summary"])
+    notes = [h.get("note") for f in d["findings"] for h in f["runs"] if h.get("note")]
+    assert any("deliberate guard test" in n for n in notes) and all("title" in f for f in d["findings"])
+
+
+def test_insights_local_scores_a_dashboard_run(env):
+    empty = env["a"].get("/api/insights").json()
+    assert empty["runs"] == 0 and empty["latest_scored"] is None and empty["findings"] == []
+    assert env["a"].post("/api/run").status_code == 202
+    wait_idle(env)
+    d = env["a"].get("/api/insights").json()
+    assert d["runs"] == 1 and d["recent"][0]["run_id"] == env["store"].list_runs()[-1]
+    s = d["latest_scored"]
+    assert s is not None and 0 <= s["score"] <= 100 and set(s["components"]) == {
+        "detection", "recovery", "data_integrity", "blast_radius"}
+
+
+def test_insights_failure_never_breaks_the_controls(env, monkeypatch):
+    import resiliencepilot.insights as ins
+    monkeypatch.setattr(ins, "build_insights", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    r = env["a"].get("/api/insights")
+    assert r.status_code == 500 and "boom" in r.json()["detail"]
+    assert env["a"].get("/api/status").status_code == 200
+
+
+def test_page_shows_proposals_without_any_way_to_run_them():
+    html = (api_mod._STATIC).read_text(encoding="utf-8")
+    for el in ('id="score"', 'id="summary"', 'id="recent"', 'id="plan"', 'id="findings"', "proposals only"):
+        assert el in html
+    assert "/api/insights?source=" in html
+    # the only POSTs remain the three existing controls; planner commands are rendered as text
+    assert sorted(set(__import__("re").findall(r'post\("(/api/[a-z]+)"', html))) == ["/api/kill", "/api/reset", "/api/run"]
+    assert '<span class="cmd">' in html

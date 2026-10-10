@@ -5,12 +5,44 @@
   "description": "A human-approved request to run one allowlisted experiment. Unknown fields are rejected.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["experiment_type", "target", "duration_s", "approved_by"],
+  "required": [
+    "experiment_type",
+    "target",
+    "duration_s",
+    "approved_by"
+  ],
   "properties": {
-    "experiment_type": { "type": "string", "enum": ["telemetry_stall"] },
-    "target": { "type": "string", "enum": ["fms-forwarder"], "description": "Exact container name; must also be in config/experiments.json for this type." },
-    "duration_s": { "type": "integer", "minimum": 1, "maximum": 30, "description": "Fault-active duration. Hard cap 30 s (config may lower it)." },
-    "approved_by": { "type": "string", "minLength": 1, "maxLength": 80, "description": "Human approver; required, no anonymous runs." },
-    "hypothesis": { "type": "string", "maxLength": 500 }
+    "experiment_type": {
+      "type": "string",
+      "enum": [
+        "telemetry_stall",
+        "service_crash",
+        "dependency_failure"
+      ]
+    },
+    "target": {
+      "type": "string",
+      "enum": [
+        "fms-forwarder",
+        "influxDB"
+      ],
+      "description": "Exact container name; must also be allowlisted for this type in config/experiments.json."
+    },
+    "duration_s": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 30,
+      "description": "Fault-active duration. Hard cap 30 s; the catalogue lowers it per type (service_crash, dependency_failure: 15 s)."
+    },
+    "approved_by": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "description": "Human approver; required, no anonymous runs."
+    },
+    "hypothesis": {
+      "type": "string",
+      "maxLength": 500
+    }
   }
 }

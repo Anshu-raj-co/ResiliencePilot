@@ -1,0 +1,292 @@
+{
+  "nodes": [
+    {
+      "name": "fms-server",
+      "service": "fms-server",
+      "image": "ghcr.io/eclipse-sdv-blueprints/fleet-management/fms-server:main",
+      "networks": [
+        "resiliencepilot-sdv_fms-backend"
+      ],
+      "ports": [
+        "127.0.0.1:8081->8081/tcp"
+      ],
+      "healthcheck": false,
+      "restart_policy": "no"
+    },
+    {
+      "name": "fms-consumer",
+      "service": "fms-consumer",
+      "image": "ghcr.io/eclipse-sdv-blueprints/fleet-management/fms-consumer:main",
+      "networks": [
+        "resiliencepilot-sdv_fms-backend"
+      ],
+      "ports": [],
+      "healthcheck": false,
+      "restart_policy": "no"
+    },
+    {
+      "name": "csv-provider",
+      "service": "csv-provider",
+      "image": "quay.io/eclipse-kuksa/csv-provider:0.4.5",
+      "networks": [
+        "resiliencepilot-sdv_fms-vehicle"
+      ],
+      "ports": [],
+      "healthcheck": false,
+      "restart_policy": "no"
+    },
+    {
+      "name": "grafana",
+      "service": "grafana",
+      "image": "docker.io/grafana/grafana:9.5.14",
+      "networks": [
+        "resiliencepilot-sdv_fms-backend"
+      ],
+      "ports": [
+        "127.0.0.1:3000->3000/tcp"
+      ],
+      "healthcheck": false,
+      "restart_policy": "no"
+    },
+    {
+      "name": "databroker",
+      "service": "databroker",
+      "image": "quay.io/eclipse-kuksa/kuksa-databroker:0.6.0",
+      "networks": [
+        "resiliencepilot-sdv_fms-vehicle"
+      ],
+      "ports": [
+        "127.0.0.1:55557->55556/tcp"
+      ],
+      "healthcheck": false,
+      "restart_policy": "no"
+    },
+    {
+      "name": "influxDB",
+      "service": "influxdb",
+      "image": "docker.io/library/influxdb:2.7",
+      "networks": [
+        "resiliencepilot-sdv_fms-backend"
+      ],
+      "ports": [
+        "127.0.0.1:8086->8086/tcp"
+      ],
+      "healthcheck": true,
+      "restart_policy": "no"
+    },
+    {
+      "name": "fms-zenoh-router",
+      "service": "fms-zenoh-router",
+      "image": "eclipse/zenoh:1.1.0",
+      "networks": [
+        "resiliencepilot-sdv_fms-backend",
+        "resiliencepilot-sdv_fms-vehicle"
+      ],
+      "ports": [
+        "127.0.0.1:7447->7447/tcp"
+      ],
+      "healthcheck": false,
+      "restart_policy": "unless-stopped"
+    },
+    {
+      "name": "fms-forwarder",
+      "service": "fms-forwarder",
+      "image": "ghcr.io/eclipse-sdv-blueprints/fleet-management/fms-forwarder:main",
+      "networks": [
+        "resiliencepilot-sdv_fms-backend",
+        "resiliencepilot-sdv_fms-vehicle"
+      ],
+      "ports": [],
+      "healthcheck": false,
+      "restart_policy": "no"
+    }
+  ],
+  "edges": [
+    {
+      "from": "csv-provider",
+      "to": "databroker",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "env_reference",
+          "detail": "KUKSA_DATA_BROKER_ADDR=databroker"
+        },
+        {
+          "kind": "depends_on",
+          "detail": "databroker:service_started:false"
+        }
+      ]
+    },
+    {
+      "from": "fms-consumer",
+      "to": "fms-zenoh-router",
+      "confidence": "low",
+      "evidence": [
+        {
+          "kind": "depends_on",
+          "detail": "fms-zenoh-router:service_started:false"
+        }
+      ]
+    },
+    {
+      "from": "fms-consumer",
+      "to": "influxDB",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "env_reference",
+          "detail": "INFLUXDB_URI=http://influxdb:8086"
+        },
+        {
+          "kind": "depends_on",
+          "detail": "influxdb:service_healthy:false"
+        }
+      ]
+    },
+    {
+      "from": "fms-forwarder",
+      "to": "csv-provider",
+      "confidence": "low",
+      "evidence": [
+        {
+          "kind": "depends_on",
+          "detail": "csv-provider:service_started:false"
+        }
+      ]
+    },
+    {
+      "from": "fms-forwarder",
+      "to": "databroker",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "env_reference",
+          "detail": "KUKSA_DATABROKER_URI=http://databroker:55556"
+        }
+      ]
+    },
+    {
+      "from": "fms-forwarder",
+      "to": "fms-zenoh-router",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "config_reference",
+          "detail": "/zenoh-config.json5: tcp/fms-zenoh-router:7447"
+        },
+        {
+          "kind": "depends_on",
+          "detail": "fms-zenoh-router:service_started:false"
+        }
+      ]
+    },
+    {
+      "from": "fms-server",
+      "to": "influxDB",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "env_reference",
+          "detail": "INFLUXDB_URI=http://influxdb:8086"
+        },
+        {
+          "kind": "depends_on",
+          "detail": "influxdb:service_healthy:false"
+        }
+      ]
+    },
+    {
+      "from": "grafana",
+      "to": "influxDB",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "config_reference",
+          "detail": "/etc/dashboards/grafana_fms_dashboard.json: influxdb"
+        },
+        {
+          "kind": "depends_on",
+          "detail": "influxdb:service_healthy:false"
+        }
+      ]
+    }
+  ],
+  "diff_vs_dependency_map": {
+    "matched": [
+      {
+        "from": "csv-provider",
+        "to": "databroker",
+        "evidence": [
+          "env_reference",
+          "depends_on"
+        ]
+      },
+      {
+        "from": "fms-forwarder",
+        "to": "databroker",
+        "evidence": [
+          "env_reference"
+        ]
+      },
+      {
+        "from": "fms-forwarder",
+        "to": "fms-zenoh-router",
+        "evidence": [
+          "config_reference",
+          "depends_on"
+        ]
+      },
+      {
+        "from": "fms-consumer",
+        "to": "influxDB",
+        "evidence": [
+          "env_reference",
+          "depends_on"
+        ]
+      },
+      {
+        "from": "fms-server",
+        "to": "influxDB",
+        "evidence": [
+          "env_reference",
+          "depends_on"
+        ]
+      },
+      {
+        "from": "grafana",
+        "to": "influxDB",
+        "evidence": [
+          "config_reference",
+          "depends_on"
+        ]
+      }
+    ],
+    "direction_differs": [
+      {
+        "map": "fms-zenoh-router -> fms-consumer",
+        "discovered": "fms-consumer -> fms-zenoh-router",
+        "evidence": [
+          "depends_on"
+        ],
+        "note": "map follows data flow; discovery follows who connects to whom"
+      }
+    ],
+    "map_only": [],
+    "discovered_only": [
+      {
+        "from": "fms-forwarder",
+        "to": "csv-provider",
+        "confidence": "low",
+        "evidence": [
+          {
+            "kind": "depends_on",
+            "detail": "csv-provider:service_started:false"
+          }
+        ]
+      }
+    ],
+    "not_discoverable": [
+      "resiliencepilot"
+    ]
+  }
+}

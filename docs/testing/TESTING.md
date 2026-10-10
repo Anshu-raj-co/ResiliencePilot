@@ -10,6 +10,16 @@ Setup: `python -m venv .venv && .venv/Scripts/python -m pip install -e ".[test]"
 ## Day-1 results (2026-10-10)
 - `pytest -q`: **38 passed**. `RP_LIVE=1 pytest -q`: **41 passed** (≈24 s).
 
+## Day-2 results (2026-10-10, branch feat/day2-service-crash)
+- `pytest -q`: **140 passed, 3 skipped**. `RP_LIVE=1 pytest -q`: **143 passed**.
+- New: `test_service_crash.py` (23 collected: stop/start, cap 15 s, start failure latches, no-op stop, replaced
+  container never restarted, watchdog starts the container, emergency stop, startup recovery only starts a target
+  stopped by our own docker_stop marker for the same container id, injection latency + exit code, and the Day-2
+  safety-review regressions M1/M2/M4/L1), `test_guardrails.py` (37 collected: each guard's logic, lower AND upper
+  config bounds, each guard tripping end to end for both mechanisms with verified rollback, blast-radius unobservable,
+  refusal to inject when unobservable or the target is missing from the baseline, breach after the fault window
+  still latches).
+
 ## What the unit tests cover
 Fakes in `tests/helpers.py` model the real blueprint: telemetry `createdDateTime` advances only while the fake
 forwarder container is unpaused, so detection and recovery logic is exercised end to end without Docker.

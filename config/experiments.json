@@ -2,7 +2,9 @@
   "telemetry_stall": {
     "description": "Freeze the vehicle-side publisher so createdDateTime stops advancing while the rFMS API stays up.",
     "mechanism": "docker_pause",
-    "allowed_targets": ["fms-forwarder"],
+    "allowed_targets": [
+      "fms-forwarder"
+    ],
     "max_duration_s": 30,
     "expected_symptoms": [
       "fms-server keeps returning HTTP 200",
@@ -12,6 +14,61 @@
     "risks": [
       "Zenoh session lease may expire during a long pause and require reconnect on unpause",
       "Telemetry for the paused window is not produced (no backfill)"
+    ],
+    "blast_radius": [
+      "fms-forwarder"
     ]
+  },
+  "service_crash": {
+    "description": "Crash the vehicle-side publisher (docker stop: SIGTERM, SIGKILL after stop_timeout_s) and restart it.",
+    "mechanism": "docker_stop",
+    "allowed_targets": [
+      "fms-forwarder"
+    ],
+    "blast_radius": [
+      "fms-forwarder"
+    ],
+    "stop_timeout_s": 2,
+    "max_duration_s": 15,
+    "expected_symptoms": [
+      "HYPOTHESIS: fms-server keeps returning HTTP 200",
+      "HYPOTHESIS: createdDateTime stops advancing; data age grows past stale_threshold_s",
+      "HYPOTHESIS: after docker start, fresh data takes longer to return than after unpause (cold databroker + Zenoh reconnect)"
+    ],
+    "risks": [
+      "fms-forwarder has no restart policy: if docker start fails it stays down (rollback not verified -> LATCHED_UNSAFE)",
+      "Zenoh client may reconnect slowly or not at all after a cold start",
+      "Telemetry for the stopped window is never produced (no backfill)"
+    ]
+  },
+  "dependency_failure": {
+    "description": "Stop the shared time-series store (docker stop) and start it again. Expected symptom: the rFMS API answers with an error status instead of data.",
+    "mechanism": "docker_stop",
+    "allowed_targets": [
+      "influxDB"
+    ],
+    "blast_radius": [
+      "influxDB"
+    ],
+    "stop_timeout_s": 2,
+    "max_duration_s": 15,
+    "expected_statuses": [
+      500
+    ],
+    "expected_symptoms": [
+      "HYPOTHESIS: fms-server answers HTTP 500 (source: fms-server/src/lib.rs maps query errors to INTERNAL_SERVER_ERROR), i.e. the failure is VISIBLE to a plain health check",
+      "HYPOTHESIS: fms-consumer keeps running but drops the statuses it cannot write (influx-client writer.rs: 'failed to write data to influx'), leaving a gap in stored data after recovery",
+      "HYPOTHESIS: no container other than influxDB changes state (fms-server, fms-consumer, grafana keep running)",
+      "MEASURED Day 2 (strict 2 s rule): fms-server does not answer within 2 s while influxDB is down (~2 s connect failure, or blocks until influxDB returns); envelope 5 s added to observe the full profile",
+      "MEASURED Day 2 (5 s envelope): 3 of 5 runs got no answer within 5 s on the first fault poll; envelope widened to 8 s / 7.5 s (D-022)"
+    ],
+    "risks": [
+      "Wider blast radius in effect: InfluxDB is shared by fms-server, fms-consumer and grafana (their container state is watched by the blast-radius guard)",
+      "InfluxDB start-up time is unmeasured; recovery waits up to recovery_timeout_s (30 s) for fresh data",
+      "Data written while InfluxDB is down is lost unless the consumer buffers it (to be measured as a data gap)",
+      "Volumes (influxdb-data, influxdb-auth) persist across stop/start; the adapter never removes containers or volumes"
+    ],
+    "fault_observer_timeout_s": 8.0,
+    "fault_latency_p95_max_ms": 7500.0
   }
 }

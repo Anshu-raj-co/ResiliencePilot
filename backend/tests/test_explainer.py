@@ -6,10 +6,11 @@ from resiliencepilot.config import REPO_ROOT
 from resiliencepilot.explainer import collect, load_runs, render
 
 
-def test_default_run_is_latest_full_length_completed():
+def test_default_run_is_latest_full_length_completed_telemetry_stall():
     data = collect(REPO_ROOT, None)
     runs = load_runs(REPO_ROOT)
-    full = [rid for rid, (r, _) in runs.items() if r["state"] == "COMPLETED" and r["stop_reason"] == "duration_elapsed"]
+    full = [rid for rid, (r, _) in runs.items() if r["state"] == "COMPLETED" and r["stop_reason"] == "duration_elapsed"
+            and r["request"].get("experiment_type", "telemetry_stall") == "telemetry_stall"]  # Day-1 explainer topic
     assert data["run"]["run_id"] == full[-1]
     assert len(data["full_runs"]) == len(full)
 

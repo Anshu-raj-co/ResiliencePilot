@@ -34,7 +34,12 @@ verifies recovery from advancing telemetry — never from HTTP 200 or "container
 3. One active experiment at a time, across processes (`backend/data/run.lock` with owner PID). Total fault time
    ≤ 30 s including watchdog grace (config may set lower, never higher).
 4. Watchdog thread enforces deadline independent of API/UI/AI. Emergency stop always available (API + CLI + `scripts/kill-switch`).
-5. Rollback on: completion, cancel, timeout, safety-threshold violation, observer loss, any exception (`finally`).
+   The kill switch and startup recovery restore allowlisted sandbox targets by **unpause** (paused) or **start** (stopped).
+5. Rollback on: completion, cancel, timeout, observer loss, any exception (`finally`), and the automatic guardrails
+   (`guardrails.py`, limits in `config/safety.json`): HTTP error rate (default: first non-200 aborts), latency p95 above
+   max(5 x stored-baseline p95, 250 ms), and **blast radius** (any compose-project container outside the experiment's
+   `blast_radius` changing id/status/start time; a change found after recovery latches). Guard bounds are validated and
+   cannot be loosened past them in config. `docker_stop` rollback only counts for the same container id.
 6. Recovery = rollback verified by `docker inspect` AND `createdDateTime` advancing 3 successive times past both the
    last frozen value and the server time of the last fault-window poll, each fresh (≤ 5 s) with HTTP 200. HTTP 200 alone is never recovery.
 7. Rollback or recovery not verified → **LATCHED_UNSAFE**. No new experiments until an explicit, logged reset after a human checks the stack.

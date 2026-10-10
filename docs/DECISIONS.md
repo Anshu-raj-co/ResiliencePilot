@@ -52,7 +52,64 @@ unpauses without the backend; next backend start runs `startup_recovery` (unpaus
 run record). Known limit: the in-process watchdog dies with a hard-killed process (verified live), so between crash
 and kill-switch/restart the fault persists.
 
+**D-012 — service_crash = `docker stop -t 2` / `docker start` (`StopStartFault`).** Rollback is verified only for the
+**same container id** recorded before the stop; a removed or replaced container is reported as not restored (latch),
+never recreated. `stop_timeout_s` is bounded to 0..5 (catalogue) and 0..10 (Docker wrapper). Catalogue cap 15 s.
+
+**D-013 — Guardrails detect, the orchestrator rolls back.** Error-rate and latency guards run in the fault loop; the
+blast-radius guard is a separate read-only monitor thread (a whole-project `docker inspect` costs ~66 ms by container id,
+but each Docker CLI call is ~190 ms on this machine, so checking inside the 0.5 s poll loop would distort cadence).
+Thresholds: error rate 0.0 by default (identical to Day 1's "any non-200 aborts"), with an optional per-experiment
+tolerance judged only after 5 responses (one early error is not a 100 % rate); latency p95 > max(5 x p95 of the newest
+stored baseline, 250 ms) over the last 10 polls (min 5); blast radius compares id, status and StartedAt (a restart
+keeps status `running` but changes StartedAt; verified live with Grafana).
+
+**D-014 — Detection time is recorded twice.** `time_to_detection_s` is measured from the fault command (as on Day 1);
+`time_to_detection_from_verified_injection_s` subtracts `injection_latency_s`. For service_crash they differ by the
+~2.4 s stop grace because fms-forwarder ignores SIGTERM (exit code 137, verified).
+
+**D-015: The expected-status rule (dependency_failure).** An experiment may declare `expected_statuses` (HTTP
+400–599). During the fault window only, those codes count as the symptom, never as errors. Any other non-200 still
+counts for the error-rate guard. If a symptom is declared, the first poll with no response aborts (observer loss
+limit 1, instead of 4). Precheck and recovery are unchanged. Approved by the lead.
+
+**D-016: Stored-data gap as evidence.** After recovery is verified, one read-only `starttime/stoptime` query
+records the largest gap between stored `createdDateTime` values around the fault. It is evidence only: a failure here
+is recorded and never changes the run's state.
+
+**D-017: Per-experiment response envelope (approved option b).** An experiment may declare
+`fault_observer_timeout_s` (at most 5 s) and `fault_latency_p95_max_ms` (at most 5000 ms, and below the timeout). Both
+apply to fault-window polls only. Duration plus timeout must be at most 30 s, and a request's duration must exceed the
+timeout. The fault loop never starts a poll that could outlive the window, so the watchdog stays a backstop. Precheck
+and recovery keep the global 2 s timeout. Used by `dependency_failure` (5 s / 4.5 s).
+
+**D-018: `reset` requires fresh, advancing telemetry.** Besides healthy containers, `reset` needs 3 consecutive FRESH
+polls (HTTP 200, age at most 5 s) with at least one advance of `createdDateTime`, within 15 s. Containers are
+re-checked after polling, the check is recorded in the reset history, and without an observer reset refuses. This
+prevents the 2026-10-10 operator error (reset while the API answered 500).
+
+
+**D-019 — Resilience Score = weighted mean of measured components × silent-failure multiplier (`docs/SCORING.md`).**
+Detection 0.25, recovery 0.30, data integrity 0.20, blast radius 0.25; unmeasured components drop out (never imputed);
+`× (1 − 0.5 · silent ratio)` over fault + recovery polls. Only `duration_elapsed` runs enter the per-type summary;
+runs cut short by the system's response are scored but `partial`; operator/tool stops and unverified rollbacks are
+not scorable. Read-only: computed from stored run records, never fed back into the safety path.
+
+**D-020 — AI layer is advisory, local and evidence-gated (`docs/AI_LAYER.md`).** Local Ollama only (loopback URL
+enforced); `ai.py` may not import anything that reaches Docker, the shell or safety state (test-enforced). The
+planner may only reorder rule-based candidates (exact permutation, else fallback). Analyst items must cite their own
+finding's runs and pass a deterministic grounding check against the verified facts; failures fall back per item to
+the rule-based knowledge base with the reason and the model's text recorded. Rule-based answers are always available.
+
 **D-021 — Databroker host port moved to 55557 (override: `RP_DATABROKER_HOST_PORT`).** Upstream hardcodes
 `127.0.0.1:55555`, which collided with another program on a dev Mac and blocked `databroker`, `csv-provider` and
 `fms-forwarder`. Remapped via `config/compose/resiliencepilot.override.yaml` (`ports: !override`), blueprint untouched.
 No ResiliencePilot code uses the host port; container-to-container traffic is unchanged.
+
+**D-022: Response envelope ceilings widened to 8 s / 7500 ms (approved by the user, 2026-10-11).** Under D-017's
+5 s, 3 of 5 `dependency_failure` runs aborted on the first fault poll (fms-server blocked > 5 s while InfluxDB was
+down). Raising only the timeout would not help: the latency guard's nearest-rank p95 over 5–10 samples equals that one
+slow poll, so a 4.5 s cap would abort the same runs. Both ceilings rise together: `MAX_FAULT_OBSERVER_TIMEOUT_S` 8.0,
+`MAX_FAULT_LATENCY_P95_MS` 7500 (cap still strictly below the timeout); `dependency_failure` uses 8 s / 7.5 s.
+Unchanged: fault-window polls only; duration + timeout ≤ 30 s (15 + 8 = 23); precheck and recovery keep the global
+2 s timeout; recovery rule 6 and all other guards are untouched.

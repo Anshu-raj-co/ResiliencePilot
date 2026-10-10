@@ -1,0 +1,432 @@
+{
+  "summary": {
+    "samples": 30,
+    "started_at": "2026-10-10T20:35:47.288542+00:00",
+    "ended_at": "2026-10-10T20:36:03.722753+00:00",
+    "http_ok_ratio": 1.0,
+    "vins": [
+      "YV2E4C3A5VB180691"
+    ],
+    "freshness_counts": {
+      "FRESH": 30,
+      "STALE": 0,
+      "NO_DATA": 0,
+      "OBSERVER_ERROR": 0
+    },
+    "healthy_but_stale_count": 0,
+    "data_age_s": {
+      "n": 30,
+      "min": 0.277,
+      "median": 0.743,
+      "p95": 1.204,
+      "max": 1.227
+    },
+    "created_advance_interval_s": {
+      "n": 16,
+      "min": 1.001,
+      "median": 1.006,
+      "p95": 1.01,
+      "max": 1.014
+    },
+    "distinct_created_values": 17,
+    "regressions": 0,
+    "latency_ms": {
+      "n": 30,
+      "min": 49.05,
+      "median": 63.16,
+      "p95": 83.39,
+      "max": 89.86
+    },
+    "stale_threshold_s": 5.0,
+    "unavailable_signals": {
+      "sequence_id": "VehicleStatus carries no sequence number; progression uses strictly increasing createdDateTime",
+      "end_to_end_latency": "createdDateTime is stamped by fms-forwarder, but InfluxDB write time is not exposed by the rFMS API; data_age_s (server_time - createdDateTime) is an upper bound on pipeline delay plus polling offset",
+      "completeness": "no expected-message counter exists in the data; not measured"
+    },
+    "collected_at": "2026-10-10T20:36:03.723017+00:00",
+    "interval_s": 0.5,
+    "load_conditions": {
+      "forwarder_timer_interval": "500ms",
+      "csv_provider_infinite": "1",
+      "csv_rows": 4001,
+      "vehicles": 1,
+      "observer_poll_interval_s": 0.5,
+      "other_clients": "not measured (ResiliencePilot starts no load generator; Grafana polls only while a browser has it open)",
+      "docker_mem_total_gib": 7.75,
+      "stack_stats": [
+        {
+          "name": "databroker",
+          "cpu": "1.26%",
+          "mem": "17.12MiB / 7.748GiB"
+        },
+        {
+          "name": "fms-forwarder",
+          "cpu": "0.69%",
+          "mem": "34.82MiB / 7.748GiB"
+        },
+        {
+          "name": "csv-provider",
+          "cpu": "2.08%",
+          "mem": "64.79MiB / 7.748GiB"
+        },
+        {
+          "name": "grafana",
+          "cpu": "0.03%",
+          "mem": "218.4MiB / 7.748GiB"
+        },
+        {
+          "name": "fms-consumer",
+          "cpu": "0.52%",
+          "mem": "35.35MiB / 7.748GiB"
+        },
+        {
+          "name": "fms-server",
+          "cpu": "0.37%",
+          "mem": "18.53MiB / 7.748GiB"
+        },
+        {
+          "name": "fms-zenoh-router",
+          "cpu": "0.19%",
+          "mem": "34.52MiB / 7.748GiB"
+        },
+        {
+          "name": "influxDB",
+          "cpu": "26.70%",
+          "mem": "340.2MiB / 7.748GiB"
+        }
+      ]
+    }
+  },
+  "observations": [
+    {
+      "observed_at": "2026-10-10T20:35:47.288542+00:00",
+      "http_status": 200,
+      "latency_ms": 58.48,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:35:46.750000+00:00",
+      "received_at": "2026-10-10T20:35:47.286556+00:00",
+      "server_time": "2026-10-10T20:35:47.286559+00:00",
+      "error": null,
+      "data_age_s": 0.537
+    },
+    {
+      "observed_at": "2026-10-10T20:35:47.838193+00:00",
+      "http_status": 200,
+      "latency_ms": 49.05,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:35:46.750000+00:00",
+      "received_at": "2026-10-10T20:35:47.836233+00:00",
+      "server_time": "2026-10-10T20:35:47.836236+00:00",
+      "error": null,
+      "data_age_s": 1.086
+    },
+    {
+      "observed_at": "2026-10-10T20:35:48.393103+00:00",
+      "http_status": 200,
+      "latency_ms": 54.1,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:35:47.756000+00:00",
+      "received_at": "2026-10-10T20:35:48.391737+00:00",
+      "server_time": "2026-10-10T20:35:48.391739+00:00",
+      "error": null,
+      "data_age_s": 0.636
+    },
+    {
+      "observed_at": "2026-10-10T20:35:48.961345+00:00",
+      "http_status": 200,
+      "latency_ms": 63.13,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:35:47.756000+00:00",
+      "received_at": "2026-10-10T20:35:48.959783+00:00",
+      "server_time": "2026-10-10T20:35:48.959785+00:00",
+      "error": null,
+      "data_age_s": 1.204
+    },
+    {
+      "observed_at": "2026-10-10T20:35:49.511654+00:00",
+      "http_status": 200,
+      "latency_ms": 49.93,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:35:48.763000+00:00",
+      "received_at": "2026-10-10T20:35:49.509975+00:00",
+      "server_time": "2026-10-10T20:35:49.509978+00:00",
+      "error": null,
+      "data_age_s": 0.747
+    },
+    {
+      "observed_at": "2026-10-10T20:35:50.079146+00:00",
+      "http_status": 200,
+      "latency_ms": 64.23,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:35:49.767000+00:00",
+      "received_at": "2026-10-10T20:35:50.077608+00:00",
+      "server_time": "2026-10-10T20:35:50.077619+00:00",
+      "error": null,
+      "data_age_s": 0.311
+    },
+    {
+      "observed_at": "2026-10-10T20:35:50.655095+00:00",
+      "http_status": 200,
+      "latency_ms": 71.34,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:35:49.767000+00:00",
+      "received_at": "2026-10-10T20:35:50.653375+00:00",
+      "server_time": "2026-10-10T20:35:50.653381+00:00",
+      "error": null,
+      "data_age_s": 0.886
+    },
+    {
+      "observed_at": "2026-10-10T20:35:51.228049+00:00",
+      "http_status": 200,
+      "latency_ms": 72.68,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:35:50.776000+00:00",
+      "received_at": "2026-10-10T20:35:51.226280+00:00",
+      "server_time": "2026-10-10T20:35:51.226283+00:00",
+      "error": null,
+      "data_age_s": 0.45
+    },
+    {
+      "observed_at": "2026-10-10T20:35:51.790616+00:00",
+      "http_status": 200,
+      "latency_ms": 61.9,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:35:50.776000+00:00",
+      "received_at": "2026-10-10T20:35:51.787563+00:00",
+      "server_time": "2026-10-10T20:35:51.787570+00:00",
+      "error": null,
+      "data_age_s": 1.012
+    },
+    {
+      "observed_at": "2026-10-10T20:35:52.356069+00:00",
+      "http_status": 200,
+      "latency_ms": 62.94,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:35:51.783000+00:00",
+      "received_at": "2026-10-10T20:35:52.353885+00:00",
+      "server_time": "2026-10-10T20:35:52.353888+00:00",
+      "error": null,
+      "data_age_s": 0.571
+    },
+    {
+      "observed_at": "2026-10-10T20:35:52.926633+00:00",
+      "http_status": 200,
+      "latency_ms": 68.36,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:35:51.783000+00:00",
+      "received_at": "2026-10-10T20:35:52.924760+00:00",
+      "server_time": "2026-10-10T20:35:52.924761+00:00",
+      "error": null,
+      "data_age_s": 1.142
+    },
+    {
+      "observed_at": "2026-10-10T20:35:53.512186+00:00",
+      "http_status": 200,
+      "latency_ms": 83.39,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:35:52.789000+00:00",
+      "received_at": "2026-10-10T20:35:53.510465+00:00",
+      "server_time": "2026-10-10T20:35:53.510468+00:00",
+      "error": null,
+      "data_age_s": 0.721
+    },
+    {
+      "observed_at": "2026-10-10T20:35:54.076016+00:00",
+      "http_status": 200,
+      "latency_ms": 60.13,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:35:53.797000+00:00",
+      "received_at": "2026-10-10T20:35:54.074205+00:00",
+      "server_time": "2026-10-10T20:35:54.074208+00:00",
+      "error": null,
+      "data_age_s": 0.277
+    },
+    {
+      "observed_at": "2026-10-10T20:35:54.670758+00:00",
+      "http_status": 200,
+      "latency_ms": 89.86,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:35:53.797000+00:00",
+      "received_at": "2026-10-10T20:35:54.669259+00:00",
+      "server_time": "2026-10-10T20:35:54.669263+00:00",
+      "error": null,
+      "data_age_s": 0.872
+    },
+    {
+      "observed_at": "2026-10-10T20:35:55.221501+00:00",
+      "http_status": 200,
+      "latency_ms": 49.5,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:35:54.803000+00:00",
+      "received_at": "2026-10-10T20:35:55.219711+00:00",
+      "server_time": "2026-10-10T20:35:55.219714+00:00",
+      "error": null,
+      "data_age_s": 0.417
+    },
+    {
+      "observed_at": "2026-10-10T20:35:55.784135+00:00",
+      "http_status": 200,
+      "latency_ms": 62.08,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:35:54.803000+00:00",
+      "received_at": "2026-10-10T20:35:55.782563+00:00",
+      "server_time": "2026-10-10T20:35:55.782565+00:00",
+      "error": null,
+      "data_age_s": 0.98
+    },
+    {
+      "observed_at": "2026-10-10T20:35:56.352188+00:00",
+      "http_status": 200,
+      "latency_ms": 66.31,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:35:55.809000+00:00",
+      "received_at": "2026-10-10T20:35:56.350549+00:00",
+      "server_time": "2026-10-10T20:35:56.350558+00:00",
+      "error": null,
+      "data_age_s": 0.542
+    },
+    {
+      "observed_at": "2026-10-10T20:35:56.910221+00:00",
+      "http_status": 200,
+      "latency_ms": 55.29,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:35:55.809000+00:00",
+      "received_at": "2026-10-10T20:35:56.908565+00:00",
+      "server_time": "2026-10-10T20:35:56.908568+00:00",
+      "error": null,
+      "data_age_s": 1.1
+    },
+    {
+      "observed_at": "2026-10-10T20:35:57.476009+00:00",
+      "http_status": 200,
+      "latency_ms": 63.19,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:35:56.814000+00:00",
+      "received_at": "2026-10-10T20:35:57.474358+00:00",
+      "server_time": "2026-10-10T20:35:57.474361+00:00",
+      "error": null,
+      "data_age_s": 0.66
+    },
+    {
+      "observed_at": "2026-10-10T20:35:58.042591+00:00",
+      "http_status": 200,
+      "latency_ms": 64.84,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:35:56.814000+00:00",
+      "received_at": "2026-10-10T20:35:58.040983+00:00",
+      "server_time": "2026-10-10T20:35:58.040986+00:00",
+      "error": null,
+      "data_age_s": 1.227
+    },
+    {
+      "observed_at": "2026-10-10T20:35:58.615072+00:00",
+      "http_status": 200,
+      "latency_ms": 70.19,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:35:57.823000+00:00",
+      "received_at": "2026-10-10T20:35:58.613305+00:00",
+      "server_time": "2026-10-10T20:35:58.613318+00:00",
+      "error": null,
+      "data_age_s": 0.79
+    },
+    {
+      "observed_at": "2026-10-10T20:35:59.177184+00:00",
+      "http_status": 200,
+      "latency_ms": 60.94,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:35:58.828000+00:00",
+      "received_at": "2026-10-10T20:35:59.175552+00:00",
+      "server_time": "2026-10-10T20:35:59.175554+00:00",
+      "error": null,
+      "data_age_s": 0.348
+    },
+    {
+      "observed_at": "2026-10-10T20:35:59.746807+00:00",
+      "http_status": 200,
+      "latency_ms": 68.97,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:35:58.828000+00:00",
+      "received_at": "2026-10-10T20:35:59.745458+00:00",
+      "server_time": "2026-10-10T20:35:59.745461+00:00",
+      "error": null,
+      "data_age_s": 0.917
+    },
+    {
+      "observed_at": "2026-10-10T20:36:00.320458+00:00",
+      "http_status": 200,
+      "latency_ms": 69.06,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:35:59.829000+00:00",
+      "received_at": "2026-10-10T20:36:00.318915+00:00",
+      "server_time": "2026-10-10T20:36:00.318918+00:00",
+      "error": null,
+      "data_age_s": 0.49
+    },
+    {
+      "observed_at": "2026-10-10T20:36:00.886689+00:00",
+      "http_status": 200,
+      "latency_ms": 64.66,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:35:59.829000+00:00",
+      "received_at": "2026-10-10T20:36:00.885173+00:00",
+      "server_time": "2026-10-10T20:36:00.885176+00:00",
+      "error": null,
+      "data_age_s": 1.056
+    },
+    {
+      "observed_at": "2026-10-10T20:36:01.450299+00:00",
+      "http_status": 200,
+      "latency_ms": 61.17,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:36:00.834000+00:00",
+      "received_at": "2026-10-10T20:36:01.448601+00:00",
+      "server_time": "2026-10-10T20:36:01.448622+00:00",
+      "error": null,
+      "data_age_s": 0.615
+    },
+    {
+      "observed_at": "2026-10-10T20:36:02.017429+00:00",
+      "http_status": 200,
+      "latency_ms": 62.77,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:36:00.834000+00:00",
+      "received_at": "2026-10-10T20:36:02.015898+00:00",
+      "server_time": "2026-10-10T20:36:02.015901+00:00",
+      "error": null,
+      "data_age_s": 1.182
+    },
+    {
+      "observed_at": "2026-10-10T20:36:02.584598+00:00",
+      "http_status": 200,
+      "latency_ms": 62.67,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:36:01.844000+00:00",
+      "received_at": "2026-10-10T20:36:02.583083+00:00",
+      "server_time": "2026-10-10T20:36:02.583086+00:00",
+      "error": null,
+      "data_age_s": 0.739
+    },
+    {
+      "observed_at": "2026-10-10T20:36:03.155387+00:00",
+      "http_status": 200,
+      "latency_ms": 65.61,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:36:02.858000+00:00",
+      "received_at": "2026-10-10T20:36:03.153548+00:00",
+      "server_time": "2026-10-10T20:36:03.153556+00:00",
+      "error": null,
+      "data_age_s": 0.296
+    },
+    {
+      "observed_at": "2026-10-10T20:36:03.722753+00:00",
+      "http_status": 200,
+      "latency_ms": 65.35,
+      "vin": "YV2E4C3A5VB180691",
+      "created_at": "2026-10-10T20:36:02.858000+00:00",
+      "received_at": "2026-10-10T20:36:03.720861+00:00",
+      "server_time": "2026-10-10T20:36:03.720864+00:00",
+      "error": null,
+      "data_age_s": 0.863
+    }
+  ]
+}

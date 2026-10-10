@@ -127,3 +127,13 @@ Evidence files are committed in `reports/day1/`.
 - **Crash test** (`20261010T084842Z-baf896.json`): backend process tree hard-killed (`taskkill /F`) mid-fault →
   forwarder stayed paused (expected: watchdog is in-process). `kill-switch.sh` unpaused it; the next CLI start found
   the fault marker, latched, annotated the run as LATCHED_UNSAFE and refused a new run until `reset`.
+
+## 9. Day 2 measurements [V]
+- **Cadence resolved at the data level.** Stored statuses arrive every 0.501 s (window query), so the forwarder honours
+  `TIMER_INTERVAL=500ms`. `latestOnly=true` exposes a new `createdDateTime` only about every 1.0 s. The cause inside
+  fms-server's `latestOnly` query is still [Q].
+- fms-forwarder ignores SIGTERM: `docker stop` exits with code 137 after the grace period.
+- InfluxDB handles SIGTERM: it exits with code 2 in about 0.4 s.
+- While InfluxDB is down, fms-server requests take at least 2 s: they fail with "failed to connect" and then HTTP 500,
+  or block until InfluxDB returns. fms-consumer drops writes (no buffering). After a ~10 s outage, fms-server kept
+  failing with "failed to resolve host name" for about 18 s after InfluxDB was running.

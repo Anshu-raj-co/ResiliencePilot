@@ -1,12 +1,67 @@
 # Handoff
 
-_Updated: 2026-10-10 ~16:30 IST, live dashboard (branch feat/day1-dashboard)_
+_Updated: 2026-10-11 ~03:00 IST. PR #19 MERGED (`be727d4`). Open: PR #20 (D-022 envelope + 3rd run + AI 14B), PR for `docs/submission-pack` (stacked on #20), PR #7, PR #8._
+
+## RESUME HERE
+- **Submission pack (branch `docs/submission-pack`):** `README.md` (final, screenshot + scores),
+  `docs/ARCHITECTURE_OVERVIEW.md`, `docs/demo/DAY2_DEMO_SCRIPT.md` (3 min), `docs/TEAM_FORM_INFO.md` (team fields
+  marked [TO FILL]: only `Anshu-raj-co` and `nishtrip14` are known from git), `reports/day2/findings.md` (21 runs).
+- **D-022 (PR #20):** envelope 8 s / 7.5 s; 3rd completed dependency_failure run `748875` (envelope not exercised;
+  only first ~4 s of the window polled). AI: 14B analyst times out on this Mac; config stays 7B, 240 s.
+- **Live runs (M2 top-up):** 3 `dependency_failure` attempts at 20:36–20:38 UTC: `08b9dd` COMPLETED; `596e45`,
+  `01d396` ABORTED `observer_lost` (first fault poll blocked > 5 s envelope). All rollback + recovery verified, blast
+  clean. Completed dependency_failure runs: **2 of 3** (`e2eacd`, `08b9dd`). 3 of 5 envelope-era runs abort on the
+  first poll; reaching 3 needs more attempts or a wider envelope (D-017, lead's call). Details:
+  `reports/day2/README.md` (last section). Emergency stop from the dashboard (17:12 UTC) was cleared by a logged reset
+  first, with the user's approval.
+- **Phase E dashboard:** `GET /api/insights?source=local|day2` (read-only; fixed names, never a path; built by
+  `insights.py` from the same functions as `rp score/plan/findings`; planner uses the server's own catalog). Page:
+  latest score with component bars + silent penalty, per-type medians, recent runs, planner proposals (text only, no
+  button), findings with annotations; score refreshes when a run finishes. Screenshot `docs/demo/dashboard-day2.png`.
+  Verified at 1200 px and 500 px (headless Chrome cannot render narrower; no page-level horizontal scroll at 500).
+- Tests: 266 unit pass on macOS (+9 API insights).
+- PR #7: decision renumbered to D-021 (`fc27d02`); still needs `main` merged in (DECISIONS.md conflict).
+- Waiting: `qwen2.5-coder:14b` download (user); then set `model` in `config/ai.json` and rerun `rp advise --dir reports/day2`.
+
+## Day 2 milestone 3: response envelope + telemetry-checked reset (branch `feat/day2-envelope-and-reset`, PR open)
+- D-017 envelope (dependency_failure: 5 s timeout, 4.5 s latency cap, fault window only); D-018 reset needs 3 fresh,
+  advancing polls. 184 unit tests.
+- Live: envelope run 1 LATCHED (consumer DNS failures for ~27 s after influxDB returned → silent stale data);
+  run 2 COMPLETED (500s; server DNS failures for ~22 s after return). Telemetry-checked reset verified live.
+
+## Day 2 milestone 2: dependency_failure (MERGED, PR #16)
+- Implemented the expected-status rule (D-015) and stored-data-gap evidence (D-016); 18 new tests; 158 unit tests.
+- Live: 3 runs all ABORTED with `observer_lost` on the first fault poll. fms-server does not answer within 2 s while
+  InfluxDB is down. Data loss verified (2.0–4.5 s gaps). Kill switch started influxDB with the backend dead.
+- Incident: after the kill-switch restart, fms-server returned 500 ("failed to resolve host name") for about 18 s; I
+  wrongly reset during it (reset checks containers only). Details in `reports/day2/README.md`.
+- **Decisions pending (lead):** (1) how to observe slow-failing dependencies (per-experiment response envelope vs.
+  keep the abort-on-first-poll result); (2) should `reset` require fresh telemetry?
+
+## Day 2 milestone 1: service_crash + guardrails (MERGED, PR #15) (branch `feat/day2-service-crash`, PR open, awaiting approval)
+- Implemented: `StopStartFault` (same-container-id rollback), guardrails (error rate, latency p95, blast-radius
+  monitor + final check), kill switch and startup recovery restore stopped targets (start only for our own marker).
+- Verified live (evidence `reports/day2/`, index `reports/day2/README.md`): 4 + 1 service_crash runs COMPLETED,
+  telemetry_stall regression x2, blast-radius guard tripped live (Grafana restart), kill switch started a stopped
+  target with the backend dead, startup recovery started it without the kill switch.
+- NOT verified live: error-rate and latency guards tripping (no experiment produces errors/latency yet; unit-tested).
+- Tests: 140 unit, 143 with `RP_LIVE=1`. Safety review: no high; M1–M4, L1–L4 fixed (`docs/testing/SAFETY_REVIEW.md`).
+- Next: `dependency_failure` (stop influxDB) needs the expected-symptom rule (D-013 caps error tolerance at 0.5;
+  an expected HTTP 500 must be modelled separately, not by raising tolerance). Then `sensor_freeze`.
 
 ## Where things are
-- Branch `wip/day1-recon` (pushed). Last known-good on main: `401a23d`.
-- Phases 0–2 done and verified live; see `CURRENT_STATUS.md` for the acceptance checklist and `docs/recon.md` §8 for numbers.
-- Safety review done and fixed (`docs/testing/SAFETY_REVIEW.md`). Demo: `docs/demo/DAY1_DEMO.md`, `scripts/demo-day1.sh`.
-- PR #1 merged into `main` (`401a23d`). Wrap-up (dependency map, load conditions, impact view, judge report) is in PR #2 from `wip/day1-recon`; merge is left to the engineering lead.
+- `main` = `843889a`: Day 1 complete, explainer (PR #4) and dashboard (PR #6) merged. Verified 2026-10-10 22:1x:
+  `RP_LIVE=1 pytest` 70 passed; `scripts/demo-day1.sh` exit 0 (46 s).
+- **Day 2 step 1 (cleanup): one PR per item, all open and awaiting the lead's merge approval:**
+  | PR | Branch | Item |
+  |---|---|---|
+  | #10 | `fix/safety-file-retry` | Bounded PermissionError retry in `safety.py`; 12 tests; stress 40/40 with 87,261 concurrent `status()` calls; safety review: no high findings |
+  | #9 | `fix/cli-utf8` | CLI forces UTF-8 stdout/stderr (piped output no longer crashes) |
+  | #11 | `docs/readme-longpaths` | README `git -c core.longpaths=true submodule update --init` |
+  | #12 | `docs/explained-refresh` | PROJECT_EXPLAINED §5, §6, §11, §12 |
+  | this PR | `docs/day2-plan` | `docs/DAY2_PLAN.md` (plan only) + this handoff |
+- Follow-ups noted by the safety review (pre-existing, fail-closed, not in scope): `latch()` in-memory fallback if
+  its write fails; reorder `reset()` so files are deleted before writing the unlatched state.
 
 ## Day-1 explainer (branch `feat/day1-explainer`, PR pending the lead's approval)
 - `rp report [--run ID] [--out FILE]` → `reports/day1/explainer.html`: a standalone offline HTML page built only from
@@ -35,6 +90,13 @@ _Updated: 2026-10-10 ~16:30 IST, live dashboard (branch feat/day1-dashboard)_
   the unlink calls.
 - Live end-to-end run from the page passed (run `20261010T102525Z-e0bb59`); see the PR description.
 
+## Day 2 step 1 (cleanup) — in progress
+- PR #6 (dashboard) was already merged (`843889a`). Verified on main: `RP_LIVE=1 pytest` 70 passed; `demo-day1.sh` exit 0, 46 s.
+- `fix/safety-file-retry`: bounded retry (5 attempts, 20-50 ms) on PermissionError only, for safety-file replace/read/delete.
+  Fails closed as before if retries fail. O_EXCL lock creation and all decisions untouched. Tests:
+  `tests/test_safety_file_retry.py`. Stress: API suite 40/40 with a second process making 87,261 `status()` calls.
+  Awaiting safety review + the lead's merge approval.
+
 ## Where the evidence lives
 | What | Where |
 |---|---|
@@ -59,7 +121,9 @@ RP_LIVE=1 .venv/Scripts/python -m pytest -q    # expect 52 passed
 If `docker info` says "Docker Desktop is unable to start": quit Docker Desktop fully and relaunch it.
 
 ## Next concrete task
-Day 1 is complete. Next session = Phase 3 (`docs/ROADMAP.md`), first task:
+After the lead merges PRs #9-#13: follow `docs/DAY2_PLAN.md`. Decision needed first: the per-experiment
+"expected symptom" rule for `dependency_failure` (HTTP 500 currently trips `safety_threshold`).
+Earlier plan (still valid), Phase 3 first task:
 add `consumer_stall` (pause `fms-consumer`) and `forwarder_restart` (`docker stop`/`start`) to `config/experiments.json`,
 `contracts/experiment_request.schema.json` and `ExperimentRequest`, with a `StopStartFault` adapter, the same
 negative-path tests, and 3 repeated live runs each with TTD/TTR variability reported.
