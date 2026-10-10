@@ -1,7 +1,7 @@
 # Current Status
 
 - **Milestone:** Day 1 COMPLETE — Phases 0, 1, 2 verified live; safety review fixes applied; demo rehearsed
-- **Branch:** `wip/day1-recon` (pushed). `main` unchanged at `38588a5`.
+- **Branch:** `wip/day1-recon` (pushed). `main` = `401a23d` (PR #1 merged); wrap-up in PR #2.
 
 ## Acceptance criteria
 

@@ -3,10 +3,10 @@
 _Updated: 2026-10-10 ~15:20 IST, Day-1 wrap-up (presentation + judge report)_
 
 ## Where things are
-- Branch `wip/day1-recon` (pushed). `main` untouched (`38588a5`). No PR yet.
+- Branch `wip/day1-recon` (pushed). Last known-good on main: `401a23d`.
 - Phases 0–2 done and verified live; see `CURRENT_STATUS.md` for the acceptance checklist and `docs/recon.md` §8 for numbers.
 - Safety review done and fixed (`docs/testing/SAFETY_REVIEW.md`). Demo: `docs/demo/DAY1_DEMO.md`, `scripts/demo-day1.sh`.
-- PR #1 open: `wip/day1-recon` → `main`. Merge is left to the engineering lead.
+- PR #1 merged into `main` (`401a23d`). Wrap-up (dependency map, load conditions, impact view, judge report) is in PR #2 from `wip/day1-recon`; merge is left to the engineering lead.
 
 ## Where the evidence lives
 | What | Where |
