@@ -188,7 +188,10 @@ def main(argv: list[str] | None = None) -> int:
         src = d.relative_to(REPO_ROOT).as_posix() if d.is_relative_to(REPO_ROOT) else d.name
         ann_file = d / "annotations.json"
         ann = json.loads(ann_file.read_text(encoding="utf-8")) if ann_file.is_file() else {}
-        out.write_text(render_markdown(runs, entries, src, {k: v for k, v in ann.items() if not k.startswith("_")}),
+        plat_file = d / "platforms.json"
+        plat = json.loads(plat_file.read_text(encoding="utf-8")) if plat_file.is_file() else {}
+        out.write_text(render_markdown(runs, entries, src, {k: v for k, v in ann.items() if not k.startswith("_")},
+                                       {k: v for k, v in plat.items() if not k.startswith("_")}),
                        encoding="utf-8")
         print(f"wrote {out} ({len(runs)} run records)")
         return 0
