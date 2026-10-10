@@ -9,7 +9,7 @@ check, one experiment at a time across processes, total fault time ≤ 30 s enfo
 
 | | telemetry_stall | service_crash | dependency_failure |
 |---|---|---|---|
-| Status | **Done (Day 1)** | **Done (Day 2): 4 live runs, see `reports/day2/README.md`** | Planned |
+| Status | **Done (Day 1)** | **Done (Day 2): 4 live runs, see `reports/day2/README.md`** | **Implemented (Day 2); 3 live runs all abort on the first poll (API times out); see decision below** |
 | Mechanism | `docker pause` / `unpause` | `docker stop` / `start` | `docker stop` / `start` |
 | Allowlisted target | `fms-forwarder` | `fms-forwarder` | `influxDB` |
 | Duration cap | ≤ 30 s total incl. grace (used: 10–12 s) | *proposed* ≤ 15 s fault window | *proposed* ≤ 15 s fault window |
@@ -51,7 +51,12 @@ check, one experiment at a time across processes, total fault time ≤ 30 s enfo
   - A new fault adapter (`StopStartFault`) is code that changes the system. It needs the same negative-path tests as
     `PauseFault` and an independent safety review.
 
-## 3. dependency_failure: stop/start `influxDB`
+## 3. dependency_failure: stop/start `influxDB` (implemented)
+
+> **Result (3 live runs):** with the approved strict rule, every run aborted on the first fault-window poll, because
+> fms-server does not answer within the 2 s observer timeout while InfluxDB is down (it fails after ~2 s or blocks
+> until InfluxDB returns). Data loss during the outage was verified (2.0–4.5 s gaps). Open decision for the lead: how
+> to observe a dependency failure that shows up as slow responses (see `reports/day2/README.md`).
 
 - **Hypothesis:** with InfluxDB down, fms-server answers **HTTP 500**, not 200. Inferred from source:
   `components/fms-server/src/lib.rs:92,117,146` map query errors to `INTERNAL_SERVER_ERROR`. In that case this

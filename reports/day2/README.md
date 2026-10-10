@@ -61,3 +61,48 @@ blueprint @ `3d514ac72a`). Nothing is edited or simulated. UTC times.
 
 Both COMPLETED. `RP_LIVE=1 pytest`: 143 passed. `kill-switch.sh` (with `--type container`) reported
 `fms-forwarder already restored (running, not paused)`, exit 0.
+
+---
+
+## dependency_failure: stop/start `influxDB` with the expected-status rule (live, 2026-10-10 18:53–18:56 UTC)
+
+Rule (approved by the lead): the declared HTTP 500 is tolerated during the fault window only; any other status, a
+timeout or a lost connection aborts immediately; precheck and recovery stay strictly HTTP 200 + fresh advancing data.
+
+| Run | Result | InfluxDB stop (injection latency, exit code) | Fault-window polls | Stored-data gap | Rollback → first fresh / verified | Final blast check |
+|---|---|---|---|---|---|---|
+| `20261010T185355Z-540224` | ABORTED, `observer_lost` | 0.39 s, exit 2 | 1 (no response within 2 s) | **4.51 s** (17 stored, median interval 0.501 s) | 1.12 s / 4.80 s | clean |
+| `20261010T185440Z-2f33aa` | ABORTED, `observer_lost` | 0.42 s, exit 2 | 1 (no response within 2 s) | **2.01 s** (15 stored) | 0.63 s / 1.94 s | clean |
+| `20261010T185448Z-595a16` | ABORTED, `observer_lost` | 0.45 s, exit 2 | 1 (no response within 2 s) | **4.01 s** (13 stored) | 0.66 s / 2.54 s | clean |
+| `20261010T185518Z-219f1c` | LATCHED_UNSAFE (by design) | 0.44 s | — | — | — | — |
+
+The last run is the crash test: the backend was hard-killed about 0.4 s after the stop. `kill-switch.sh` printed
+`started influxDB` (exit 0); the next backend start latched.
+
+### Hypotheses vs measurements
+1. **"fms-server answers HTTP 500, a visible failure": partly wrong.** The API does not fail *fast*. In every run the
+   first fault-window poll got **no response within the 2 s observer timeout**, and under the agreed rule each run
+   aborted on that poll. fms-server logs show each request first spends about 2 s failing to connect to the stopped
+   InfluxDB (`isahc … failed to connect to the server`) and only then answers 500. Two independent
+   `curl -m 10` requests sent during runs 2 and 3 got **HTTP 200 after 3.17 s**: they blocked until InfluxDB was back
+   (after our rollback) instead of failing. Clients with timeouts under ~2–3 s therefore see **timeouts**, not 500s.
+2. **"Statuses produced during the outage are lost": verified.** fms-consumer logged
+   `failed to write data to influx`, and the stored-data window query shows gaps of 2.0–4.5 s in a stream that is
+   otherwise stored every 0.501 s. There is no buffering or backfill.
+3. **"No other container changes state": verified for these runs.** The final blast check was clean in all 3.
+
+### Incident during the crash test (recorded, including an operator error)
+- **18:55:30:** the kill switch started InfluxDB. It reported healthy, but fms-server kept answering HTTP 500 with
+  `failed to resolve host name` until **18:55:48**, about 18 s after InfluxDB was running. That outage had lasted
+  about 10 s, longer than the ~2.5 s orchestrated runs. Root cause not verified (DNS caching in fms-server's HTTP
+  client is a candidate). InfluxDB's network attachment was correct (`influxdb` alias present).
+- **Operator error (Claude):** `reset` was run while the API was still answering 500, because `reset` only checks
+  container states. An emergency stop was engaged as soon as this was noticed. The API recovered on its own by
+  18:56:06; reset was redone only after 12/12 fresh observations. Proposed fix: `reset` should require fresh,
+  advancing telemetry, not only healthy containers (awaiting the lead's decision).
+
+### Also resolved today: the 1.0 s vs 500 ms cadence question
+InfluxDB stores a status every **0.501 s** (window query: 56 statuses, interval 0.499–0.503 s), so fms-forwarder
+honours `TIMER_INTERVAL=500ms`. The `latestOnly=true` read returns a new `createdDateTime` only about every 1.0 s
+(8 samples at 0.25 s showed 4 distinct values). The 1.0 s cadence is therefore produced by fms-server's
+`latestOnly` read path, not by the data. Exactly why that query skips every other status is not verified.
