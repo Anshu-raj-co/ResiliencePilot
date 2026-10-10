@@ -137,3 +137,19 @@ Envelope for this experiment, fault window only: observer timeout 5 s (precheck/
 After run 1 latched, `reset` succeeded only once 3 consecutive FRESH polls with an advance were seen; the check is
 recorded in the reset history. The incident case (containers healthy, API answering 500) is covered by
 `test_reset_refused_while_api_answers_500_with_healthy_containers`.
+
+## Milestone-2 top-up runs (2026-10-10 20:36–20:38 UTC, macOS, envelope D-017 unchanged)
+Goal: 3 completed `dependency_failure` runs. Before the runs: dashboard emergency stop (engaged 17:12 UTC) cleared by a
+logged, telemetry-checked reset (operator nishtrip14); fresh baseline `baseline-20261010T203606Z.json` (30/30 FRESH,
+latency p95 83 ms). All three: rollback verified, recovery verified, final blast check clean.
+
+| Run | Result | Fault-window polls | After rollback | Stored-data gap | Score |
+|---|---|---|---|---|---|
+| `20261010T203616Z-596e45` | ABORTED, `observer_lost` | 1: no answer within 5 s | 3 × HTTP 500, then fresh; verified +4.6 s | 7.5 s | 69.6 (partial) |
+| `20261010T203712Z-08b9dd` | **COMPLETED** | 14 × HTTP 500 (first in 158 ms) | HTTP 500 for ~18 s (server-side, visible); verified +20.5 s | 10.1 s | 63.2 |
+| `20261010T203817Z-01d396` | ABORTED, `observer_lost` | 1: no answer within 5 s | **HTTP 200 + stale data on 42 polls (~21 s, consumer-side, silent)**; verified +27.1 s | **30.7 s** | 24.6 (partial) |
+
+Outcome: **2 of the 3 required completed runs** (`e2eacd`, `08b9dd`). Under the 5 s envelope, 3 of the 5 envelope-era
+runs aborted on the first fault poll because fms-server blocked longer than 5 s. Reaching 3 completed runs either
+needs more attempts (about 2 in 5 complete) or a wider envelope, which is a safety-config decision for the lead
+(D-017). Both recovery modes from Day 2 reproduced: server-side visible 500s and consumer-side silent stale data.

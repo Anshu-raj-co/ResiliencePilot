@@ -669,14 +669,149 @@
         "ratio": 0.0
       },
       "not_measured": []
+    },
+    {
+      "run_id": "20261010T203616Z-596e45",
+      "experiment_type": "dependency_failure",
+      "target": "influxDB",
+      "state": "ABORTED",
+      "stop_reason": "observer_lost",
+      "scorable": true,
+      "partial": true,
+      "score": 69.6,
+      "weighted_mean": 0.733,
+      "components": {
+        "detection": {
+          "measured": true,
+          "ttd_s": 5.003,
+          "kind": "visible",
+          "score": 0.583
+        },
+        "recovery": {
+          "measured": true,
+          "ttr_s": 4.566,
+          "score": 0.848
+        },
+        "data_integrity": {
+          "measured": true,
+          "lost_s": 7.033,
+          "score": 0.414
+        },
+        "blast_radius": {
+          "measured": true,
+          "changed": [],
+          "others": 7,
+          "score": 1.0
+        }
+      },
+      "silent": {
+        "polls": 10,
+        "silent_polls": 1,
+        "by_phase": {
+          "fault": 0,
+          "recovery": 1
+        },
+        "ratio": 0.1
+      },
+      "not_measured": []
+    },
+    {
+      "run_id": "20261010T203712Z-08b9dd",
+      "experiment_type": "dependency_failure",
+      "target": "influxDB",
+      "state": "COMPLETED",
+      "stop_reason": "duration_elapsed",
+      "scorable": true,
+      "partial": false,
+      "score": 63.2,
+      "weighted_mean": 0.632,
+      "components": {
+        "detection": {
+          "measured": true,
+          "ttd_s": 0.159,
+          "kind": "visible",
+          "score": 0.987
+        },
+        "recovery": {
+          "measured": true,
+          "ttr_s": 20.488,
+          "score": 0.317
+        },
+        "data_integrity": {
+          "measured": true,
+          "lost_s": 9.562,
+          "score": 0.203
+        },
+        "blast_radius": {
+          "measured": true,
+          "changed": [],
+          "others": 7,
+          "score": 1.0
+        }
+      },
+      "silent": {
+        "polls": 55,
+        "silent_polls": 0,
+        "by_phase": {
+          "fault": 0,
+          "recovery": 0
+        },
+        "ratio": 0.0
+      },
+      "not_measured": []
+    },
+    {
+      "run_id": "20261010T203817Z-01d396",
+      "experiment_type": "dependency_failure",
+      "target": "influxDB",
+      "state": "ABORTED",
+      "stop_reason": "observer_lost",
+      "scorable": true,
+      "partial": true,
+      "score": 24.6,
+      "weighted_mean": 0.424,
+      "components": {
+        "detection": {
+          "measured": true,
+          "ttd_s": 5.003,
+          "kind": "visible",
+          "score": 0.583
+        },
+        "recovery": {
+          "measured": true,
+          "ttr_s": 27.143,
+          "score": 0.095
+        },
+        "data_integrity": {
+          "measured": true,
+          "lost_s": 30.182,
+          "score": 0.0
+        },
+        "blast_radius": {
+          "measured": true,
+          "changed": [],
+          "others": 7,
+          "score": 1.0
+        }
+      },
+      "silent": {
+        "polls": 50,
+        "silent_polls": 42,
+        "by_phase": {
+          "fault": 0,
+          "recovery": 42
+        },
+        "ratio": 0.84
+      },
+      "not_measured": []
     }
   ],
   "summary": {
     "dependency_failure": {
-      "n": 1,
-      "median": 61.6,
+      "n": 2,
+      "median": 62.4,
       "min": 61.6,
-      "max": 61.6
+      "max": 63.2
     },
     "service_crash": {
       "n": 5,
