@@ -153,3 +153,16 @@ Outcome: **2 of the 3 required completed runs** (`e2eacd`, `08b9dd`). Under the 
 runs aborted on the first fault poll because fms-server blocked longer than 5 s. Reaching 3 completed runs either
 needs more attempts (about 2 in 5 complete) or a wider envelope, which is a safety-config decision for the lead
 (D-017). Both recovery modes from Day 2 reproduced: server-side visible 500s and consumer-side silent stale data.
+
+## Third completed dependency_failure run, 8 s / 7.5 s envelope (D-022), 2026-10-10 21:17 UTC
+| Run | Result | Fault-window polls | After rollback | Stored-data gap | Score |
+|---|---|---|---|---|---|
+| `20261010T211735Z-748875` | **COMPLETED** | 8 × HTTP 500 (first in 6 ms; p95 7.7 ms) | HTTP 500 on 36 polls (~18 s, server-side), 2 silent; verified +21.3 s | 30.7 s | 57.5 |
+
+Read with care:
+- **The wider envelope was not exercised.** InfluxDB's outage failed fast on this run (first answer 6 ms), so it
+  would also have completed under 5 s. It completes the set of 3 (`e2eacd`, `08b9dd`, `748875`), but it is not
+  evidence that 8 s prevents the `observer_lost` aborts.
+- **Side effect of D-022 (measured):** the fault loop never starts a poll that could outlive the window, so with an
+  8 s timeout it stops polling 8 s before the window ends. In this 12 s run only the first ~4 s were polled (8 polls,
+  vs 14 with the 5 s envelope in `08b9dd`). Rollback, recovery and the stored-data gap are measured as before.

@@ -9,8 +9,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 HARD_MAX_DURATION_S = 30  # non-negotiable ceiling; config may only lower it
 MAX_WATCHDOG_GRACE_S = 10.0
 MAX_ERROR_RATE = 0.5
-MAX_FAULT_OBSERVER_TIMEOUT_S = 5.0      # longest a single fault-window poll may wait for an answer
-MAX_FAULT_LATENCY_P95_MS = 5000.0  # a tolerated error rate above 50 % would let a broken service pass as an experiment symptom
+MAX_FAULT_OBSERVER_TIMEOUT_S = 8.0      # longest a single fault-window poll may wait for an answer (D-022; was 5.0)
+MAX_FAULT_LATENCY_P95_MS = 7500.0       # ceiling for a declared fault-window latency cap; must stay below the timeout (D-022)
 
 
 SUPPORTED_MECHANISMS = ("docker_pause", "docker_stop")

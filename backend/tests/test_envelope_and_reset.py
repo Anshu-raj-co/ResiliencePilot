@@ -104,10 +104,13 @@ def test_reset_needs_an_advance_not_just_three_fresh_polls(tmp_path):
 
 
 # ======================= (b) response envelope =======================
-@pytest.mark.parametrize("kw", [dict(fault_observer_timeout_s=5.1), dict(fault_observer_timeout_s=0),
+@pytest.mark.parametrize("kw", [dict(fault_observer_timeout_s=8.01), dict(fault_observer_timeout_s=0),
+                                dict(fault_observer_timeout_s=60.0),
                                 dict(fault_latency_p95_max_ms=1000.0),                       # cap without a timeout
                                 dict(fault_observer_timeout_s=2.0, fault_latency_p95_max_ms=2000.0),   # >= timeout
-                                dict(fault_observer_timeout_s=5.0, fault_latency_p95_max_ms=5001.0)])
+                                dict(fault_observer_timeout_s=5.0, fault_latency_p95_max_ms=5001.0),   # >= timeout
+                                dict(fault_observer_timeout_s=8.0, fault_latency_p95_max_ms=7501.0),   # above ceiling
+                                dict(fault_observer_timeout_s=8.0, fault_latency_p95_max_ms=8000.0)])  # == timeout
 def test_envelope_bounds(kw):
     with pytest.raises(ValueError):
         ExperimentSpec("x", "docker_stop", ("influxDB",), 15, **kw)
@@ -116,12 +119,22 @@ def test_envelope_bounds(kw):
 def test_envelope_cannot_push_total_fault_time_past_30s():
     with pytest.raises(ValueError):
         ExperimentSpec("x", "docker_stop", ("influxDB",), 26, fault_observer_timeout_s=5.0)
+    with pytest.raises(ValueError):                    # D-022: the wider 8 s timeout still counts against the 30 s cap
+        ExperimentSpec("x", "docker_stop", ("influxDB",), 23, fault_observer_timeout_s=8.0)
+    ExperimentSpec("x", "docker_stop", ("influxDB",), 22, fault_observer_timeout_s=8.0, fault_latency_p95_max_ms=7500.0)
+
+
+def test_d022_ceilings_are_exactly_8s_and_7500ms():
+    from resiliencepilot import config
+    assert config.MAX_FAULT_OBSERVER_TIMEOUT_S == 8.0 and config.MAX_FAULT_LATENCY_P95_MS == 7500.0
+    assert config.MAX_FAULT_LATENCY_P95_MS < config.MAX_FAULT_OBSERVER_TIMEOUT_S * 1000
 
 
 def test_catalogue_envelope_only_for_dependency_failure():
     cat = load_experiment_catalog()
     d = cat["dependency_failure"]
-    assert d.fault_observer_timeout_s == 5.0 and d.fault_latency_p95_max_ms == 4500.0
+    assert d.fault_observer_timeout_s == 8.0 and d.fault_latency_p95_max_ms == 7500.0
+    assert d.max_duration_s + d.fault_observer_timeout_s <= 30
     assert cat["telemetry_stall"].fault_observer_timeout_s is None and cat["service_crash"].fault_observer_timeout_s is None
 
 

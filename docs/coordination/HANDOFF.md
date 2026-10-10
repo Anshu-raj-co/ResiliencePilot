@@ -1,8 +1,13 @@
 # Handoff
 
-_Updated: 2026-10-11 ~02:20 IST. PR #18 (Phases C+D) MERGED (`cec7b0d`). Branch `feat/day2-dashboard-runs` (PR open)._
+_Updated: 2026-10-11 ~03:00 IST. PR #19 MERGED (`be727d4`). Open: PR #20 (D-022 envelope + 3rd run + AI 14B), PR for `docs/submission-pack` (stacked on #20), PR #7, PR #8._
 
 ## RESUME HERE
+- **Submission pack (branch `docs/submission-pack`):** `README.md` (final, screenshot + scores),
+  `docs/ARCHITECTURE_OVERVIEW.md`, `docs/demo/DAY2_DEMO_SCRIPT.md` (3 min), `docs/TEAM_FORM_INFO.md` (team fields
+  marked [TO FILL]: only `Anshu-raj-co` and `nishtrip14` are known from git), `reports/day2/findings.md` (21 runs).
+- **D-022 (PR #20):** envelope 8 s / 7.5 s; 3rd completed dependency_failure run `748875` (envelope not exercised;
+  only first ~4 s of the window polled). AI: 14B analyst times out on this Mac; config stays 7B, 240 s.
 - **Live runs (M2 top-up):** 3 `dependency_failure` attempts at 20:36–20:38 UTC: `08b9dd` COMPLETED; `596e45`,
   `01d396` ABORTED `observer_lost` (first fault poll blocked > 5 s envelope). All rollback + recovery verified, blast
   clean. Completed dependency_failure runs: **2 of 3** (`e2eacd`, `08b9dd`). 3 of 5 envelope-era runs abort on the

@@ -804,13 +804,58 @@
         "ratio": 0.84
       },
       "not_measured": []
+    },
+    {
+      "run_id": "20261010T211735Z-748875",
+      "experiment_type": "dependency_failure",
+      "target": "influxDB",
+      "state": "COMPLETED",
+      "stop_reason": "duration_elapsed",
+      "scorable": true,
+      "partial": false,
+      "score": 57.5,
+      "weighted_mean": 0.587,
+      "components": {
+        "detection": {
+          "measured": true,
+          "ttd_s": 0.007,
+          "kind": "visible",
+          "score": 0.999
+        },
+        "recovery": {
+          "measured": true,
+          "ttr_s": 21.265,
+          "score": 0.291
+        },
+        "data_integrity": {
+          "measured": true,
+          "lost_s": 30.197,
+          "score": 0.0
+        },
+        "blast_radius": {
+          "measured": true,
+          "changed": [],
+          "others": 7,
+          "score": 1.0
+        }
+      },
+      "silent": {
+        "polls": 50,
+        "silent_polls": 2,
+        "by_phase": {
+          "fault": 0,
+          "recovery": 2
+        },
+        "ratio": 0.04
+      },
+      "not_measured": []
     }
   ],
   "summary": {
     "dependency_failure": {
-      "n": 2,
-      "median": 62.4,
-      "min": 61.6,
+      "n": 3,
+      "median": 61.6,
+      "min": 57.5,
       "max": 63.2
     },
     "service_crash": {
