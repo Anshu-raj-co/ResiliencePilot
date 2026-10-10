@@ -1,6 +1,6 @@
 # Handoff
 
-_Updated: 2026-10-10 ~16:30 IST, live dashboard (branch feat/day1-dashboard)_
+_Updated: 2026-10-10 ~22:30 IST, Day 2 step 1 cleanup (one PR per item)_
 
 ## Where things are
 - Branch `wip/day1-recon` (pushed). Last known-good on main: `401a23d`.
@@ -34,6 +34,13 @@ _Updated: 2026-10-10 ~16:30 IST, live dashboard (branch feat/day1-dashboard)_
   terminal at the exact moment can still trigger it. Proposed fix: retry-on-PermissionError in `_atomic_write` and
   the unlink calls.
 - Live end-to-end run from the page passed (run `20261010T102525Z-e0bb59`); see the PR description.
+
+## Day 2 step 1 (cleanup) — in progress
+- PR #6 (dashboard) was already merged (`843889a`). Verified on main: `RP_LIVE=1 pytest` 70 passed; `demo-day1.sh` exit 0, 46 s.
+- `fix/safety-file-retry`: bounded retry (5 attempts, 20-50 ms) on PermissionError only, for safety-file replace/read/delete.
+  Fails closed as before if retries fail. O_EXCL lock creation and all decisions untouched. Tests:
+  `tests/test_safety_file_retry.py`. Stress: API suite 40/40 with a second process making 87,261 `status()` calls.
+  Awaiting safety review + the lead's merge approval.
 
 ## Where the evidence lives
 | What | Where |

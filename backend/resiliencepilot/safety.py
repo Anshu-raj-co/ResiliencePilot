@@ -16,6 +16,7 @@ import json
 import os
 import sys
 import threading
+import time
 from pathlib import Path
 from typing import Literal
 
@@ -86,10 +87,33 @@ def pid_alive(pid: int) -> bool:
     return True
 
 
+# On Windows, replacing/deleting/reading a file fails with PermissionError while another thread or process has it
+# open (e.g. a status poller). Retry ONLY that error, briefly and boundedly; then fail exactly as before (closed).
+# Never used for decisions, lock acquisition (O_EXCL) or anything with a timeout.
+IO_RETRY_DELAYS_S = (0.02, 0.03, 0.04, 0.05)  # 5 attempts in total, 20-50 ms apart (<= 140 ms)
+
+
+def _retry_io(op):
+    for delay in IO_RETRY_DELAYS_S:
+        try:
+            return op()
+        except PermissionError:
+            time.sleep(delay)
+    return op()  # 5th and last attempt: any error propagates unchanged
+
+
+def _unlink(path: Path) -> None:
+    _retry_io(lambda: path.unlink(missing_ok=True))
+
+
+def _read_text(path: Path) -> str:
+    return _retry_io(lambda: path.read_text(encoding="utf-8"))
+
+
 def _atomic_write(path: Path, payload: dict) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    os.replace(tmp, path)
+    _retry_io(lambda: os.replace(tmp, path))
 
 
 class SafetyController:
@@ -114,7 +138,7 @@ class SafetyController:
     def _read_state(self) -> dict:
         if self._state_path.exists():
             try:
-                st = json.loads(self._state_path.read_text(encoding="utf-8"))
+                st = json.loads(_read_text(self._state_path))
                 if isinstance(st, dict) and "latched" in st:
                     st.setdefault("history", [])
                     return st
@@ -155,7 +179,7 @@ class SafetyController:
         if not self._run_lock_path.exists():
             return None
         try:
-            info = json.loads(self._run_lock_path.read_text(encoding="utf-8"))
+            info = json.loads(_read_text(self._run_lock_path))
             pid = int(info.get("pid", -1))
         except (OSError, ValueError, TypeError):
             return {"pid": None, "run_id": None, "alive": False, "corrupt": True}
@@ -179,8 +203,8 @@ class SafetyController:
 
     def _release_run_lock(self, run_id: str) -> None:
         h = self.lock_holder()
-        if h is not None and h.get("pid") == os.getpid() and h.get("run_id") == run_id:
-            self._run_lock_path.unlink(missing_ok=True)
+        if h is not None and h.get("pid") == os.getpid() and h.get("run_id") == run_id:  # decided once
+            _unlink(self._run_lock_path)
 
     # ---------- validation ----------
     def validate(self, raw: object) -> ExperimentRequest:
@@ -261,13 +285,13 @@ class SafetyController:
                                           "pid": os.getpid(), "at": utcnow().isoformat()})
 
     def clear_fault_marker(self) -> None:
-        self._marker_path.unlink(missing_ok=True)
+        _unlink(self._marker_path)
 
     def active_fault_marker(self) -> dict | None:
         if not self._marker_path.exists():
             return None
         try:
-            m = json.loads(self._marker_path.read_text(encoding="utf-8"))
+            m = json.loads(_read_text(self._marker_path))
             return m if isinstance(m, dict) else {"corrupt": True}
         except (OSError, ValueError):
             return {"corrupt": True}
@@ -299,7 +323,7 @@ class SafetyController:
         outcome = "; ".join(outcomes)
         run_id = (marker or {}).get("run_id") or (holder or {}).get("run_id")
         self.latch(f"interrupted run {run_id} found at startup ({outcome})")
-        self._run_lock_path.unlink(missing_ok=True)  # dead holder: lock is meaningless now; latch still blocks
+        _unlink(self._run_lock_path)  # dead holder: lock is meaningless now; latch still blocks
         return {"marker": marker or {"run_id": run_id}, "outcome": outcome}
 
     def reset(self, operator: str, note: str) -> dict:
@@ -326,6 +350,6 @@ class SafetyController:
             st.update(latched=False, reason=None, since=None)
             _atomic_write(self._state_path, st)
             self.clear_fault_marker()
-            self._run_lock_path.unlink(missing_ok=True)
+            _unlink(self._run_lock_path)
             self.stop_file.unlink(missing_ok=True)
         return {"reset_by": operator, "targets_checked": self.allowed_targets}
