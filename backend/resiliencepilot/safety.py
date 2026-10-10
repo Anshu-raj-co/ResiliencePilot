@@ -280,9 +280,9 @@ class SafetyController:
         return {"stopped_run": self._active_run or (holder or {}).get("run_id"), "source": source}
 
     # ---------- active-fault marker ----------
-    def mark_fault_active(self, run_id: str, target: str, mechanism: str) -> None:
+    def mark_fault_active(self, run_id: str, target: str, mechanism: str, container_id: str | None = None) -> None:
         _atomic_write(self._marker_path, {"run_id": run_id, "target": target, "mechanism": mechanism,
-                                          "pid": os.getpid(), "at": utcnow().isoformat()})
+                                          "container_id": container_id, "pid": os.getpid(), "at": utcnow().isoformat()})
 
     def clear_fault_marker(self) -> None:
         _unlink(self._marker_path)
@@ -317,9 +317,15 @@ class SafetyController:
                 if in_sandbox and st.paused:
                     self.docker.unpause(target)
                     outcomes.append(f"{target}: unpaused")
-                elif in_sandbox and not st.running:  # left stopped by an interrupted service_crash run
-                    self.docker.start(target)
-                    outcomes.append(f"{target}: started")
+                elif in_sandbox and not st.running:
+                    # only undo a stop WE made: marker says docker_stop for this exact container id
+                    ours = (marker is not None and marker.get("mechanism") == "docker_stop"
+                            and marker.get("target") == target and marker.get("container_id") == st.id)
+                    if ours:
+                        self.docker.start(target)
+                        outcomes.append(f"{target}: started")
+                    else:
+                        outcomes.append(f"{target}: stopped, NOT started (no matching docker_stop marker)")
                 else:
                     outcomes.append(f"{target}: state {st.status}")
             except DockerError as exc:

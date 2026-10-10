@@ -8,6 +8,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 HARD_MAX_DURATION_S = 30  # non-negotiable ceiling; config may only lower it
 MAX_WATCHDOG_GRACE_S = 10.0
+MAX_ERROR_RATE = 0.5  # a tolerated error rate above 50 % would let a broken service pass as an experiment symptom
 
 
 SUPPORTED_MECHANISMS = ("docker_pause", "docker_stop")
@@ -35,16 +36,17 @@ class Guardrails:
     blast_radius_max_snapshot_failures: int = 3
 
     def __post_init__(self) -> None:
-        if not 0.0 <= self.max_error_rate < 1.0:
-            raise ValueError("max_error_rate must be within [0, 1)")
-        if self.error_min_samples < 1:
-            raise ValueError("error_min_samples must be >= 1")
-        if self.latency_p95_multiplier < 1.0 or self.latency_p95_floor_ms <= 0:
-            raise ValueError("latency guard must be at least the baseline (multiplier >= 1, floor > 0)")
-        if not 1 <= self.latency_min_samples <= self.latency_window:
-            raise ValueError("need 1 <= latency_min_samples <= latency_window")
-        if not 0 < self.blast_radius_interval_s <= 2.0 or self.blast_radius_max_snapshot_failures < 1:
-            raise ValueError("blast-radius monitor must poll at least every 2 s and allow >= 1 failure")
+        # lower AND upper bounds: config may tighten a guard, never switch it off inside a 30 s window
+        if not 0.0 <= self.max_error_rate <= MAX_ERROR_RATE:
+            raise ValueError(f"max_error_rate must be within [0, {MAX_ERROR_RATE}]")
+        if not 1 <= self.error_min_samples <= 10:
+            raise ValueError("error_min_samples must be within 1..10")
+        if not 1.0 <= self.latency_p95_multiplier <= 20.0 or not 0 < self.latency_p95_floor_ms <= 5000:
+            raise ValueError("latency guard: multiplier within 1..20, floor within (0, 5000] ms")
+        if not 1 <= self.latency_min_samples <= self.latency_window <= 30:
+            raise ValueError("need 1 <= latency_min_samples <= latency_window <= 30")
+        if not 0 < self.blast_radius_interval_s <= 2.0 or not 1 <= self.blast_radius_max_snapshot_failures <= 5:
+            raise ValueError("blast-radius monitor: interval within (0, 2] s, max_snapshot_failures within 1..5")
 
 
 @dataclass(frozen=True)
@@ -97,8 +99,8 @@ class ExperimentSpec:
             raise ValueError(f"{self.name}: blast_radius must include every allowed target")
         if not 0 <= self.stop_timeout_s <= 5:
             raise ValueError(f"{self.name}: stop_timeout_s must be within 0..5")
-        if self.max_error_rate is not None and not 0.0 <= self.max_error_rate < 1.0:
-            raise ValueError(f"{self.name}: max_error_rate must be within [0, 1)")
+        if self.max_error_rate is not None and not 0.0 <= self.max_error_rate <= MAX_ERROR_RATE:
+            raise ValueError(f"{self.name}: max_error_rate must be within [0, {MAX_ERROR_RATE}]")
 
     @property
     def effective_blast_radius(self) -> tuple[str, ...]:

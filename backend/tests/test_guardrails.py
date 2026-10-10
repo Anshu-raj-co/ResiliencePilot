@@ -97,7 +97,10 @@ def test_blast_radius_diff():
     assert blast_radius_changes(base, added, {"fms-forwarder"})[0]["container"] == "intruder"
 
 
-@pytest.mark.parametrize("bad", [dict(error_min_samples=0), dict(max_error_rate=1.0), dict(max_error_rate=-0.1), dict(latency_p95_multiplier=0.5),
+@pytest.mark.parametrize("bad", [dict(error_min_samples=0), dict(error_min_samples=11), dict(max_error_rate=0.51),
+                                 dict(latency_p95_multiplier=21), dict(latency_p95_floor_ms=5001),
+                                 dict(latency_window=31, latency_min_samples=5), dict(blast_radius_max_snapshot_failures=6),
+                                 dict(max_error_rate=1.0), dict(max_error_rate=-0.1), dict(latency_p95_multiplier=0.5),
                                  dict(latency_p95_floor_ms=0), dict(latency_min_samples=20, latency_window=10),
                                  dict(blast_radius_interval_s=5), dict(blast_radius_max_snapshot_failures=0)])
 def test_guardrail_config_cannot_be_loosened_past_bounds(bad):
@@ -139,9 +142,9 @@ def test_error_rate_trips_and_rolls_back(tmp_path, req):
 
 def test_error_rate_tolerance_is_per_experiment(tmp_path):
     cat = {**CATALOG, "telemetry_stall": ExperimentSpec("telemetry_stall", "docker_pause", ("fms-forwarder",), 30,
-                                                        max_error_rate=0.9)}
+                                                        max_error_rate=0.5)}
     world, ctl, runner = build(tmp_path, catalog=cat)
-    flips = iter([500, 200] * 1000)
+    flips = iter([200, 500] * 1000)                    # 1/2, 1/4 ... 2/5, 3/6: never above 50 %
     orig = runner.observer.observe
 
     def flaky():
@@ -152,8 +155,8 @@ def test_error_rate_tolerance_is_per_experiment(tmp_path):
         return orig()
     runner.observer.observe = flaky
     rec = runner.run({**STALL, "duration_s": 1})
-    assert rec["stop_reason"] == "duration_elapsed", "50 % errors are tolerated when max_error_rate is 0.9"
-    assert rec["guardrails"]["config"]["max_error_rate"] == 0.9
+    assert rec["stop_reason"] == "duration_elapsed", "alternating 500/200 (<= 50 %) is tolerated at max_error_rate 0.5"
+    assert rec["guardrails"]["config"]["max_error_rate"] == 0.5
     assert rec["impact"]["http_error_rate_during_fault"] > 0
 
 
@@ -220,3 +223,17 @@ def test_breach_after_the_fault_window_still_latches(tmp_path):
     assert rec["stop_reason"] == "duration_elapsed" and rec["recovery"]["verified"]
     assert rec["guardrails"]["final_blast_check"]["clean"] is False
     assert rec["state"] == "LATCHED_UNSAFE" and ctl.latched
+
+
+def test_spec_error_rate_override_is_capped():
+    with pytest.raises(ValueError):
+        ExperimentSpec("x", "docker_pause", ("fms-forwarder",), 10, max_error_rate=0.6)
+
+
+def test_refuses_to_inject_when_target_missing_from_blast_baseline(tmp_path):
+    world, ctl, runner = build(tmp_path)
+    orig = runner.docker.snapshot
+    runner.docker.snapshot = lambda ids: {k: v for k, v in orig(ids).items() if k != "fms-forwarder"}
+    rec = runner.run(STALL)
+    assert rec["state"] == "ABORTED" and rec["stop_reason"] == "precheck_failed"
+    assert [c for c in world.calls if c[1] in ("pause", "stop")] == []

@@ -141,7 +141,7 @@ def test_emergency_stop_starts_container_early(env):
 
 def test_startup_recovery_starts_a_stopped_target_and_latches(env):
     cfg, world, docker, _, ctl, _ = env
-    ctl.mark_fault_active("dead-run", "fms-forwarder", "docker_stop")
+    ctl.mark_fault_active("dead-run", "fms-forwarder", "docker_stop", container_id=fwd(world).id)
     docker.stop("fms-forwarder", 2)
     fresh = SafetyController(cfg, CATALOG, docker)    # a new process after a crash
     out = fresh.startup_recovery()
@@ -155,3 +155,113 @@ def test_startup_recovery_never_touches_containers_outside_the_sandbox(env):
     ctl.mark_fault_active("dead-run", "fms-forwarder", "docker_stop")
     out = SafetyController(cfg, CATALOG, docker).startup_recovery()
     assert calls(world, "start") == [] and "state exited" in out["outcome"]
+
+
+def test_injection_latency_and_detection_from_verified_injection_recorded(env):
+    _, world, docker, _, _, runner = env
+    slow_stop = docker.stop
+
+    def stop_with_grace(name, timeout_s):
+        time.sleep(0.2)                                # SIGTERM ignored: docker waits before SIGKILL
+        slow_stop(name, timeout_s)
+        world.mutate(name, exit_code=137)
+    docker.stop = stop_with_grace
+    rec = runner.run(CRASH)
+    imp = rec["impact"]
+    assert imp["injection_latency_s"] >= 0.2
+    assert imp["time_to_detection_from_verified_injection_s"] == pytest.approx(
+        imp["time_to_detection_s"] - imp["injection_latency_s"], abs=0.002)
+    active = next(e for e in rec["timeline"] if e["event"] == "fault_active")["detail"]
+    assert active["exit_code"] == 137 and active["injection_latency_s"] >= 0.2
+
+
+# ---------------- safety-review regressions (feat/day2-service-crash) ----------------
+from resiliencepilot.faults import InjectAborted  # noqa: E402
+
+
+def test_M1_inject_refused_after_rollback_started(env):
+    _, world, docker, _, _, _ = env
+    f = StopStartFault(docker, "fms-forwarder")
+    f.bind_precheck(fwd(world))
+    f.rollback(by="watchdog")                          # watchdog fired before the stop was issued
+    with pytest.raises(InjectAborted):
+        f.inject()
+    assert calls(world, "stop") == [] and fwd(world).running
+
+
+def test_M1_watchdog_firing_during_a_slow_stop_still_ends_restored(env):
+    _, world, docker, _, _, runner = env
+    real_stop = docker.stop
+
+    def slow_stop(name, timeout_s):
+        time.sleep(2.0)                                # stop lands after duration (1 s) + grace (0.5 s)
+        real_stop(name, timeout_s)
+    docker.stop = slow_stop
+    rec = runner.run(CRASH)
+    assert fwd(world).running, "the late stop must be undone"
+    assert rec["rollback"]["verified"]
+    assert rec["stop_reason"] in ("watchdog_timeout", "fault_not_verified", "duration_elapsed")
+    assert calls(world, "start"), "the container was started after the late stop"
+
+
+def test_M2_attribution_goes_to_whoever_actually_restored(env):
+    _, world, docker, _, _, _ = env
+    f = StopStartFault(docker, "fms-forwarder")
+    f.bind_precheck(fwd(world))
+    first = f.rollback(by="watchdog")                  # nothing to do yet: "verified" by watchdog
+    assert first.verified and first.by == "watchdog"
+    docker.stop("fms-forwarder", 2)                    # a late stop lands afterwards
+    second = f.rollback(by="orchestrator")
+    assert second.verified and second.by == "orchestrator" and "superseded" in second.detail
+
+
+def test_M4_stale_lock_only_does_not_start_a_stopped_target(env):
+    cfg, world, docker, _, ctl, _ = env
+    import json, os
+    (cfg.data_dir / "run.lock").write_text(json.dumps({"pid": 2_000_000_000, "run_id": "dead"}))
+    docker.stop("fms-forwarder", 2)                    # an operator stopped it on purpose
+    out = SafetyController(cfg, CATALOG, docker).startup_recovery()
+    assert calls(world, "start") == [] and "NOT started" in out["outcome"]
+    assert ctl.latched
+
+
+@pytest.mark.parametrize("mechanism,matching_id", [("docker_pause", True), ("docker_stop", False)])
+def test_M4_marker_must_be_docker_stop_for_this_container(env, mechanism, matching_id):
+    cfg, world, docker, _, ctl, _ = env
+    cid = fwd(world).id if matching_id else "f" * 64
+    ctl.mark_fault_active("dead", "fms-forwarder", mechanism, container_id=cid)
+    docker.stop("fms-forwarder", 2)
+    out = SafetyController(cfg, CATALOG, docker).startup_recovery()
+    assert calls(world, "start") == [] and "NOT started" in out["outcome"]
+
+
+def test_L1_rollback_never_starts_a_container_whose_id_was_not_recorded(env):
+    _, world, docker, _, _, _ = env
+    docker.stop("fms-forwarder", 2)
+    f = StopStartFault(docker, "fms-forwarder")       # no precheck binding, inject never recorded an id
+    res = f.rollback(by="orchestrator")
+    assert not res.verified and "never recorded" in res.detail
+    assert calls(world, "start") == []
+
+
+def test_L1_inject_refuses_if_container_changed_since_precheck(env):
+    _, world, docker, _, _, _ = env
+    f = StopStartFault(docker, "fms-forwarder")
+    f.bind_precheck(fwd(world))
+    world.mutate("fms-forwarder", id="e" * 64)         # recreated between precheck and inject
+    with pytest.raises(Exception):
+        f.inject()
+    assert calls(world, "stop") == []
+
+
+def test_marker_records_container_id(env):
+    cfg, world, _, _, ctl, runner = env
+    seen = {}
+    orig = ctl.mark_fault_active
+
+    def spy(*a, **kw):
+        seen.update(kw)
+        return orig(*a, **kw)
+    ctl.mark_fault_active = spy
+    runner.run(CRASH)
+    assert seen["container_id"] == fwd(world).id

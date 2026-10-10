@@ -146,7 +146,8 @@ class ExperimentRunner:
         try:
             # ---- PRECHECK: never inject into an already-degraded or non-sandbox system ----
             event("precheck_start", state="PRECHECK")
-            self.ctl.verify_target(req.target)
+            target_state = self.ctl.verify_target(req.target)
+            fault.bind_precheck(target_state)
             fresh_streak, seen_advance = 0, False
             deadline = time.monotonic() + max(5.0, cfg.precheck_fresh_consecutive * cfg.poll_interval_s * 6)
             while not (fresh_streak >= cfg.precheck_fresh_consecutive and seen_advance):
@@ -174,6 +175,8 @@ class ExperimentRunner:
                 br_baseline = self.docker.snapshot(br_ids)
             except DockerError as exc:
                 raise SafetyError(f"blast radius not observable before injection: {exc}") from exc
+            if req.target not in br_baseline:
+                raise SafetyError("blast-radius baseline is empty or does not contain the target; not injecting")
             allowed = set(spec.effective_blast_radius)
             rec["guardrails"].update(
                 latency_baseline_p95_ms=base_p95, latency_baseline_source=base_src, latency_threshold_ms=round(thr_ms, 2),
@@ -186,7 +189,8 @@ class ExperimentRunner:
                                        "watched_containers": len(br_baseline)})
 
             # ---- INJECT ----
-            self.ctl.mark_fault_active(run_id, req.target, fault.mechanism)  # before the fault: crash-recoverable
+            self.ctl.mark_fault_active(run_id, req.target, fault.mechanism,  # before the fault: crash-recoverable
+                                       container_id=target_state.id)
             event("injecting", {"target": req.target, "mechanism": fault.mechanism}, state="INJECTING")
             inject_mono = time.monotonic()
             # total fault time is capped at 30 s even including grace (brief: hard max 30 s)
@@ -202,7 +206,11 @@ class ExperimentRunner:
                 event("fault_not_verified", {"target": req.target})
                 return rec  # finally{} rolls back and records outcome
             rec["impact"]["fault_verified"] = True
-            event("fault_active", {"verified_by": fault.verified_by}, state="ACTIVE")
+            rec["impact"]["injection_latency_s"] = round(time.monotonic() - inject_mono, 3)
+            active = {"verified_by": fault.verified_by, "injection_latency_s": rec["impact"]["injection_latency_s"]}
+            if getattr(fault, "exit_code", None) is not None:
+                active["exit_code"] = fault.exit_code
+            event("fault_active", active, state="ACTIVE")
 
             # ---- ACTIVE: observe until duration, stop, or safety condition ----
             losses = 0
@@ -251,6 +259,7 @@ class ExperimentRunner:
         finally:
             if monitor is not None:
                 monitor.stop()
+                monitor.join(timeout=2.0)
             self._finish(rec, req, run_id, fault, watchdog, tracker, phase_obs, inject_mono, ttd, event, observe,
                          br_ids, br_baseline)
         return rec
@@ -347,7 +356,11 @@ class ExperimentRunner:
         finally:
             if watchdog is not None:
                 watchdog.cancel()
+            inj_lat = rec["impact"].get("injection_latency_s")
             rec["impact"] = _impact(rec["impact"].get("fault_verified", False), phase_obs, ttd)
+            rec["impact"]["injection_latency_s"] = inj_lat
+            rec["impact"]["time_to_detection_from_verified_injection_s"] = (
+                round(ttd - inj_lat, 3) if ttd is not None and inj_lat is not None else None)
             self.store.save_run(rec)
             self.on_event("finished", {"run_id": run_id, "state": rec["state"]})
 
@@ -361,7 +374,7 @@ def _impact(fault_verified: bool, phase_obs: dict, ttd: float | None) -> dict:
         "fault_verified": fault_verified,
         "fault_observations": len(fault),
         "stale_detected": ttd is not None,
-        "time_to_detection_s": ttd,
+        "time_to_detection_s": ttd,  # measured from the moment the fault command was issued
         "precheck_max_data_age_s": round(max(pre_ages), 3) if pre_ages else None,
         "max_data_age_s": round(max(ages), 3) if ages else None,
         "max_stalled_for_s": round(max(stalls), 3) if stalls else None,

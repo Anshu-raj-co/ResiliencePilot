@@ -9,7 +9,7 @@ check, one experiment at a time across processes, total fault time ≤ 30 s enfo
 
 | | telemetry_stall | service_crash | dependency_failure |
 |---|---|---|---|
-| Status | **Done (Day 1)** | Planned | Planned |
+| Status | **Done (Day 1)** | **Done (Day 2): 4 live runs, see `reports/day2/README.md`** | Planned |
 | Mechanism | `docker pause` / `unpause` | `docker stop` / `start` | `docker stop` / `start` |
 | Allowlisted target | `fms-forwarder` | `fms-forwarder` | `influxDB` |
 | Duration cap | ≤ 30 s total incl. grace (used: 10–12 s) | *proposed* ≤ 15 s fault window | *proposed* ≤ 15 s fault window |
@@ -26,7 +26,11 @@ check, one experiment at a time across processes, total fault time ≤ 30 s enfo
 - **Recovery criteria:** 3 successive advances of `createdDateTime` past the last frozen value and past the server
   time of the last fault-window poll, each with HTTP 200 and age ≤ 5 s, within 30 s.
 
-## 2. service_crash: stop/start `fms-forwarder`
+## 2. service_crash: stop/start `fms-forwarder` (implemented)
+
+> **Result (4 live runs):** first part confirmed (HTTP 200 on 100 % of fault polls, `createdDateTime` frozen).
+> Second part **not supported**: rollback → first fresh data 0.68–1.89 s vs 0.53–1.59 s for unpause (overlapping).
+> New verified finding: fms-forwarder ignores SIGTERM (exit 137 after the 2 s grace). Details: `reports/day2/README.md`.
 
 - **Hypothesis:** stopping the forwarder process produces the same visible symptom as the pause (HTTP 200, frozen
   `createdDateTime`). After `docker start`, the forwarder needs **longer** to deliver fresh data than after an

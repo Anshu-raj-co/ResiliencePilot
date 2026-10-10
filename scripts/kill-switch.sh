@@ -27,31 +27,31 @@ printf '{"at": "%s", "source": "kill-switch.sh"}\n' "$(date -u +%Y-%m-%dT%H:%M:%
 
 status=0
 for t in ${TARGETS//,/ }; do
-  project=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "$t" 2>/dev/null || true)
+  project=$(docker inspect --type container -f '{{index .Config.Labels "com.docker.compose.project"}}' "$t" 2>/dev/null || true)
   if [ "$project" != "$PROJECT" ]; then
     echo "skip $t (not in sandbox project: '$project')"
     continue
   fi
   for attempt in 1 2 3; do
-    state=$(docker inspect -f 'running={{.State.Running}} paused={{.State.Paused}}' "$t" 2>/dev/null || echo "unknown")
+    state=$(docker inspect --type container -f 'running={{.State.Running}} paused={{.State.Paused}}' "$t" 2>/dev/null || echo "unknown")
     if [ "$state" = "running=true paused=false" ]; then
       [ "$attempt" = 1 ] && echo "$t already restored (running, not paused)"
       break
     fi
     if [ "$state" = "running=true paused=true" ]; then          # telemetry_stall left it paused
       if docker unpause "$t" >/dev/null 2>&1; then echo "unpaused $t"
-      elif [ "$(docker inspect -f '{{.State.Paused}}' "$t" 2>/dev/null)" = "false" ]; then
+      elif [ "$(docker inspect --type container -f '{{.State.Paused}}' "$t" 2>/dev/null)" = "false" ]; then
         echo "$t already restored (unpaused concurrently, e.g. by the backend's own rollback)"; break
       else echo "unpause $t failed (attempt $attempt)" >&2; fi
     elif [ "${state%% *}" = "running=false" ]; then              # service_crash left it stopped
       if docker start "$t" >/dev/null 2>&1; then echo "started $t"
-      elif [ "$(docker inspect -f '{{.State.Running}}' "$t" 2>/dev/null)" = "true" ]; then
+      elif [ "$(docker inspect --type container -f '{{.State.Running}}' "$t" 2>/dev/null)" = "true" ]; then
         echo "$t already restored (started concurrently, e.g. by the backend's own rollback)"; break
       else echo "start $t failed (attempt $attempt)" >&2; fi
     fi
     sleep 0.5
   done
-  final=$(docker inspect -f 'running={{.State.Running}} paused={{.State.Paused}}' "$t" 2>/dev/null || echo "inspect failed")
+  final=$(docker inspect --type container -f 'running={{.State.Running}} paused={{.State.Paused}}' "$t" 2>/dev/null || echo "inspect failed")
   echo "$t: $final"
   [ "$final" = "running=true paused=false" ] || status=1
 done

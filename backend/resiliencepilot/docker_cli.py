@@ -25,6 +25,7 @@ class ContainerState:
     project: str | None = None
     id: str | None = None
     started_at: str | None = None
+    exit_code: int | None = None
 
 
 @dataclass(frozen=True)
@@ -71,7 +72,7 @@ class DockerCLI:
         st = info["State"]
         return ContainerState(name=name, exists=True, running=bool(st["Running"]), paused=bool(st["Paused"]),
                               status=st["Status"], project=(info["Config"].get("Labels") or {}).get(PROJECT_LABEL),
-                              id=info.get("Id"), started_at=st.get("StartedAt"))
+                              id=info.get("Id"), started_at=st.get("StartedAt"), exit_code=st.get("ExitCode"))
 
     def project_container_ids(self, project: str) -> list[str]:
         """IDs of every container (any state) carrying the compose-project label."""
