@@ -8,3 +8,10 @@ networks:
   fms-vehicle:
     driver: bridge
     attachable: false
+
+# Host port for the KUKSA databroker is configurable (default 55555 upstream; see DECISIONS D-021).
+# Nothing in ResiliencePilot uses this host port; services reach the databroker over the fms-vehicle network.
+services:
+  databroker:
+    ports: !override
+      - "${FMS_DATABROKER_BIND_HOST:-127.0.0.1}:${RP_DATABROKER_HOST_PORT:-55557}:55556"

@@ -101,6 +101,11 @@ planner may only reorder rule-based candidates (exact permutation, else fallback
 finding's runs and pass a deterministic grounding check against the verified facts; failures fall back per item to
 the rule-based knowledge base with the reason and the model's text recorded. Rule-based answers are always available.
 
+**D-021 — Databroker host port moved to 55557 (override: `RP_DATABROKER_HOST_PORT`).** Upstream hardcodes
+`127.0.0.1:55555`, which collided with another program on a dev Mac and blocked `databroker`, `csv-provider` and
+`fms-forwarder`. Remapped via `config/compose/resiliencepilot.override.yaml` (`ports: !override`), blueprint untouched.
+No ResiliencePilot code uses the host port; container-to-container traffic is unchanged.
+
 **D-022: Response envelope ceilings widened to 8 s / 7500 ms (approved by the user, 2026-10-11).** Under D-017's
 5 s, 3 of 5 `dependency_failure` runs aborted on the first fault poll (fms-server blocked > 5 s while InfluxDB was
 down). Raising only the timeout would not help: the latency guard's nearest-rank p95 over 5–10 samples equals that one
