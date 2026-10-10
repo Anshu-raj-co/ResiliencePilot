@@ -1,6 +1,6 @@
 # Handoff
 
-_Updated: 2026-10-11 ~05:00 IST. `main` = `b133630` (PR #7 merged: scripts executable, databroker host port 55557).
+_Updated: 2026-10-11 ~05:20 IST. `main` = `b133630` (PR #7 merged: scripts executable, databroker host port 55557).
 Open: PR #22 (A-to-Z guide + requirements trace), PR "clean run" (branch `fix/clean-run`), PR #8._
 
 ## RESUME HERE (fix list from the lead, 2026-10-11; one PR per item; ask the lead before merging anything that touches safety or abort logic)
@@ -10,10 +10,14 @@ Open: PR #22 (A-to-Z guide + requirements trace), PR "clean run" (branch `fix/cl
    change); `rp findings` shows platform per experiment (`reports/day2/platforms.json` labels only documented runs).
    Fresh clone on macOS arm64 with fms-server/fms-consumer images deleted first: pulled as amd64, 8/8 running,
    `stack-status` exit 0 (exit 1 after stack-down), 270 unit + 3 live tests pass, `demo-day1.sh` exit 0 (42 s), `rp serve` 200.
-2. Wording: DNS cause → hypothesis (README.md:29/35, ai.py:28); state what the AI does / does not do. (next)
-3. Experiment picker on the dashboard (experiment_id enum + typed approver name); log prompts/raw responses/model/validation.
-4. Live evidence for error-rate and latency guardrails with a labelled "guardrail-demo" config (ask before merging config).
-5. Privacy: strip local usernames/paths from `docs/demo/day1-demo-run.log`, `reports/day2/scores.json`; no contact details in TEAM_FORM_INFO.
+2. Wording: DONE, PR #24 merged.
+3. **Experiment picker: PR #25 open, waits for the lead** (changes the API run path). Live run
+   `20261010T233453Z-958562` via the picker; real `rp advise` call logged (`reports/day2/ai_calls/`).
+4. **Guardrail demo: branch `feat/guardrail-demo` (pushed, PR not opened yet).** Allowlisted overlay profiles
+   (`RP_CONFIG_PROFILE`, `config/profiles/`). Live: `guardrail_error_rate` tripped in run `20261010T234332Z-77b84c`,
+   rollback verified, recovery not verified in 30 s → **controller LATCHED_UNSAFE (not reset; needs the lead)**. Stack
+   checked afterwards: 8/8 running, telemetry FRESH and advancing. Latency demo not run yet.
+5. Privacy: DONE, PR #26 merged. Personal emails remain only in old commit metadata (history rewrite forbidden).
 Then regenerate `docs/REQUIREMENTS_TRACE.md`.
 
 ## Earlier (before 2026-10-11 05:00 IST)
