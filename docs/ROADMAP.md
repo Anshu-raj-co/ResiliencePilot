@@ -19,3 +19,13 @@ Day 1 scope (override #2): Phases 0–2 only. Phases 3–6 are listed here and *
 - `stop influxdb` — expected to turn fms-server into HTTP 500 (detected by plain health checks — useful contrast).
 - Network degradation: only if a mechanism truly sits on the path (e.g. `tc netem` inside the forwarder netns via a
   helper container). No proxy exists today; do not claim proxy-based faults.
+
+## Backlog: safety-controller follow-ups (from the PR #10 safety review; not fixed)
+Both are pre-existing and fail closed today; they are listed so they are not forgotten.
+- **Latch write memory.** If `latch()` cannot write `safety_state.json` even after the bounded retry, it raises and
+  the latch exists nowhere. Proposal: keep an in-memory latched flag that `_read_state()` honours, then re-raise.
+  Needs negative-path tests and a safety review.
+- **Reset ordering.** `reset()` writes `latched=False` first and then deletes the marker and `run.lock`; if a delete
+  fails, the state says unlatched while a leftover file still blocks runs. Proposal: delete the files first and
+  write the unlatched state last. Needs tests and a safety review.
+
