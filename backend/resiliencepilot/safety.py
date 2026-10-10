@@ -46,7 +46,7 @@ class Latched(SafetyError):
 class ExperimentRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
 
-    experiment_type: Literal["telemetry_stall"]
+    experiment_type: Literal["telemetry_stall", "service_crash"]
     target: str = Field(min_length=1, max_length=63, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_.-]*$")
     duration_s: int = Field(ge=1, le=HARD_MAX_DURATION_S)
     approved_by: str = Field(min_length=1, max_length=80)
@@ -280,9 +280,9 @@ class SafetyController:
         return {"stopped_run": self._active_run or (holder or {}).get("run_id"), "source": source}
 
     # ---------- active-fault marker ----------
-    def mark_fault_active(self, run_id: str, target: str, mechanism: str) -> None:
+    def mark_fault_active(self, run_id: str, target: str, mechanism: str, container_id: str | None = None) -> None:
         _atomic_write(self._marker_path, {"run_id": run_id, "target": target, "mechanism": mechanism,
-                                          "pid": os.getpid(), "at": utcnow().isoformat()})
+                                          "container_id": container_id, "pid": os.getpid(), "at": utcnow().isoformat()})
 
     def clear_fault_marker(self) -> None:
         _unlink(self._marker_path)
@@ -313,9 +313,19 @@ class SafetyController:
         for target in targets:
             try:
                 st = self.docker.inspect(target)
-                if st.exists and st.paused and st.project == self.cfg.compose_project:
+                in_sandbox = st.exists and st.project == self.cfg.compose_project
+                if in_sandbox and st.paused:
                     self.docker.unpause(target)
                     outcomes.append(f"{target}: unpaused")
+                elif in_sandbox and not st.running:
+                    # only undo a stop WE made: marker says docker_stop for this exact container id
+                    ours = (marker is not None and marker.get("mechanism") == "docker_stop"
+                            and marker.get("target") == target and marker.get("container_id") == st.id)
+                    if ours:
+                        self.docker.start(target)
+                        outcomes.append(f"{target}: started")
+                    else:
+                        outcomes.append(f"{target}: stopped, NOT started (no matching docker_stop marker)")
                 else:
                     outcomes.append(f"{target}: state {st.status}")
             except DockerError as exc:

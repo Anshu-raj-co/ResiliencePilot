@@ -2,7 +2,9 @@
   "telemetry_stall": {
     "description": "Freeze the vehicle-side publisher so createdDateTime stops advancing while the rFMS API stays up.",
     "mechanism": "docker_pause",
-    "allowed_targets": ["fms-forwarder"],
+    "allowed_targets": [
+      "fms-forwarder"
+    ],
     "max_duration_s": 30,
     "expected_symptoms": [
       "fms-server keeps returning HTTP 200",
@@ -12,6 +14,31 @@
     "risks": [
       "Zenoh session lease may expire during a long pause and require reconnect on unpause",
       "Telemetry for the paused window is not produced (no backfill)"
+    ],
+    "blast_radius": [
+      "fms-forwarder"
+    ]
+  },
+  "service_crash": {
+    "description": "Crash the vehicle-side publisher (docker stop: SIGTERM, SIGKILL after stop_timeout_s) and restart it.",
+    "mechanism": "docker_stop",
+    "allowed_targets": [
+      "fms-forwarder"
+    ],
+    "blast_radius": [
+      "fms-forwarder"
+    ],
+    "stop_timeout_s": 2,
+    "max_duration_s": 15,
+    "expected_symptoms": [
+      "HYPOTHESIS: fms-server keeps returning HTTP 200",
+      "HYPOTHESIS: createdDateTime stops advancing; data age grows past stale_threshold_s",
+      "HYPOTHESIS: after docker start, fresh data takes longer to return than after unpause (cold databroker + Zenoh reconnect)"
+    ],
+    "risks": [
+      "fms-forwarder has no restart policy: if docker start fails it stays down (rollback not verified -> LATCHED_UNSAFE)",
+      "Zenoh client may reconnect slowly or not at all after a cold start",
+      "Telemetry for the stopped window is never produced (no backfill)"
     ]
   }
 }

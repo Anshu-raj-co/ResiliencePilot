@@ -1,7 +1,17 @@
 # Handoff
 
-_Updated: 2026-10-10 ~22:45 IST, Day 2 step 1 cleanup: PRs #9-#13 open for review_
-_Updated: 2026-10-10 ~22:30 IST, Day 2 step 1 cleanup (one PR per item)_
+_Updated: 2026-10-11 ~00:10 IST, Day 2 milestone 1 ready for review (PR from feat/day2-service-crash)_
+
+## Day 2 milestone 1: service_crash + guardrails (branch `feat/day2-service-crash`, PR open, awaiting approval)
+- Implemented: `StopStartFault` (same-container-id rollback), guardrails (error rate, latency p95, blast-radius
+  monitor + final check), kill switch and startup recovery restore stopped targets (start only for our own marker).
+- Verified live (evidence `reports/day2/`, index `reports/day2/README.md`): 4 + 1 service_crash runs COMPLETED,
+  telemetry_stall regression x2, blast-radius guard tripped live (Grafana restart), kill switch started a stopped
+  target with the backend dead, startup recovery started it without the kill switch.
+- NOT verified live: error-rate and latency guards tripping (no experiment produces errors/latency yet; unit-tested).
+- Tests: 140 unit, 143 with `RP_LIVE=1`. Safety review: no high; M1–M4, L1–L4 fixed (`docs/testing/SAFETY_REVIEW.md`).
+- Next: `dependency_failure` (stop influxDB) needs the expected-symptom rule (D-013 caps error tolerance at 0.5;
+  an expected HTTP 500 must be modelled separately, not by raising tolerance). Then `sensor_freeze`.
 
 ## Where things are
 - `main` = `843889a`: Day 1 complete, explainer (PR #4) and dashboard (PR #6) merged. Verified 2026-10-10 22:1x:

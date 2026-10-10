@@ -51,3 +51,19 @@ last pre-rollback value, each with HTTP 200 and age ≤ 5 s, within 30 s.** Othe
 unpauses without the backend; next backend start runs `startup_recovery` (unpause if needed + latch + annotate the
 run record). Known limit: the in-process watchdog dies with a hard-killed process (verified live), so between crash
 and kill-switch/restart the fault persists.
+
+**D-012 — service_crash = `docker stop -t 2` / `docker start` (`StopStartFault`).** Rollback is verified only for the
+**same container id** recorded before the stop; a removed or replaced container is reported as not restored (latch),
+never recreated. `stop_timeout_s` is bounded to 0..5 (catalogue) and 0..10 (Docker wrapper). Catalogue cap 15 s.
+
+**D-013 — Guardrails detect, the orchestrator rolls back.** Error-rate and latency guards run in the fault loop; the
+blast-radius guard is a separate read-only monitor thread (a whole-project `docker inspect` costs ~66 ms by container id,
+but each Docker CLI call is ~190 ms on this machine, so checking inside the 0.5 s poll loop would distort cadence).
+Thresholds: error rate 0.0 by default (identical to Day 1's "any non-200 aborts"), with an optional per-experiment
+tolerance judged only after 5 responses (one early error is not a 100 % rate); latency p95 > max(5 x p95 of the newest
+stored baseline, 250 ms) over the last 10 polls (min 5); blast radius compares id, status and StartedAt (a restart
+keeps status `running` but changes StartedAt; verified live with Grafana).
+
+**D-014 — Detection time is recorded twice.** `time_to_detection_s` is measured from the fault command (as on Day 1);
+`time_to_detection_from_verified_injection_s` subtracts `injection_latency_s`. For service_crash they differ by the
+~2.4 s stop grace because fms-forwarder ignores SIGTERM (exit code 137, verified).
