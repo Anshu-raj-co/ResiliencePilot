@@ -10,7 +10,11 @@ _Updated: 2026-10-11, Phase C (discovery) done on macOS; next: Phase D scoring_
   `reports/day2/discovery.json` (scanned: no tokens/passwords/host paths).
 - Fix found by the new tests: evidence snippets now redact URL credentials (`//user:pass@` -> `//***@`).
 - Tests: 194 unit pass on macOS (176 + 18 discovery; 8 Windows-only file-retry tests skip on macOS, 3 live skip).
-- Next: `docs/SCORING.md` + `rp score`, then rule-based planner + `reports/day2/findings.md`, then the AI provider
+- Phase D (score) done: `docs/SCORING.md` (D-019), `backend/resiliencepilot/scoring.py`, `rp score [--dir] [--run]
+  [--json] [--out]`. Day-2 full-window medians: telemetry_stall 62.2 (n=2), service_crash 65.1 (n=5),
+  dependency_failure 61.6 (n=1); lowest = partial run 179795 (14.3, silent after recovery). `reports/day2/scores.json`.
+  Tests: 211 unit pass on macOS (+17 scoring).
+- Next: rule-based planner + `reports/day2/findings.md`, then the AI provider
   layer (local Ollama `qwen2.5:7b` / `qwen2.5-coder:14b`, advisory only, deterministic fallback when unreachable).
 - Mac notes: PR #7 (databroker host port 55557, scripts executable) and PR #8 (CLI "Nones") are open. `main` already
   prints "not detected" for detection time, so #8 only still adds `n/a` for unverified recovery timings.

@@ -113,6 +113,10 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("runs")
     sh = sub.add_parser("show"); sh.add_argument("run_id"); sh.add_argument("--json", action="store_true")
     sub.add_parser("deps")
+    sc = sub.add_parser("score", help="read-only: Resilience Score of stored runs (docs/SCORING.md)")
+    sc.add_argument("--dir", help="run-record directory (default: the evidence store's runs/)")
+    sc.add_argument("--run", help="score only this run id"); sc.add_argument("--json", action="store_true")
+    sc.add_argument("--out", help="also write the JSON result here")
     sd = sub.add_parser("discover", help="read-only: derive the dependency graph from docker inspect, diff vs the map")
     sd.add_argument("--json", action="store_true"); sd.add_argument("--out", help="also write the JSON result here")
     sbs = sub.add_parser("show-baseline"); sbs.add_argument("file", nargs="?")
@@ -131,6 +135,26 @@ def main(argv: list[str] | None = None) -> int:
         out = Path(args.out)
         out = out if out.is_absolute() else REPO_ROOT / out
         print(f"wrote {build_report(REPO_ROOT, args.run, out)}")
+        return 0
+
+    if args.cmd == "score":  # read-only: stored run records only; no Docker, no safety objects
+        from pathlib import Path
+        from .scoring import load_runs, render_text, score_run, summarise
+        d = Path(args.dir) if args.dir else load_safety_config().data_dir / "runs"
+        d = d if d.is_absolute() else REPO_ROOT / d
+        recs = [r for r in load_runs(d) if args.run in (None, r["run_id"])]
+        if not recs:
+            print(f"no run records{' for ' + args.run if args.run else ''} in {d}")
+            return 1
+        scores = [score_run(r) for r in recs]
+        result = {"formula": "docs/SCORING.md", "source": str(d), "runs": scores, "summary": summarise(scores)}
+        print(json.dumps(result, indent=2) if args.json else render_text(scores))
+        if args.out:
+            out = Path(args.out)
+            out = out if out.is_absolute() else REPO_ROOT / out
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+            print(f"wrote {out}")
         return 0
 
     if args.cmd == "discover":  # read-only (docker ps/inspect + bind-mounted config files); no safety objects needed

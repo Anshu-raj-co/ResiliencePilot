@@ -88,3 +88,9 @@ polls (HTTP 200, age at most 5 s) with at least one advance of `createdDateTime`
 re-checked after polling, the check is recorded in the reset history, and without an observer reset refuses. This
 prevents the 2026-10-10 operator error (reset while the API answered 500).
 
+
+**D-019 — Resilience Score = weighted mean of measured components × silent-failure multiplier (`docs/SCORING.md`).**
+Detection 0.25, recovery 0.30, data integrity 0.20, blast radius 0.25; unmeasured components drop out (never imputed);
+`× (1 − 0.5 · silent ratio)` over fault + recovery polls. Only `duration_elapsed` runs enter the per-type summary;
+runs cut short by the system's response are scored but `partial`; operator/tool stops and unverified rollbacks are
+not scorable. Read-only: computed from stored run records, never fed back into the safety path.
