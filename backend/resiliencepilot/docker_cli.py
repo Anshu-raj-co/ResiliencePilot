@@ -58,6 +58,30 @@ class DockerCLI:
         return ContainerState(name=name, exists=True, running=bool(st["Running"]), paused=bool(st["Paused"]),
                               status=st["Status"], project=(info["Config"].get("Labels") or {}).get(PROJECT_LABEL))
 
+    # ---- read-only helpers for evidence/display (never used by fault logic) ----
+    def networks(self, name: str) -> list[str]:
+        proc = self._run("inspect", "-f", "{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}", _check_name(name))
+        return proc.stdout.split() if proc.returncode == 0 else []
+
+    def env(self, name: str) -> dict[str, str]:
+        proc = self._run("inspect", "-f", "{{json .Config.Env}}", _check_name(name))
+        if proc.returncode != 0:
+            return {}
+        return dict(e.split("=", 1) for e in json.loads(proc.stdout) if "=" in e)
+
+    def stats(self, project: str) -> list[dict]:
+        """One `docker stats --no-stream` snapshot of the project's containers."""
+        ids = self._run("ps", "-q", "--filter", f"label={PROJECT_LABEL}={project}").stdout.split()
+        if not ids:
+            return []
+        proc = self._run("stats", "--no-stream", "--format", "{{json .}}", *ids)
+        rows = [json.loads(line) for line in proc.stdout.splitlines() if line.strip()]
+        return [{"name": r.get("Name"), "cpu": r.get("CPUPerc"), "mem": r.get("MemUsage")} for r in rows]
+
+    def mem_total_bytes(self) -> int | None:
+        proc = self._run("info", "--format", "{{.MemTotal}}")
+        return int(proc.stdout.strip()) if proc.returncode == 0 and proc.stdout.strip().isdigit() else None
+
     def pause(self, name: str) -> None:
         proc = self._run("pause", _check_name(name))
         if proc.returncode != 0:

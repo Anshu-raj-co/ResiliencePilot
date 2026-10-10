@@ -1,0 +1,31 @@
+{
+  "_about": "Verified service dependencies of the Eclipse SDV Fleet Management Blueprint @ 3d514ac72a (Zenoh variant) as run by ResiliencePilot. Paths are relative to 'Fleet Management/fleet-management/'. Confidence: 'source' = read in code/config; 'live_network' is checked at display time (both containers on a shared Docker network); 'experiment' = a fault upstream changed what fms-server returns (run 20261010T084750Z-2a256d and later).",
+  "telemetry_path": ["csv-provider", "databroker", "fms-forwarder", "fms-zenoh-router", "fms-consumer", "influxDB", "fms-server"],
+  "nodes": {
+    "csv-provider":       {"role": "vehicle sensor simulator: replays csv-provider/signalsFmsRecording.csv (4,001 rows) forever", "side": "vehicle"},
+    "databroker":         {"role": "Eclipse KUKSA VSS databroker", "side": "vehicle"},
+    "fms-forwarder":      {"role": "builds VehicleStatus every TIMER_INTERVAL; stamps createdDateTime", "side": "vehicle", "fault_target": "telemetry_stall (docker pause)"},
+    "fms-zenoh-router":   {"role": "Eclipse Zenoh router (uProtocol transport)", "side": "both"},
+    "fms-consumer":       {"role": "uProtocol listener; writes to InfluxDB", "side": "backend"},
+    "influxDB":           {"role": "time-series store (bucket demo)", "side": "backend"},
+    "fms-server":         {"role": "rFMS HTTP API; receivedDateTime = Utc::now()", "side": "backend"},
+    "grafana":            {"role": "dashboard (FMS Fleet)", "side": "backend"},
+    "resiliencepilot":    {"role": "this tool: read-only observer + allowlisted fault control", "side": "host"}
+  },
+  "edges": [
+    {"from": "csv-provider", "to": "databroker", "protocol": "gRPC (kuksa.val), publish signals", "evidence": ["fms-blueprint-compose.yaml:192 KUKSA_DATA_BROKER_ADDR=databroker"], "confidence": ["source"], "on_telemetry_path": true},
+    {"from": "fms-forwarder", "to": "databroker", "protocol": "gRPC get + subscribe", "evidence": ["fms-blueprint-compose.yaml:210 KUKSA_DATABROKER_URI", "components/fms-forwarder/src/vehicle_abstraction.rs:353 subscribe"], "confidence": ["source"], "on_telemetry_path": true},
+    {"from": "fms-forwarder", "to": "fms-zenoh-router", "protocol": "Zenoh, uProtocol notification (VehicleStatus protobuf)", "evidence": ["config/zenoh/config-client.json5:96 tcp/fms-zenoh-router:7447", "components/fms-forwarder/src/main.rs:100 publish"], "confidence": ["source", "experiment"], "on_telemetry_path": true},
+    {"from": "fms-zenoh-router", "to": "fms-consumer", "protocol": "Zenoh delivery to listener up://*/D100/1/D100", "evidence": ["config/zenoh/config-client.json5:96", "components/fms-consumer/src/main.rs:117 register_listener"], "confidence": ["source", "experiment"], "on_telemetry_path": true},
+    {"from": "fms-consumer", "to": "influxDB", "protocol": "HTTP write (measurements header/snapshot, field createdDateTime)", "evidence": ["influxdb/fms-demo.env:4 INFLUXDB_URI", "components/fms-consumer/src/main.rs:44 write_vehicle_status"], "confidence": ["source", "experiment"], "on_telemetry_path": true},
+    {"from": "fms-server", "to": "influxDB", "protocol": "HTTP Flux query, last()", "evidence": ["influxdb/fms-demo.env:4 INFLUXDB_URI", "components/fms-server/src/influx_reader.rs:226 get_vehiclesstatuses"], "confidence": ["source", "experiment"], "on_telemetry_path": true},
+    {"from": "grafana", "to": "influxDB", "protocol": "Flux datasource", "evidence": ["influxdb/init-scripts/create-fms-token.sh:40"], "confidence": ["source"], "on_telemetry_path": false},
+    {"from": "resiliencepilot", "to": "fms-server", "protocol": "HTTP GET /rfms/vehiclestatuses?latestOnly=true (read-only)", "evidence": ["backend/resiliencepilot/sdv_adapter.py"], "confidence": ["source"], "on_telemetry_path": false},
+    {"from": "resiliencepilot", "to": "fms-forwarder", "protocol": "docker pause/unpause (allowlisted control)", "evidence": ["config/experiments.json"], "confidence": ["source"], "on_telemetry_path": false}
+  ],
+  "timestamps": {
+    "createdDateTime": "components/fms-forwarder/src/vehicle_abstraction/kuksa.rs:44 Timestamp::now() in fms-forwarder (the freshness signal)",
+    "receivedDateTime": "components/fms-server/src/influx_reader.rs:372 Utc::now() at request time (always looks fresh)"
+  },
+  "not_present": ["no HTTP/TCP proxy on any path (no network-proxy faults are claimed)", "fleet-analysis-backend excluded on Day 1 (reads InfluxDB only; not on the telemetry path)"]
+}
