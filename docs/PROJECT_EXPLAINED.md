@@ -259,7 +259,7 @@ All code is in `backend/resiliencepilot/`.
 | **Python 3.13** | It was installed, it supports typing, and it is fast to test (D-007). |
 | **pydantic** | Validates the experiment request strictly (`extra="forbid"`: any unknown field is an error). |
 | **httpx** | Makes the HTTP calls to the rFMS API. |
-| **pytest** | The tests on `main`: 67 unit tests, plus 3 live tests that need the running stack (70 with `RP_LIVE=1`, verified 2026-10-10). Open PRs #9 and #10 add more. |
+| **pytest** | The tests on `main`: 80 unit tests, plus 3 live tests that need the running stack (83 with `RP_LIVE=1`, verified 2026-10-10 after merging PRs #9–#13). |
 | **`docker` command line via one wrapper** | One small file that tests can fake; no Docker socket is ever handed to any other component. |
 | **FastAPI + uvicorn** | Run the local API and dashboard (`rp serve`), bound to 127.0.0.1 only. |
 | **Frontend** | No framework, npm or build step. The dashboard is one static HTML file (inline CSS/JS) served by the API. The explainer is a generated HTML file that needs no server. |
@@ -426,14 +426,14 @@ run with a precise timestamp: 0.6 s from switch to verified rollback.
 | Application mapping (services, dependencies, data flow) | **Done**: `config/dependency_map.json` + `deps` command |
 | Monitoring baseline (error rate, latency, health) | **Done**: 2 committed baselines |
 | First failure injected and observed | **Done**: `telemetry_stall` |
-| Safety controls (automatic stop/rollback) tested | **Done**: watchdog, kill switch, latch; 67 unit + 3 live tests on `main` |
+| Safety controls (automatic stop/rollback) tested | **Done**: watchdog, kill switch, latch; 80 unit + 3 live tests on `main` |
 | Day-1 demo | **Done**: `scripts/demo-day1.sh`, `docs/demo/DAY1_DEMO.md` |
 | Visual impact report | **Done**: explainer page (`rp report`) |
 | AI experiment planner (ranks experiments from the dependency map) | **Planned (Day 2)** |
 | Three or more failure types (e.g. consumer pause, forwarder crash/restart, InfluxDB stop) | **Planned (Day 2)**; only 1 built |
 | AI findings, severity ranking, fixes, resilience score | **Planned (Day 2)** |
 | Interactive dashboard | **Done** (PR #6, merged): `rp serve`; run live from the page |
-| Windows file-race fix in the safety controller, CLI UTF-8 output | **In review**: PR #10 and PR #9 (not merged) |
+| Windows file-race fix in the safety controller, CLI UTF-8 output | **Done**: PR #10 and PR #9 (merged) |
 | Clean run from scratch, demo video, final README | **Planned (Day 2)** |
 
 *source: `docs/ROADMAP.md`, `docs/coordination/CURRENT_STATUS.md`, `docs/coordination/HANDOFF.md`*
@@ -442,9 +442,9 @@ run with a precise timestamp: 0.6 s from switch to verified rollback.
 
 ## 12. Run it yourself
 
-> **Test counts below are for current `main` (`843889a`, dashboard merged):** 67 unit tests, 70 with live tests
+> **Test counts below are for current `main` (`50f1f42`, after PRs #9–#13):** 80 unit tests, 83 with live tests
 > (verified 2026-10-10). The clean-clone re-test described next was done earlier, at `519fff8`, before the dashboard
-> was merged, when the counts were 52 and 55. The clean-clone run has not been repeated on `843889a`.
+> was merged, when the counts were 52 and 55. The clean-clone run has not been repeated on `50f1f42`.
 >
 > **Re-tested from a clean clone on 2026-10-10** (fresh `git clone` of `main` at `519fff8` into a new folder):
 > steps 1–3 and 5–8 all passed: 52 unit tests, 55 with live tests, `deps`, `observe`, a 20-sample baseline, the full
@@ -489,7 +489,7 @@ python -m venv .venv
 .venv/Scripts/python -m pytest -q
 cd ..
 ```
-Success: `67 passed, 3 skipped` (the 3 skipped are the live tests).
+Success: `80 passed, 3 skipped` (the 3 skipped are the live tests).
 
 **4. Start the stack**
 ```bash
@@ -504,7 +504,7 @@ cd backend
 .venv/Scripts/python -m resiliencepilot status       # "state": "READY"
 .venv/Scripts/python -m resiliencepilot deps         # dependency map with live network checks
 .venv/Scripts/python -m resiliencepilot observe -n 6 # FRESH lines, createdDateTime advancing
-RP_LIVE=1 .venv/Scripts/python -m pytest -q          # 70 passed
+RP_LIVE=1 .venv/Scripts/python -m pytest -q          # 83 passed
 ```
 
 **6. Baseline**
@@ -564,7 +564,7 @@ cd .. && ./scripts/stack-down.sh            # add --volumes to also delete Influ
 | Low disk space | Only ~18 GB free on the Day-1 machine | Use prebuilt images only (`stack-up.sh` never builds). `fleet-analysis-backend` is excluded because it would need a local Java build. *(a constraint we worked around; no failure was hit)* |
 | `port is already allocated` on 8081/8086/3000/55555/7447 | Another program or an old stack uses the port | Run `./scripts/stack-down.sh`, or stop the other program. *(not hit by us; general advice)* |
 | `fatal: cannot write keep file … Filename too long` during `git submodule update --init` | Windows' 260-character path limit; the blueprint has deep paths, so a clone inside a long folder path fails | `git -c core.longpaths=true submodule update --init`, or clone into a short path such as `C:\src`. *(hit during the clean-clone test)* |
-| `UnicodeEncodeError: 'charmap' codec can't encode characters` from `deps`, `observe` or `baseline` | On Windows, Python falls back to the cp1252 encoding when output is piped or redirected, and the CLI prints symbols like `→` and `█` | `export PYTHONIOENCODING=utf-8` before running the CLI (`demo-day1.sh` already does this). *(hit during the clean-clone test; the code fix is in PR #9, which is not merged yet)* |
+| `UnicodeEncodeError: 'charmap' codec can't encode characters` from `deps`, `observe` or `baseline` | On Windows, Python falls back to the cp1252 encoding when output is piped or redirected, and the CLI prints symbols like `→` and `█` | `export PYTHONIOENCODING=utf-8` before running the CLI (`demo-day1.sh` already does this). *(hit during the clean-clone test; fixed in code by PR #9: the CLI now sets UTF-8 itself, so this is only needed on older commits)* |
 | `status` says `BUSY` | Another terminal is running an experiment | Wait for it, or stop it with `python -m resiliencepilot stop`. |
 | `status` says `LATCHED_UNSAFE` | A rollback/recovery was not verified, or the backend crashed mid-fault | Run `./scripts/kill-switch.sh`, check `./scripts/stack-status.sh`, then `reset` with your name and a note. |
 
