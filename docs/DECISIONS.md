@@ -52,7 +52,7 @@ unpauses without the backend; next backend start runs `startup_recovery` (unpaus
 run record). Known limit: the in-process watchdog dies with a hard-killed process (verified live), so between crash
 and kill-switch/restart the fault persists.
 
-**D-012 — Databroker host port moved to 55557 (override: `RP_DATABROKER_HOST_PORT`).** Upstream hardcodes
+**D-021 — Databroker host port moved to 55557 (override: `RP_DATABROKER_HOST_PORT`).** Upstream hardcodes
 `127.0.0.1:55555`, which collided with another program on a dev Mac and blocked `databroker`, `csv-provider` and
 `fms-forwarder`. Remapped via `config/compose/resiliencepilot.override.yaml` (`ports: !override`), blueprint untouched.
 No ResiliencePilot code uses the host port; container-to-container traffic is unchanged.
