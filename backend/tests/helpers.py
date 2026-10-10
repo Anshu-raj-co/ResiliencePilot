@@ -62,6 +62,8 @@ class FakeWorld:
         self.pause_delay_s = 0.0
         self.block_observe_s = 0.0
         self.snapshot_fails = False
+        self.influx_down_status: int | None = 500   # what the API answers while influxDB is stopped (None = no response)
+        self.stored: list[datetime] = []            # statuses the backend actually stored (not produced while influx is down)
         self.calls: list[tuple[float, str, str]] = []
 
     def forwarder_paused(self) -> bool:
@@ -69,6 +71,10 @@ class FakeWorld:
 
     def forwarder_down(self) -> bool:
         c = self.containers["fms-forwarder"]
+        return c.paused or not c.running
+
+    def influx_down(self) -> bool:
+        c = self.containers["influxDB"]
         return c.paused or not c.running
 
     def mutate(self, name: str, **changes) -> None:
@@ -150,7 +156,17 @@ class FakeObserver:
             if w.api_status != 200:
                 return Observation(now, w.api_status, w.latency_ms, None, None, None, None, error=f"HTTP {w.api_status}")
             frozen = w.forwarder_down() or w.stay_stale_after_unpause and any(c[1] == "unpause" for c in w.calls)
+            if w.influx_down():                       # store unreachable: produced statuses are dropped
+                if w.influx_down_status is None:
+                    return Observation(now, None, None, None, None, None, None, error="ReadTimeout")
+                return Observation(now, w.influx_down_status, w.latency_ms, None, None, None, None,
+                                   error=f"HTTP {w.influx_down_status}")
             if not frozen:
                 w.last_created = now - timedelta(seconds=0.01)
+                w.stored.append(w.last_created)
             created = w.last_created
         return Observation(now, 200, w.latency_ms, "VIN1", created, now, now)
+
+    def statuses_between(self, start: datetime, end: datetime) -> list[datetime]:
+        with self.w.lock:
+            return sorted(c for c in self.w.stored if start <= c <= end)

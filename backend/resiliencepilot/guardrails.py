@@ -29,16 +29,22 @@ class Violation:
 
 class ErrorRateGuard:
     """Share of fault-window polls with an HTTP response other than 200. Polls without a response are not errors
-    here (the observer-loss rule handles them)."""
+    here (the observer-loss rule handles them). Codes in `expected` are the experiment's declared symptom (e.g. 500
+    while InfluxDB is down): counted separately, never as errors. Anything else still counts."""
 
-    def __init__(self, max_error_rate: float, min_samples: int = 5) -> None:
+    def __init__(self, max_error_rate: float, min_samples: int = 5, expected: tuple[int, ...] = ()) -> None:
         self.max_error_rate = max_error_rate
         self.min_samples = min_samples
+        self.expected = frozenset(expected)
         self.responses = 0
         self.errors = 0
+        self.expected_seen = 0
 
     def update(self, http_status: int | None) -> Violation | None:
         if http_status is None:
+            return None
+        if http_status in self.expected:
+            self.expected_seen += 1
             return None
         self.responses += 1
         if http_status != 200:

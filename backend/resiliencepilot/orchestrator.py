@@ -181,10 +181,15 @@ class ExperimentRunner:
             rec["guardrails"].update(
                 latency_baseline_p95_ms=base_p95, latency_baseline_source=base_src, latency_threshold_ms=round(thr_ms, 2),
                 blast_radius_baseline={n: e.status for n, e in sorted(br_baseline.items())})
-            err_guard = ErrorRateGuard(rec["guardrails"]["config"]["max_error_rate"], g.error_min_samples)
+            err_guard = ErrorRateGuard(rec["guardrails"]["config"]["max_error_rate"], g.error_min_samples,
+                                       expected=spec.expected_statuses)
+            rec["guardrails"]["expected_statuses"] = list(spec.expected_statuses)
+            # with a declared expected symptom, the API must keep ANSWERING: the first lost poll aborts
+            loss_limit = 1 if spec.expected_statuses else cfg.observer_loss_max_consecutive
             lat_guard = LatencyGuard(thr_ms, g.latency_window, g.latency_min_samples)
             event("guardrails_armed", {"latency_threshold_ms": round(thr_ms, 2), "latency_baseline": base_src,
                                        "max_error_rate": err_guard.max_error_rate,
+                                       "expected_statuses": list(spec.expected_statuses),
                                        "blast_radius_allowed": sorted(allowed),
                                        "watched_containers": len(br_baseline)})
 
@@ -193,6 +198,7 @@ class ExperimentRunner:
                                        container_id=target_state.id)
             event("injecting", {"target": req.target, "mechanism": fault.mechanism}, state="INJECTING")
             inject_mono = time.monotonic()
+            rec["impact"]["injected_at"] = utcnow().isoformat()
             # total fault time is capped at 30 s even including grace (brief: hard max 30 s)
             watchdog = Watchdog(inject_mono + min(req.duration_s + cfg.watchdog_grace_s, HARD_MAX_DURATION_S),
                                 watchdog_fire)
@@ -214,6 +220,7 @@ class ExperimentRunner:
 
             # ---- ACTIVE: observe until duration, stop, or safety condition ----
             losses = 0
+            first_expected = None
             while True:
                 if watchdog.fired.is_set():
                     rec["stop_reason"] = "watchdog_timeout"
@@ -236,9 +243,12 @@ class ExperimentRunner:
                                           "latency_p95": "guardrail_latency"}[tripped.guard]
                     self._trip(rec, tripped, mono0, event)
                     break
+                if o.http_status in spec.expected_statuses and first_expected is None:
+                    first_expected = round(time.monotonic() - inject_mono, 3)
+                    event("expected_symptom", {"time_s": first_expected, "http_status": o.http_status})
                 if a.freshness is Freshness.OBSERVER_ERROR and o.http_status is None:  # no response at all
                     losses += 1
-                    if losses >= cfg.observer_loss_max_consecutive:
+                    if losses >= loss_limit:
                         rec["stop_reason"] = "observer_lost"
                         event("observer_lost", {"consecutive_failures": losses})
                         break
@@ -249,6 +259,7 @@ class ExperimentRunner:
                     event("stale_detected", {"time_to_detection_s": ttd, "http_status": o.http_status,
                                              "data_age_s": a.data_age_s, "healthy_but_stale": a.healthy_but_stale})
                 time.sleep(max(0.0, min(cfg.poll_interval_s, req.duration_s - (time.monotonic() - inject_mono))))
+            rec["impact"]["time_to_first_expected_status_s"] = first_expected
             event("fault_window_closed", {"stop_reason": rec["stop_reason"]})
         except SafetyError as exc:
             rec["stop_reason"] = rec["stop_reason"] or "precheck_failed"
@@ -269,6 +280,33 @@ class ExperimentRunner:
         rec["guardrails"]["triggered"] = {"guard": violation.guard, "detail": violation.detail,
                                           "t_s": round(time.monotonic() - mono0, 3)}
         event("guardrail_triggered", {"guard": violation.guard, **violation.detail})
+
+    def _measure_data_gap(self, rec: dict, event) -> None:
+        """Evidence only (never changes the outcome): which statuses did the backend actually STORE around the fault?
+        One read-only window query from 5 s before injection until now."""
+        query = getattr(self.observer, "statuses_between", None)
+        injected_at = rec["impact"].get("injected_at")
+        if query is None or injected_at is None:
+            return
+        from datetime import datetime, timedelta
+        start = datetime.fromisoformat(injected_at) - timedelta(seconds=5)
+        end = utcnow()
+        try:
+            created = query(start, end)
+        except Exception as exc:  # noqa: BLE001 - evidence collection must never affect safety
+            rec["data_gap"] = {"error": repr(exc)}
+            return
+        gaps = [(b - a).total_seconds() for a, b in zip(created, created[1:])]
+        biggest = max(range(len(gaps)), key=gaps.__getitem__) if gaps else None
+        rec["data_gap"] = {
+            "window_start": start.isoformat(), "window_end": end.isoformat(), "stored_statuses": len(created),
+            "max_gap_s": round(gaps[biggest], 3) if gaps else None,
+            "gap_from": created[biggest].isoformat() if gaps else None,
+            "gap_to": created[biggest + 1].isoformat() if gaps else None,
+            "median_interval_s": round(sorted(gaps)[len(gaps) // 2], 3) if gaps else None,
+            "method": "GET /rfms/vehiclestatuses?starttime&stoptime (stored createdDateTime values)",
+        }
+        event("data_gap_measured", {k: rec["data_gap"][k] for k in ("stored_statuses", "max_gap_s", "median_interval_s")})
 
     def _final_blast_check(self, rec, br_ids, br_baseline) -> bool:
         """After recovery: nothing outside the blast radius may have changed during the whole run."""
@@ -340,6 +378,7 @@ class ExperimentRunner:
                 event("latched", "recovery not verified", state="LATCHED_UNSAFE")
                 return
             event("recovery_verified", rec["recovery"])
+            self._measure_data_gap(rec, event)
             if not self._final_blast_check(rec, list(br_ids), br_baseline or {}):
                 self.ctl.latch(f"run {run_id}: containers outside the blast radius changed during the run")
                 event("latched", {"final_blast_check": rec["guardrails"]["final_blast_check"]}, state="LATCHED_UNSAFE")
@@ -356,9 +395,16 @@ class ExperimentRunner:
         finally:
             if watchdog is not None:
                 watchdog.cancel()
-            inj_lat = rec["impact"].get("injection_latency_s")
+            keep = {k: rec["impact"].get(k) for k in ("injection_latency_s", "injected_at", "time_to_first_expected_status_s")}
+            inj_lat = keep["injection_latency_s"]
             rec["impact"] = _impact(rec["impact"].get("fault_verified", False), phase_obs, ttd)
-            rec["impact"]["injection_latency_s"] = inj_lat
+            rec["impact"].update(keep)
+            fault_polls = phase_obs["fault"]
+            rec["impact"]["expected_status_observations"] = sum(
+                1 for o, _ in fault_polls if o.http_status in set(rec["guardrails"].get("expected_statuses") or []))
+            # silent = the failure was only visible in the data (HTTP 200 while stale), never as an HTTP error
+            rec["impact"]["silent_failure"] = bool(rec["impact"]["healthy_but_stale_observations"]) and not any(
+                o.http_status not in (None, 200) for o, _ in fault_polls)
             rec["impact"]["time_to_detection_from_verified_injection_s"] = (
                 round(ttd - inj_lat, 3) if ttd is not None and inj_lat is not None else None)
             self.store.save_run(rec)

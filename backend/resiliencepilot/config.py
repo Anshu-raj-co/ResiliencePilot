@@ -89,6 +89,7 @@ class ExperimentSpec:
     blast_radius: tuple[str, ...] = field(default_factory=tuple)  # containers allowed to change state; default = targets
     stop_timeout_s: int = 2                                        # docker_stop only: SIGTERM -> SIGKILL grace
     max_error_rate: float | None = None                            # per-experiment override of the guardrail
+    expected_statuses: tuple[int, ...] = field(default_factory=tuple)  # HTTP codes that ARE the symptom (fault window only)
 
     def __post_init__(self) -> None:
         if self.mechanism not in SUPPORTED_MECHANISMS:
@@ -99,6 +100,8 @@ class ExperimentSpec:
             raise ValueError(f"{self.name}: blast_radius must include every allowed target")
         if not 0 <= self.stop_timeout_s <= 5:
             raise ValueError(f"{self.name}: stop_timeout_s must be within 0..5")
+        if any(not 400 <= int(c) <= 599 for c in self.expected_statuses):
+            raise ValueError(f"{self.name}: expected_statuses must be HTTP error codes (400..599)")
         if self.max_error_rate is not None and not 0.0 <= self.max_error_rate <= MAX_ERROR_RATE:
             raise ValueError(f"{self.name}: max_error_rate must be within [0, {MAX_ERROR_RATE}]")
 
@@ -128,6 +131,7 @@ def load_experiment_catalog(root: Path = REPO_ROOT) -> dict[str, ExperimentSpec]
             blast_radius=tuple(spec.get("blast_radius", [])),
             stop_timeout_s=int(spec.get("stop_timeout_s", 2)),
             max_error_rate=spec.get("max_error_rate"),
+            expected_statuses=tuple(int(c) for c in spec.get("expected_statuses", [])),
         )
         for name, spec in raw.items()
     }
