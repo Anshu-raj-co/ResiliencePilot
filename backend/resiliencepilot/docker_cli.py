@@ -23,12 +23,26 @@ class ContainerState:
     paused: bool = False
     status: str = "missing"
     project: str | None = None
+    id: str | None = None
+    started_at: str | None = None
+
+
+@dataclass(frozen=True)
+class SnapshotEntry:
+    """What the blast-radius guard compares: any change to these fields is a state change."""
+    id: str
+    status: str
+    started_at: str | None
 
 
 class Docker(Protocol):
     def inspect(self, name: str) -> ContainerState: ...
     def pause(self, name: str) -> None: ...
     def unpause(self, name: str) -> None: ...
+    def stop(self, name: str, timeout_s: int) -> None: ...
+    def start(self, name: str) -> None: ...
+    def project_container_ids(self, project: str) -> list[str]: ...
+    def snapshot(self, ids: list[str]) -> dict[str, SnapshotEntry]: ...
 
 
 def _check_name(name: str) -> str:
@@ -56,7 +70,32 @@ class DockerCLI:
         info = json.loads(proc.stdout)[0]
         st = info["State"]
         return ContainerState(name=name, exists=True, running=bool(st["Running"]), paused=bool(st["Paused"]),
-                              status=st["Status"], project=(info["Config"].get("Labels") or {}).get(PROJECT_LABEL))
+                              status=st["Status"], project=(info["Config"].get("Labels") or {}).get(PROJECT_LABEL),
+                              id=info.get("Id"), started_at=st.get("StartedAt"))
+
+    def project_container_ids(self, project: str) -> list[str]:
+        """IDs of every container (any state) carrying the compose-project label."""
+        proc = self._run("ps", "-aq", "--no-trunc", "--filter", f"label={PROJECT_LABEL}={project}")
+        if proc.returncode != 0:
+            raise DockerError(f"docker ps: {proc.stderr.strip()}")
+        return sorted(proc.stdout.split())
+
+    def snapshot(self, ids: list[str]) -> dict[str, SnapshotEntry]:
+        """name -> (id, status, started_at) for the given container IDs. A removed container is simply absent."""
+        if not ids:
+            return {}
+        for i in ids:
+            if not re.fullmatch(r"[0-9a-f]{12,64}", i):
+                raise DockerError(f"refusing invalid container id {i!r}")
+        proc = self._run("inspect", "--type", "container", *ids)
+        try:
+            infos = json.loads(proc.stdout or "[]")
+        except ValueError as exc:
+            raise DockerError(f"docker inspect (snapshot): unparseable output: {exc}") from exc
+        if proc.returncode != 0 and "No such" not in proc.stderr:
+            raise DockerError(f"docker inspect (snapshot): {proc.stderr.strip()}")
+        return {info["Name"].lstrip("/"): SnapshotEntry(info["Id"], info["State"]["Status"], info["State"].get("StartedAt"))
+                for info in infos}
 
     # ---- read-only helpers for evidence/display (never used by fault logic) ----
     def networks(self, name: str) -> list[str]:
@@ -81,6 +120,19 @@ class DockerCLI:
     def mem_total_bytes(self) -> int | None:
         proc = self._run("info", "--format", "{{.MemTotal}}")
         return int(proc.stdout.strip()) if proc.returncode == 0 and proc.stdout.strip().isdigit() else None
+
+    def stop(self, name: str, timeout_s: int) -> None:
+        """`docker stop -t N`: SIGTERM, then SIGKILL after N seconds. Bounded: N must be 0..10."""
+        if not 0 <= int(timeout_s) <= 10:
+            raise DockerError(f"refusing stop timeout {timeout_s!r}")
+        proc = self._run("stop", "-t", str(int(timeout_s)), _check_name(name))
+        if proc.returncode != 0:
+            raise DockerError(f"docker stop {name}: {proc.stderr.strip()}")
+
+    def start(self, name: str) -> None:
+        proc = self._run("start", _check_name(name))
+        if proc.returncode != 0:
+            raise DockerError(f"docker start {name}: {proc.stderr.strip()}")
 
     def pause(self, name: str) -> None:
         proc = self._run("pause", _check_name(name))

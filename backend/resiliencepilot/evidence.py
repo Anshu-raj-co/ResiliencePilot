@@ -47,5 +47,16 @@ class EvidenceStore:
     def list_runs(self) -> list[str]:
         return sorted(p.stem for p in (self.data_dir / "runs").glob("*.json"))
 
+    def latest_baseline(self) -> tuple[str, dict] | None:
+        """(name, summary) of the newest stored baseline that recorded latency, or None."""
+        for p in sorted((self.data_dir / "baselines").glob("*.json"), reverse=True):
+            try:
+                summary = json.loads(p.read_text(encoding="utf-8")).get("summary") or {}
+            except (OSError, ValueError):
+                continue
+            if (summary.get("latency_ms") or {}).get("p95") is not None:
+                return p.stem, summary
+        return None
+
     def save_baseline(self, name: str, payload: dict) -> Path:
         return self._write(self.data_dir / "baselines" / f"{name}.json", payload)

@@ -204,7 +204,7 @@ def main(argv: list[str] | None = None) -> int:
         ok = rec["state"] == "COMPLETED"
         print(f"\n{C['b']}Result: {(C['g'] if ok else C['r'])}{rec['state']}{C['x']}  stop_reason={rec['stop_reason']}")
         print(f"  fault verified: {imp.get('fault_verified')}   stale detected: {imp.get('stale_detected')} "
-              f"(time to detection {imp.get('time_to_detection_s')}s)")
+              f"(time to detection {'not detected' if imp.get('time_to_detection_s') is None else str(imp['time_to_detection_s']) + 's'})")
         print(f"  during fault: HTTP-200 ratio {imp.get('http_ok_ratio_during_fault')}, max data age {imp.get('max_data_age_s')}s, "
               f"{imp.get('healthy_but_stale_observations')} healthy-but-stale observations")
         print(f"  rollback: verified={rb['verified']} by={rb['by']}   recovery: verified={rc['verified']} "

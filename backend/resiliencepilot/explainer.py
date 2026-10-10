@@ -57,7 +57,9 @@ def _summary(rec: dict, src: str) -> dict:
 
 
 def _is_full(rec: dict) -> bool:
-    return rec["state"] == "COMPLETED" and rec["stop_reason"] == "duration_elapsed"
+    """Full-length telemetry_stall runs: the Day-1 explainer is about that experiment."""
+    return (rec["state"] == "COMPLETED" and rec["stop_reason"] == "duration_elapsed"
+            and rec["request"].get("experiment_type", "telemetry_stall") == "telemetry_stall")
 
 
 def collect(root: Path, run_id: str | None) -> dict:

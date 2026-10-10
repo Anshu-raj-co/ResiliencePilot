@@ -2,18 +2,239 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "resiliencepilot/experiment_run.schema.json",
   "title": "ExperimentRun",
-  "description": "Evidence record persisted for every experiment, including aborted and unsafe ones.",
+  "description": "Evidence record persisted for every experiment, including aborted and unsafe ones. 'safety_threshold' is a legacy stop reason (Day 1); Day 2 records use guardrail_*.",
   "type": "object",
-  "required": ["run_id", "request", "state", "timeline", "observations", "stop_reason", "rollback", "recovery", "impact"],
+  "required": [
+    "run_id",
+    "request",
+    "state",
+    "timeline",
+    "observations",
+    "stop_reason",
+    "rollback",
+    "recovery",
+    "impact"
+  ],
   "properties": {
-    "run_id": { "type": "string" },
-    "request": { "$ref": "experiment_request.schema.json" },
-    "state": { "enum": ["VALIDATED", "PRECHECK", "INJECTING", "ACTIVE", "ROLLING_BACK", "VERIFYING_RECOVERY", "COMPLETED", "ABORTED", "LATCHED_UNSAFE"] },
-    "timeline": { "type": "array", "items": { "type": "object", "required": ["at", "event"], "properties": { "at": {"type": "string"}, "event": {"type": "string"}, "detail": {} } } },
-    "observations": { "type": "array", "items": { "type": "object", "required": ["phase", "observation"], "properties": { "phase": { "enum": ["precheck", "fault", "recovery"] }, "observation": { "$ref": "observation.schema.json" } } } },
-    "stop_reason": { "enum": [null, "duration_elapsed", "emergency_stop", "watchdog_timeout", "observer_lost", "safety_threshold", "precheck_failed", "fault_not_verified", "error"] },
-    "rollback": { "type": "object", "properties": { "attempted": {"type": "boolean"}, "verified": {"type": "boolean"}, "by": {"type": ["string", "null"]}, "detail": {"type": ["string", "null"]} } },
-    "recovery": { "type": "object", "properties": { "verified": {"type": "boolean"}, "time_to_recovery_s": {"type": ["number", "null"]}, "criteria": {"type": "string"}, "detail": {"type": ["string", "null"]} } },
-    "impact": { "type": "object", "properties": { "fault_verified": {"type": "boolean"}, "stale_detected": {"type": "boolean"}, "time_to_detection_s": {"type": ["number", "null"]}, "max_data_age_s": {"type": ["number", "null"]}, "http_ok_ratio_during_fault": {"type": ["number", "null"]}, "healthy_but_stale_observations": {"type": "integer"} } }
+    "run_id": {
+      "type": "string"
+    },
+    "request": {
+      "$ref": "experiment_request.schema.json"
+    },
+    "state": {
+      "enum": [
+        "VALIDATED",
+        "PRECHECK",
+        "INJECTING",
+        "ACTIVE",
+        "ROLLING_BACK",
+        "VERIFYING_RECOVERY",
+        "COMPLETED",
+        "ABORTED",
+        "LATCHED_UNSAFE"
+      ]
+    },
+    "timeline": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "at",
+          "event"
+        ],
+        "properties": {
+          "at": {
+            "type": "string"
+          },
+          "event": {
+            "type": "string"
+          },
+          "detail": {}
+        }
+      }
+    },
+    "observations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "phase",
+          "observation"
+        ],
+        "properties": {
+          "phase": {
+            "enum": [
+              "precheck",
+              "fault",
+              "recovery"
+            ]
+          },
+          "observation": {
+            "$ref": "observation.schema.json"
+          }
+        }
+      }
+    },
+    "stop_reason": {
+      "enum": [
+        null,
+        "duration_elapsed",
+        "emergency_stop",
+        "watchdog_timeout",
+        "observer_lost",
+        "safety_threshold",
+        "guardrail_error_rate",
+        "guardrail_latency",
+        "guardrail_blast_radius",
+        "precheck_failed",
+        "fault_not_verified",
+        "error"
+      ]
+    },
+    "rollback": {
+      "type": "object",
+      "properties": {
+        "attempted": {
+          "type": "boolean"
+        },
+        "verified": {
+          "type": "boolean"
+        },
+        "by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "recovery": {
+      "type": "object",
+      "properties": {
+        "verified": {
+          "type": "boolean"
+        },
+        "time_to_recovery_s": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "criteria": {
+          "type": "string"
+        },
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "impact": {
+      "type": "object",
+      "properties": {
+        "fault_verified": {
+          "type": "boolean"
+        },
+        "stale_detected": {
+          "type": "boolean"
+        },
+        "time_to_detection_s": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "max_data_age_s": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "http_ok_ratio_during_fault": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "healthy_but_stale_observations": {
+          "type": "integer"
+        },
+        "http_error_rate_during_fault": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "latency_p95_during_fault_ms": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      }
+    },
+    "guardrails": {
+      "type": "object",
+      "description": "Guardrail configuration, baselines used and the trip (if any).",
+      "properties": {
+        "config": {
+          "type": "object"
+        },
+        "blast_radius_allowed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "latency_baseline_p95_ms": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "latency_baseline_source": {
+          "type": "string"
+        },
+        "latency_threshold_ms": {
+          "type": "number"
+        },
+        "blast_radius_baseline": {
+          "type": "object"
+        },
+        "triggered": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "guard": {
+              "enum": [
+                "error_rate",
+                "latency_p95",
+                "blast_radius"
+              ]
+            },
+            "detail": {
+              "type": "object"
+            },
+            "t_s": {
+              "type": "number"
+            }
+          }
+        },
+        "final_blast_check": {
+          "type": "object"
+        }
+      }
+    }
   }
 }

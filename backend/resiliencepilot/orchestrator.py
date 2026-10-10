@@ -1,8 +1,9 @@
 """Experiment orchestrator: VALIDATED -> PRECHECK -> INJECTING -> ACTIVE -> ROLLING_BACK -> VERIFYING_RECOVERY
 -> COMPLETED | ABORTED | LATCHED_UNSAFE.
 
-Rollback happens in `finally`, so it runs on normal completion, emergency stop, observer loss, safety-threshold
-violation and any exception. The watchdog rolls back independently if the loop overruns its deadline.
+Rollback happens in `finally`, so it runs on normal completion, emergency stop, observer loss, a guardrail trip
+(error rate, latency p95, blast radius) and any exception. The watchdog rolls back independently if the loop overruns
+its deadline.
 """
 from __future__ import annotations
 
@@ -12,14 +13,15 @@ import uuid
 from typing import Callable, Protocol
 
 from .config import HARD_MAX_DURATION_S, ExperimentSpec, SafetyConfig
-from .docker_cli import Docker
+from .docker_cli import Docker, DockerError
 from .evidence import EvidenceStore
-from .faults import PauseFault, Watchdog
+from .faults import Watchdog, make_fault
+from .guardrails import BlastRadiusMonitor, ErrorRateGuard, LatencyGuard, blast_radius_changes, latency_threshold, p95
 from .observation import Observation, utcnow
 from .safety import ExperimentRequest, SafetyController, SafetyError
 from .telemetry import Freshness, FreshnessTracker
 
-RECOVERY_CRITERIA = ("rollback verified by docker inspect (running, not paused) AND {n} successive advances of "
+RECOVERY_CRITERIA = ("rollback verified by docker inspect ({restored}) AND {n} successive advances of "
                      "createdDateTime beyond both the last pre-rollback value and the fms-server time of the last fault-window "
                      "poll, each with HTTP 200 and data_age_s <= {thr}s")
 
@@ -70,6 +72,8 @@ class ExperimentRunner:
     # ---------- the state machine ----------
     def _execute(self, req: ExperimentRequest, run_id: str, stop_event: threading.Event) -> dict:
         cfg, spec = self.cfg, self.catalog[req.experiment_type]
+        g = cfg.guardrails
+        fault = make_fault(spec, self.docker, req.target)
         mono0 = time.monotonic()
         rec_lock = threading.Lock()
         rec: dict = {
@@ -80,9 +84,13 @@ class ExperimentRunner:
             "timeline": [], "observations": [], "stop_reason": None,
             "rollback": {"attempted": False, "verified": False, "by": None, "detail": None},
             "recovery": {"verified": False, "time_to_first_fresh_s": None, "time_to_verified_s": None,
-                         "criteria": RECOVERY_CRITERIA.format(n=cfg.recovery_consecutive, thr=cfg.stale_threshold_s),
+                         "criteria": RECOVERY_CRITERIA.format(restored=fault.restored_description,
+                                                              n=cfg.recovery_consecutive, thr=cfg.stale_threshold_s),
                          "detail": None},
             "impact": {},
+            "guardrails": {"config": {**vars(g), "max_error_rate": spec.max_error_rate if spec.max_error_rate is not None
+                                      else g.max_error_rate},
+                           "blast_radius_allowed": list(spec.effective_blast_radius), "triggered": None},
         }
 
         def event(name: str, detail: object = None, state: str | None = None) -> None:
@@ -115,8 +123,10 @@ class ExperimentRunner:
             self.on_event("observation", entry)
             return o, a
 
-        fault = PauseFault(self.docker, req.target)
         watchdog: Watchdog | None = None
+        monitor: BlastRadiusMonitor | None = None
+        br_ids: list[str] = []
+        br_baseline: dict = {}
         inject_mono: float | None = None
         ttd: float | None = None
 
@@ -151,6 +161,30 @@ class ExperimentRunner:
                 time.sleep(cfg.poll_interval_s)
             event("precheck_passed", {"fresh_samples": fresh_streak})
 
+            # ---- GUARDRAIL BASELINES: refuse to inject if we cannot watch the blast radius ----
+            stored = self.store.latest_baseline()
+            pre_lat = [o.latency_ms for o, _ in phase_obs["precheck"] if o.latency_ms is not None]
+            if stored is not None:
+                base_p95, base_src = stored[1]["latency_ms"]["p95"], f"baseline {stored[0]}"
+            else:
+                base_p95, base_src = p95(pre_lat), "precheck polls (no stored baseline)"
+            thr_ms = latency_threshold(base_p95, g.latency_p95_multiplier, g.latency_p95_floor_ms)
+            try:
+                br_ids = self.docker.project_container_ids(cfg.compose_project)
+                br_baseline = self.docker.snapshot(br_ids)
+            except DockerError as exc:
+                raise SafetyError(f"blast radius not observable before injection: {exc}") from exc
+            allowed = set(spec.effective_blast_radius)
+            rec["guardrails"].update(
+                latency_baseline_p95_ms=base_p95, latency_baseline_source=base_src, latency_threshold_ms=round(thr_ms, 2),
+                blast_radius_baseline={n: e.status for n, e in sorted(br_baseline.items())})
+            err_guard = ErrorRateGuard(rec["guardrails"]["config"]["max_error_rate"], g.error_min_samples)
+            lat_guard = LatencyGuard(thr_ms, g.latency_window, g.latency_min_samples)
+            event("guardrails_armed", {"latency_threshold_ms": round(thr_ms, 2), "latency_baseline": base_src,
+                                       "max_error_rate": err_guard.max_error_rate,
+                                       "blast_radius_allowed": sorted(allowed),
+                                       "watched_containers": len(br_baseline)})
+
             # ---- INJECT ----
             self.ctl.mark_fault_active(run_id, req.target, fault.mechanism)  # before the fault: crash-recoverable
             event("injecting", {"target": req.target, "mechanism": fault.mechanism}, state="INJECTING")
@@ -159,13 +193,16 @@ class ExperimentRunner:
             watchdog = Watchdog(inject_mono + min(req.duration_s + cfg.watchdog_grace_s, HARD_MAX_DURATION_S),
                                 watchdog_fire)
             watchdog.start()
+            monitor = BlastRadiusMonitor(self.docker, cfg.compose_project, br_ids, br_baseline, allowed,
+                                         g.blast_radius_interval_s, g.blast_radius_max_snapshot_failures)
+            monitor.start()
             fault.inject()
             if not fault.verify_injected():
                 rec["stop_reason"] = "fault_not_verified"
                 event("fault_not_verified", {"target": req.target})
                 return rec  # finally{} rolls back and records outcome
             rec["impact"]["fault_verified"] = True
-            event("fault_active", {"verified_by": "docker inspect State.Paused == true"}, state="ACTIVE")
+            event("fault_active", {"verified_by": fault.verified_by}, state="ACTIVE")
 
             # ---- ACTIVE: observe until duration, stop, or safety condition ----
             losses = 0
@@ -180,12 +217,18 @@ class ExperimentRunner:
                 if elapsed >= req.duration_s:
                     rec["stop_reason"] = "duration_elapsed"
                     break
+                if monitor.tripped.is_set():
+                    rec["stop_reason"] = "guardrail_blast_radius"
+                    self._trip(rec, monitor.violation, mono0, event)
+                    break
                 o, a = observe("fault")
-                if a.freshness is Freshness.OBSERVER_ERROR:
-                    if o.http_status is not None:  # API answered non-200: blast radius larger than expected
-                        rec["stop_reason"] = "safety_threshold"
-                        event("safety_threshold", {"http_status": o.http_status})
-                        break
+                tripped = err_guard.update(o.http_status) or lat_guard.update(o.latency_ms)
+                if tripped is not None:
+                    rec["stop_reason"] = {"error_rate": "guardrail_error_rate",
+                                          "latency_p95": "guardrail_latency"}[tripped.guard]
+                    self._trip(rec, tripped, mono0, event)
+                    break
+                if a.freshness is Freshness.OBSERVER_ERROR and o.http_status is None:  # no response at all
                     losses += 1
                     if losses >= cfg.observer_loss_max_consecutive:
                         rec["stop_reason"] = "observer_lost"
@@ -206,10 +249,35 @@ class ExperimentRunner:
             rec["stop_reason"] = rec["stop_reason"] or "error"
             event("exception", repr(exc))
         finally:
-            self._finish(rec, req, run_id, fault, watchdog, tracker, phase_obs, inject_mono, ttd, event, observe)
+            if monitor is not None:
+                monitor.stop()
+            self._finish(rec, req, run_id, fault, watchdog, tracker, phase_obs, inject_mono, ttd, event, observe,
+                         br_ids, br_baseline)
         return rec
 
-    def _finish(self, rec, req, run_id, fault, watchdog, tracker, phase_obs, inject_mono, ttd, event, observe) -> None:
+    @staticmethod
+    def _trip(rec: dict, violation, mono0: float, event) -> None:
+        rec["guardrails"]["triggered"] = {"guard": violation.guard, "detail": violation.detail,
+                                          "t_s": round(time.monotonic() - mono0, 3)}
+        event("guardrail_triggered", {"guard": violation.guard, **violation.detail})
+
+    def _final_blast_check(self, rec, br_ids, br_baseline) -> bool:
+        """After recovery: nothing outside the blast radius may have changed during the whole run."""
+        if not br_baseline:
+            return True
+        allowed = set(rec["guardrails"]["blast_radius_allowed"])
+        for _ in range(2):  # one retry for a transient docker error; still unobservable -> not clean
+            try:
+                ids = sorted(set(br_ids) | set(self.docker.project_container_ids(self.cfg.compose_project)))
+                changes = blast_radius_changes(br_baseline, self.docker.snapshot(ids), allowed)
+                rec["guardrails"]["final_blast_check"] = {"clean": not changes, "changes": changes}
+                return not changes
+            except DockerError as exc:
+                rec["guardrails"]["final_blast_check"] = {"clean": False, "error": str(exc)}
+        return False
+
+    def _finish(self, rec, req, run_id, fault, watchdog, tracker, phase_obs, inject_mono, ttd, event, observe,
+                br_ids=(), br_baseline=None) -> None:
         cfg = self.cfg
         try:
             if not fault.inject_attempted:
@@ -263,6 +331,10 @@ class ExperimentRunner:
                 event("latched", "recovery not verified", state="LATCHED_UNSAFE")
                 return
             event("recovery_verified", rec["recovery"])
+            if not self._final_blast_check(rec, list(br_ids), br_baseline or {}):
+                self.ctl.latch(f"run {run_id}: containers outside the blast radius changed during the run")
+                event("latched", {"final_blast_check": rec["guardrails"]["final_blast_check"]}, state="LATCHED_UNSAFE")
+                return
             as_planned = rec["impact"].get("fault_verified") and rec["stop_reason"] == "duration_elapsed"
             if self.ctl.latched:  # e.g. the watchdog latched even though a later retry succeeded
                 event("latched", "controller latched during run", state="LATCHED_UNSAFE")
@@ -295,6 +367,10 @@ def _impact(fault_verified: bool, phase_obs: dict, ttd: float | None) -> dict:
         "max_stalled_for_s": round(max(stalls), 3) if stalls else None,
         "http_ok_ratio_during_fault": round(sum(o.http_ok for o, _ in fault) / len(fault), 3) if fault else None,
         "healthy_but_stale_observations": sum(a.healthy_but_stale for _, a in fault),
+        "http_error_rate_during_fault": (round(sum(1 for o, _ in fault if o.http_status not in (None, 200))
+                                               / max(1, sum(1 for o, _ in fault if o.http_status is not None)), 3)
+                                         if fault else None),
+        "latency_p95_during_fault_ms": p95([o.latency_ms for o, _ in fault if o.latency_ms is not None]),
     }
 
 

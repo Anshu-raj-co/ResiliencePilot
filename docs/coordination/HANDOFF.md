@@ -1,7 +1,14 @@
 # Handoff
 
-_Updated: 2026-10-10 ~22:45 IST, Day 2 step 1 cleanup: PRs #9-#13 open for review_
-_Updated: 2026-10-10 ~22:30 IST, Day 2 step 1 cleanup (one PR per item)_
+_Updated: 2026-10-10 ~23:50 IST, Day 2 milestone 1 in progress (branch feat/day2-service-crash)_
+
+## Day 2 milestone 1: service_crash + guardrails (branch `feat/day2-service-crash`, IN PROGRESS)
+- New: `StopStartFault` (docker stop -t 2 / docker start, same-container-id check), `make_fault` factory,
+  `guardrails.py` (error-rate, latency p95, blast-radius monitor thread), kill switch starts stopped targets,
+  startup recovery starts stopped targets. Contracts updated.
+- Tests: 122 unit passed (80 old + 13 `test_service_crash.py` + 29 `test_guardrails.py`).
+- TODO next: live runs (3x service_crash, telemetry_stall regression, live blast-radius trip, kill switch
+  with a stopped target), evidence in `reports/day2/`, safety review, PR.
 
 ## Where things are
 - `main` = `843889a`: Day 1 complete, explainer (PR #4) and dashboard (PR #6) merged. Verified 2026-10-10 22:1x:

@@ -46,7 +46,7 @@ class Latched(SafetyError):
 class ExperimentRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
 
-    experiment_type: Literal["telemetry_stall"]
+    experiment_type: Literal["telemetry_stall", "service_crash"]
     target: str = Field(min_length=1, max_length=63, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_.-]*$")
     duration_s: int = Field(ge=1, le=HARD_MAX_DURATION_S)
     approved_by: str = Field(min_length=1, max_length=80)
@@ -313,9 +313,13 @@ class SafetyController:
         for target in targets:
             try:
                 st = self.docker.inspect(target)
-                if st.exists and st.paused and st.project == self.cfg.compose_project:
+                in_sandbox = st.exists and st.project == self.cfg.compose_project
+                if in_sandbox and st.paused:
                     self.docker.unpause(target)
                     outcomes.append(f"{target}: unpaused")
+                elif in_sandbox and not st.running:  # left stopped by an interrupted service_crash run
+                    self.docker.start(target)
+                    outcomes.append(f"{target}: started")
                 else:
                     outcomes.append(f"{target}: state {st.status}")
             except DockerError as exc:
