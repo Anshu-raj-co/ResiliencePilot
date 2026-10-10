@@ -1,12 +1,20 @@
 # Handoff
 
-_Updated: 2026-10-10 ~15:20 IST, Day-1 wrap-up (presentation + judge report)_
+_Updated: 2026-10-10 ~15:50 IST, Day-1 explainer page (branch feat/day1-explainer)_
 
 ## Where things are
 - Branch `wip/day1-recon` (pushed). Last known-good on main: `401a23d`.
 - Phases 0–2 done and verified live; see `CURRENT_STATUS.md` for the acceptance checklist and `docs/recon.md` §8 for numbers.
 - Safety review done and fixed (`docs/testing/SAFETY_REVIEW.md`). Demo: `docs/demo/DAY1_DEMO.md`, `scripts/demo-day1.sh`.
 - PR #1 merged into `main` (`401a23d`). Wrap-up (dependency map, load conditions, impact view, judge report) is in PR #2 from `wip/day1-recon`; merge is left to the engineering lead.
+
+## Day-1 explainer (branch `feat/day1-explainer`, PR pending the lead's approval)
+- `rp report [--run ID] [--out FILE]` → `reports/day1/explainer.html`: a standalone offline HTML page built only from
+  `backend/data/runs/` (falling back to `reports/day1/`), the baselines in `reports/day1/` and `config/dependency_map.json`.
+- Code: `backend/resiliencepilot/explainer.py` (read-only). No changes to safety, orchestrator or fault code.
+  Tests: `backend/tests/test_explainer.py`.
+- Verified by rendering in headless Edge: light and dark (screenshots inspected), and phone width measured in a 390 px iframe (scrollWidth 375 ≤ 390, no page-level horizontal scroll; diagram and chart scroll inside their boxes). Screenshot: `docs/demo/explainer-chart.png`.
+- Regenerate after new runs; it picks the latest full-length COMPLETED run by default.
 
 ## Where the evidence lives
 | What | Where |

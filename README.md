@@ -52,6 +52,16 @@ RP_APPROVER="<presenter name>" ./scripts/demo-day1.sh    # ~45 s live; RP_DEMO_P
 ```
 Talk track: `docs/demo/DAY1_DEMO.md`. Recorded real run: `docs/demo/day1-demo-run.log`.
 
+**Day-1 explainer page** (read-only, one offline HTML file built only from recorded runs):
+```bash
+cd backend && .venv/Scripts/rp report                       # latest full-length COMPLETED run
+.venv/Scripts/rp report --run 20261010T085737Z-c9bda7 --out reports/day1/explainer.html
+```
+It writes `reports/day1/explainer.html`. Open it in any browser; no server or network is needed. It has no controls that
+start, stop or reset experiments.
+
+![Explainer: data age vs. stale threshold while every poll returns HTTP 200](docs/demo/explainer-chart.png)
+
 ### Results
 Measured on Day 1 (details and per-run evidence: `docs/demo/DAY1_REPORT.md`, `reports/day1/`):
 HTTP 200 on 100 % of polls while the forwarder was paused. Stale data was detected 4.77–5.27 s after injection.
