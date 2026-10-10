@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -14,6 +15,30 @@ MAX_FAULT_LATENCY_P95_MS = 7500.0       # ceiling for a declared fault-window la
 
 
 SUPPORTED_MECHANISMS = ("docker_pause", "docker_stop")
+
+# Named config profiles (config/profiles/<name>/), selected with RP_CONFIG_PROFILE. A profile is an overlay on the
+# default config: it may only change guardrail settings and a few per-experiment response limits, never targets,
+# mechanisms, durations, the compose project or the data dir (so the one-run lock stays shared). Every value still
+# passes the same bounds checks. Used to demonstrate guards live with deliberately tight thresholds.
+CONFIG_PROFILES = ("guardrail-demo-error-rate", "guardrail-demo-latency")
+PROFILE_SPEC_KEYS = frozenset({"description", "expected_symptoms", "risks", "expected_statuses", "max_error_rate",
+                               "fault_observer_timeout_s", "fault_latency_p95_max_ms"})
+
+
+def active_profile() -> str | None:
+    name = os.environ.get("RP_CONFIG_PROFILE", "").strip()
+    if not name or name == "default":
+        return None
+    if name not in CONFIG_PROFILES:
+        raise ValueError(f"RP_CONFIG_PROFILE must be one of {CONFIG_PROFILES} (or unset), got {name!r}")
+    return name
+
+
+def _profile_file(root: Path, profile: str | None, name: str) -> dict:
+    if profile is None:
+        return {}
+    p = root / "config" / "profiles" / profile / name
+    return json.loads(p.read_text(encoding="utf-8")) if p.is_file() else {}
 
 
 @dataclass(frozen=True)
@@ -66,6 +91,7 @@ class SafetyConfig:
     watchdog_grace_s: float
     data_dir: Path
     guardrails: Guardrails = field(default_factory=Guardrails)
+    profile: str = "default"  # config profile in effect (recorded with every run)
 
     def __post_init__(self) -> None:
         if not 1 <= self.max_duration_s <= HARD_MAX_DURATION_S:
@@ -129,13 +155,28 @@ class ExperimentSpec:
 
 def load_safety_config(root: Path = REPO_ROOT) -> SafetyConfig:
     raw = json.loads((root / "config" / "safety.json").read_text(encoding="utf-8"))
+    profile = active_profile()
+    over = {k: v for k, v in _profile_file(root, profile, "safety.json").items() if not k.startswith("_")}
+    if set(over) - {"guardrails"}:
+        raise ValueError(f"profile {profile}: safety.json may only override 'guardrails', not {sorted(set(over) - {'guardrails'})}")
     data_dir = Path(raw.pop("data_dir"))
-    guardrails = Guardrails(**raw.pop("guardrails", {}))
-    return SafetyConfig(data_dir=data_dir if data_dir.is_absolute() else root / data_dir, guardrails=guardrails, **raw)
+    guardrails = Guardrails(**{**raw.pop("guardrails", {}), **over.get("guardrails", {})})
+    return SafetyConfig(data_dir=data_dir if data_dir.is_absolute() else root / data_dir, guardrails=guardrails,
+                        profile=profile or "default", **raw)
 
 
 def load_experiment_catalog(root: Path = REPO_ROOT) -> dict[str, ExperimentSpec]:
     raw = json.loads((root / "config" / "experiments.json").read_text(encoding="utf-8"))
+    profile = active_profile()
+    for name, over in _profile_file(root, profile, "experiments.json").items():
+        if name.startswith("_"):
+            continue
+        if name not in raw:
+            raise ValueError(f"profile {profile}: unknown experiment {name!r} (profiles cannot add experiments)")
+        bad = set(over) - PROFILE_SPEC_KEYS
+        if bad:
+            raise ValueError(f"profile {profile}: {name} may not override {sorted(bad)}")
+        raw[name] = {**raw[name], **over}
     return {
         name: ExperimentSpec(
             name=name,

@@ -1,0 +1,4 @@
+{
+  "_about": "GUARDRAIL-DEMO: judge latency from the first fault-window sample (latency_min_samples 1) so one slow poll is enough. Only 'guardrails' may be overridden by a profile.",
+  "guardrails": {"latency_min_samples": 1}
+}
