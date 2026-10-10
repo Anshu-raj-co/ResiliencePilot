@@ -71,6 +71,8 @@ def test_request_comes_from_the_catalogue_not_the_client():
     {"json": {"experiment_id": "telemetry_stall", "approved_by": "123"}},     # not a name
     {"json": {"experiment_id": "telemetry_stall"}},                           # no approver
     {"json": {"experiment_id": ["telemetry_stall"], "approved_by": "Jane"}},  # wrong type
+    {"json": {**PICK, "profile": "guardrail-demo-latency"}},                  # no way to pick a config profile
+    {"json": {"experiment_id": "guardrail-demo-latency", "approved_by": "Jane"}},
     {"json": PICK, "params": {"target": "influxDB"}},
     {"content": b"experiment_id=telemetry_stall"},
 ])
