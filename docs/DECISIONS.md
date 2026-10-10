@@ -113,3 +113,10 @@ slow poll, so a 4.5 s cap would abort the same runs. Both ceilings rise together
 `MAX_FAULT_LATENCY_P95_MS` 7500 (cap still strictly below the timeout); `dependency_failure` uses 8 s / 7.5 s.
 Unchanged: fault-window polls only; duration + timeout ≤ 30 s (15 + 8 = 23); precheck and recovery keep the global
 2 s timeout; recovery rule 6 and all other guards are untouched.
+
+**D-023: Pin `fms-server` and `fms-consumer` to `platform: linux/amd64` (`config/compose/resiliencepilot.override.yaml`).**
+Why: both images are published for linux/amd64 only (`docker buildx imagetools inspect`), so on Apple Silicon
+`docker compose pull` failed with `no matching manifest for linux/arm64/v8` and, under `set -e`, nothing started. The
+pin lets Docker Desktop pull the amd64 image and run it under emulation; it is a no-op on x86-64 hosts. Upstream files
+are not modified. Consequence: on Apple Silicon these two services run emulated, so their latency is not comparable
+with x86 runs; the platform is recorded next to run statistics.

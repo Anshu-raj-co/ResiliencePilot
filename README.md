@@ -60,19 +60,25 @@ One-page overview: `docs/ARCHITECTURE_OVERVIEW.md`. Dependency map with source e
 
 ## Quick start
 
-Prerequisites: Docker Desktop, Python 3.13, git.
+Prerequisites: Docker Desktop (Compose v2.24+), Python 3.13, git. Free local ports: 8081, 8086, 3000, 7447 and
+55557 (databroker host port; upstream uses 55555, see D-021; change it with `RP_DATABROKER_HOST_PORT`).
+
+Platforms tested: **Windows 11 x86-64** (Git Bash, Docker Desktop on WSL2) and **macOS on Apple Silicon (arm64)**.
+On Apple Silicon, `fms-server` and `fms-consumer` have no arm64 image; the override pins them to `linux/amd64`
+and Docker Desktop runs them under emulation (D-023). Linux was not tested.
 
 ```bash
-git -c core.longpaths=true submodule update --init   # fresh clone only (long paths needed on Windows)
-./scripts/stack-up.sh && ./scripts/stack-status.sh    # 8 containers; expect HTTP 200 with vehicle data
+git clone https://github.com/Anshu-raj-co/ResiliencePilot.git && cd ResiliencePilot
+git -c core.longpaths=true submodule update --init   # long-paths flag avoids "Filename too long" on Windows
+./scripts/stack-up.sh && ./scripts/stack-status.sh    # 8 containers; HTTP 200 with vehicle data; exits 1 if any is down
 cd backend && python3.13 -m venv .venv
 .venv/bin/pip install -e ".[test]"                    # Windows: .venv/Scripts/...
 .venv/bin/python -m pytest -q                         # 270 unit tests (RP_LIVE=1 adds live read-only tests)
 .venv/bin/rp serve                                    # dashboard at http://127.0.0.1:8765/
 ```
 
-If host port 55555 is taken, the databroker host port can be moved (`RP_DATABROKER_HOST_PORT`, PR #7).
-Stop the stack with `./scripts/stack-down.sh`.
+If a port is taken, stop the other program; the databroker port can be moved, e.g.
+`RP_DATABROKER_HOST_PORT=55600 ./scripts/stack-up.sh`. Stop the stack with `./scripts/stack-down.sh`.
 
 ## Commands
 
