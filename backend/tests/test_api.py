@@ -1,4 +1,4 @@
-"""Dashboard API: every POST goes through the existing safety controller; nothing can be parameterised."""
+"""Dashboard API: every POST goes through the existing safety controller; a run takes only a catalogue id and a typed approver."""
 import json
 import os
 import time
@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from resiliencepilot import api as api_mod
-from resiliencepilot.api import DASHBOARD_TEMPLATE, HOST, create_app
+from resiliencepilot.api import DASHBOARD_DURATION_S, HOST, create_app, dashboard_request
 from resiliencepilot.config import ExperimentSpec
 from resiliencepilot.evidence import EvidenceStore
 from resiliencepilot.safety import SafetyController
@@ -24,8 +24,7 @@ def env(tmp_path):
     docker = FakeDocker(world)
     ctl = SafetyController(cfg, CATALOG, docker, observer=FakeObserver(world))
     store = EvidenceStore(cfg.data_dir)
-    app = create_app(cfg, CATALOG, ctl, docker, FakeObserver(world), store,
-                     run_template={**DASHBOARD_TEMPLATE, "duration_s": 2}, monitor=True)
+    app = create_app(cfg, CATALOG, ctl, docker, FakeObserver(world), store, dashboard_duration_s=2, monitor=True)
     with TestClient(app) as a, TestClient(app) as b:  # two independent clients on the same server
         yield {"cfg": cfg, "world": world, "ctl": ctl, "store": store, "app": app, "a": a, "b": b}
 
@@ -51,54 +50,81 @@ def test_server_binds_localhost_only():
     assert HOST == "127.0.0.1"
 
 
-def test_template_is_the_approved_one():
-    assert DASHBOARD_TEMPLATE == {
-        "experiment_type": "telemetry_stall", "target": "fms-forwarder", "duration_s": 12,
-        "approved_by": "dashboard-operator",
-        "hypothesis": "Pausing fms-forwarder stalls createdDateTime while the rFMS API keeps returning HTTP 200"}
+PICK = {"experiment_id": "telemetry_stall", "approved_by": "Jane Doe"}
+
+
+def test_request_comes_from_the_catalogue_not_the_client():
+    spec = ExperimentSpec("dependency_failure", "docker_stop", ("influxDB",), 15, expected_symptoms=("HTTP 500",))
+    req = dashboard_request("dependency_failure", "Jane Doe", {"dependency_failure": spec}, 30)
+    assert req["target"] == "influxDB" and req["duration_s"] == min(DASHBOARD_DURATION_S, 15)
+    assert req["approved_by"] == "Jane Doe" and "HTTP 500" in req["hypothesis"]
 
 
 @pytest.mark.parametrize("kwargs", [
+    {},                                                                        # no body
     {"json": {"duration_s": 30}},
-    {"json": {"target": "influxDB"}},
-    {"params": {"target": "influxDB"}},
-    {"content": b"duration_s=30"},
+    {"json": {**PICK, "target": "influxDB"}},                                  # any extra field is refused
+    {"json": {**PICK, "duration_s": 30}},
+    {"json": {"experiment_id": "rm -rf", "approved_by": "Jane"}},             # not a catalogue id
+    {"json": {"experiment_id": "dependency_failure", "approved_by": "Jane"}},  # valid type, not in this catalogue
+    {"json": {"experiment_id": "telemetry_stall", "approved_by": "   "}},     # blank approver
+    {"json": {"experiment_id": "telemetry_stall", "approved_by": "123"}},     # not a name
+    {"json": {"experiment_id": "telemetry_stall"}},                           # no approver
+    {"json": {"experiment_id": ["telemetry_stall"], "approved_by": "Jane"}},  # wrong type
+    {"json": {**PICK, "profile": "guardrail-demo-latency"}},                  # no way to pick a config profile
+    {"json": {"experiment_id": "guardrail-demo-latency", "approved_by": "Jane"}},
+    {"json": PICK, "params": {"target": "influxDB"}},
+    {"content": b"experiment_id=telemetry_stall"},
 ])
-def test_run_takes_no_parameters(env, kwargs):
+def test_run_accepts_only_a_catalogue_id_and_a_typed_name(env, kwargs):
     r = env["a"].post("/api/run", **kwargs)
     assert r.status_code == 422
     assert env["world"].calls == []
 
 
-def test_run_success_uses_template_and_records_evidence(env):
-    r = env["a"].post("/api/run")
+def test_run_records_the_typed_approver_and_what_they_saw(env):
+    r = env["a"].post("/api/run", json={"experiment_id": "telemetry_stall", "approved_by": "  Jane   Doe "})
     assert r.status_code == 202
     run_id = r.json()["run_id"]
     wait_idle(env)
     rec = env["store"].load_run(run_id)
-    assert rec["request"]["approved_by"] == "dashboard-operator" and rec["request"]["target"] == "fms-forwarder"
+    assert rec["request"]["approved_by"] == "Jane Doe" and rec["request"]["target"] == "fms-forwarder"
+    assert rec["request"]["duration_s"] == 2
     assert rec["state"] == "COMPLETED" and rec["recovery"]["verified"]
+    prop = env["store"].load_proposal(run_id)
+    assert prop["approved_by"] == "Jane Doe" and prop["approved_via"] == "dashboard"
+    assert prop["proposal"]["experiment_id"] == "telemetry_stall" and prop["proposal"]["rank"] == 1
+    assert prop["proposal"]["provider"] == "rule-based" and prop["model_calls"] == []
     s = env["a"].get("/api/status").json()
-    assert s["last_run"]["run_id"] == run_id and s["phase"] == "recovered"
+    assert s["last_run"]["run_id"] == run_id and s["phase"] == "recovered" and s["last_run"]["approved_by"] == "Jane Doe"
     assert env["a"].get("/api/runs/latest").json()["run_id"] == run_id
 
 
+def test_proposals_are_the_planner_ranking_with_reasons_and_predictions(env):
+    d = env["a"].get("/api/proposals").json()
+    assert d["catalog"] == ["telemetry_stall"]
+    (p,) = d["proposals"]
+    assert p["experiment_id"] == "telemetry_stall" and p["rank"] == 1 and p["rationale"]
+    assert p["target"] == "fms-forwarder" and p["duration_s"] == 2
+    assert {"predicted_symptoms", "risks", "priority", "provider"} <= set(p)
+
+
 def test_busy_returns_409(env):
-    assert env["a"].post("/api/run").status_code == 202
-    assert env["b"].post("/api/run").status_code == 409
+    assert env["a"].post("/api/run", json=PICK).status_code == 202
+    assert env["b"].post("/api/run", json=PICK).status_code == 409
     wait_idle(env)
     assert len([c for c in env["world"].calls if c[1] == "pause"]) == 1
 
 
 def test_busy_in_another_process_returns_409(env):
     (env["cfg"].data_dir / "run.lock").write_text(json.dumps({"pid": os.getppid(), "run_id": "cli-run"}))
-    assert env["a"].post("/api/run").status_code == 409
+    assert env["a"].post("/api/run", json=PICK).status_code == 409
     assert env["world"].calls == []
 
 
 def test_latched_returns_423_and_reset_needs_confirm(env):
     env["ctl"].latch("test latch")
-    assert env["a"].post("/api/run").status_code == 423
+    assert env["a"].post("/api/run", json=PICK).status_code == 423
     assert env["a"].post("/api/reset").status_code == 400
     assert env["a"].post("/api/reset", json={"confirm": "yes"}).status_code == 400
     assert env["a"].post("/api/reset", json={"confirm": True}).status_code == 200
@@ -110,7 +136,7 @@ def test_reset_refused_when_not_latched(env):
 
 
 def test_kill_from_second_client_rolls_back_and_blocks(env):
-    run_id = env["a"].post("/api/run").json()["run_id"]
+    run_id = env["a"].post("/api/run", json=PICK).json()["run_id"]
     wait_paused(env)
     assert env["b"].post("/api/kill").status_code == 200       # a different client stops it
     wait_idle(env)
@@ -118,9 +144,9 @@ def test_kill_from_second_client_rolls_back_and_blocks(env):
     assert rec["stop_reason"] == "emergency_stop"
     assert rec["rollback"]["verified"] and rec["recovery"]["verified"]
     assert not env["world"].forwarder_paused()
-    assert env["a"].post("/api/run").status_code == 423           # blocked until reset
+    assert env["a"].post("/api/run", json=PICK).status_code == 423           # blocked until reset
     assert env["b"].post("/api/reset", json={"confirm": True}).status_code == 200
-    assert env["a"].post("/api/run").status_code == 202
+    assert env["a"].post("/api/run", json=PICK).status_code == 202
     wait_idle(env)
 
 
@@ -139,9 +165,9 @@ def test_api_module_has_no_safety_logic_of_its_own():
 
 
 def test_last_run_never_shows_an_in_progress_record(env):
-    first = env["a"].post("/api/run").json()["run_id"]
+    first = env["a"].post("/api/run", json=PICK).json()["run_id"]
     wait_idle(env)
-    env["a"].post("/api/run")
+    env["a"].post("/api/run", json=PICK)
     wait_paused(env)                                   # second run is active now
     s = env["a"].get("/api/status").json()
     assert s["state"] == "BUSY"
@@ -170,7 +196,7 @@ def test_insights_on_committed_evidence_uses_the_servers_allowlist(env):
 def test_insights_local_scores_a_dashboard_run(env):
     empty = env["a"].get("/api/insights").json()
     assert empty["runs"] == 0 and empty["latest_scored"] is None and empty["findings"] == []
-    assert env["a"].post("/api/run").status_code == 202
+    assert env["a"].post("/api/run", json=PICK).status_code == 202
     wait_idle(env)
     d = env["a"].get("/api/insights").json()
     assert d["runs"] == 1 and d["recent"][0]["run_id"] == env["store"].list_runs()[-1]
@@ -187,11 +213,24 @@ def test_insights_failure_never_breaks_the_controls(env, monkeypatch):
     assert env["a"].get("/api/status").status_code == 200
 
 
-def test_page_shows_proposals_without_any_way_to_run_them():
+def test_page_picks_one_catalogue_id_and_a_typed_name():
+    import re
     html = (api_mod._STATIC).read_text(encoding="utf-8")
-    for el in ('id="score"', 'id="summary"', 'id="recent"', 'id="plan"', 'id="findings"', "proposals only"):
+    for el in ('id="score"', 'id="summary"', 'id="recent"', 'id="plan"', 'id="findings"', 'id="pick"', 'id="approver"',
+               "/api/proposals", "/api/insights?source="):
         assert el in html
-    assert "/api/insights?source=" in html
-    # the only POSTs remain the three existing controls; planner commands are rendered as text
-    assert sorted(set(__import__("re").findall(r'post\("(/api/[a-z]+)"', html))) == ["/api/kill", "/api/reset", "/api/run"]
-    assert '<span class="cmd">' in html
+    # the only POSTs remain the three controls; the run body carries exactly the id and the typed name
+    assert sorted(set(re.findall(r'post\("(/api/[a-z]+)"', html))) == ["/api/kill", "/api/reset", "/api/run"]
+    assert 'post("/api/run",{experiment_id:p.experiment_id,approved_by:name},"Start")' in html
+    assert "dashboard-operator" not in html
+    assert '<span class="cmd">' in html                      # the insights planner card stays text only
+
+
+def test_proposals_failure_never_blocks_a_run(env, monkeypatch):
+    import resiliencepilot.planner as pl
+    monkeypatch.setattr(pl, "plan", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    assert env["a"].get("/api/proposals").status_code == 500
+    r = env["a"].post("/api/run", json=PICK)
+    assert r.status_code == 202
+    wait_idle(env)
+    assert env["store"].load_proposal(r.json()["run_id"])["proposal"] is None

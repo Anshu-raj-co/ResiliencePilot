@@ -100,22 +100,39 @@ class OllamaProvider:
             raise ValueError(f"AI base_url must be loopback (local Ollama), got host {host!r}")
         self.cfg, self.transport = cfg, transport
         self.name = f"ollama:{cfg.model}"
+        # Every call, in order: exact prompts, raw HTTP response body, model and the validation result (set by the
+        # caller). Written to data/ai_calls/ by `rp advise` so any AI text can be traced back to what the model saw.
+        self.calls: list[dict] = []
 
     def chat_json(self, system: str, user: str, schema: dict) -> dict:
         body = {"model": self.cfg.model, "stream": False, "format": schema,
                 "options": {"temperature": self.cfg.temperature, "seed": self.cfg.seed},
                 "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
+        call = {"provider": self.name, "model": self.cfg.model, "base_url": self.cfg.base_url,
+                "options": body["options"], "system_prompt": system, "user_prompt": user, "schema": schema,
+                "http_status": None, "raw_response": None, "error": None, "validation": None}
+        self.calls.append(call)
         try:
             with httpx.Client(timeout=self.cfg.timeout_s, transport=self.transport) as c:
                 r = c.post(self.cfg.base_url.rstrip("/") + "/api/chat", json=body)
         except httpx.HTTPError as exc:
-            raise AIUnavailable(f"ollama unreachable: {type(exc).__name__}: {exc}") from exc
+            call["error"] = f"ollama unreachable: {type(exc).__name__}: {exc}"
+            raise AIUnavailable(call["error"]) from exc
+        call["http_status"], call["raw_response"] = r.status_code, r.text
         if r.status_code != 200:
-            raise AIUnavailable(f"ollama HTTP {r.status_code}: {r.text[:200]}")
+            call["error"] = f"ollama HTTP {r.status_code}: {r.text[:200]}"
+            raise AIUnavailable(call["error"])
         try:
             return json.loads(r.json()["message"]["content"])
         except (KeyError, TypeError, ValueError) as exc:
-            raise AIUnavailable(f"ollama returned non-JSON content: {exc}") from exc
+            call["error"] = f"ollama returned non-JSON content: {exc}"
+            raise AIUnavailable(call["error"]) from exc
+
+
+def _validated(provider, result: str) -> None:
+    """Record the validation outcome on the provider's latest call log entry."""
+    if provider is not None and getattr(provider, "calls", None):
+        provider.calls[-1]["validation"] = result
 
 
 def _text(v) -> str:
@@ -176,10 +193,13 @@ def ai_plan(entries: list[dict], findings: list[dict], provider: OllamaProvider 
     if provider is not None:
         try:
             ans = provider.chat_json(PLAN_SYSTEM, plan_prompt(entries, findings), PLAN_SCHEMA)
+            order = validate_plan(ans, entries)
+            _validated(provider, "accepted: exact permutation of the allowlisted candidates")
             return {"provider": provider.name, "advisory": True, "summary": _text(ans.get("summary", "")),
-                    "order": validate_plan(ans, entries)}
+                    "order": order}
         except (AIUnavailable, ValueError) as exc:
             fallback = str(exc)
+            _validated(provider, f"rejected, rule-based order used: {exc}")
     return {"provider": "rule-based", "fallback_reason": fallback or "AI disabled", "advisory": True,
             "summary": "Rule-based order (priority = 0.6 x information + 0.4 x risk).", "order": rule_based_plan(entries)}
 
@@ -330,6 +350,10 @@ def ai_analyse(findings: list[dict], provider: OllamaProvider | None) -> dict:
             rejected: list[dict] = []
             kept = validate_analysis(provider.chat_json(ANALYSIS_SYSTEM, analysis_prompt(findings), ANALYSIS_SCHEMA),
                                      findings, rejected)
+            _validated(provider, {"accepted": sorted(kept), "rejected": [{"finding": r["finding"], "reason": r["reason"]}
+                                                                         for r in rejected],
+                                  "missing": sorted({b["finding"] for b in base} - set(kept)
+                                                    - {r["finding"] for r in rejected})})
             why = {r["finding"]: r for r in rejected}
             merged = [{**kept[b["finding"]], "source": provider.name} if b["finding"] in kept
                       else {**b, "source": "rule-based",
@@ -340,6 +364,7 @@ def ai_analyse(findings: list[dict], provider: OllamaProvider | None) -> dict:
                     "ai_items_rejected_or_missing": len(base) - len(kept), "rejected": rejected, "analyses": merged}
         except (AIUnavailable, ValueError) as exc:
             reason = str(exc)
+            _validated(provider, f"rejected, rule-based analysis used: {exc}")
     return {"provider": "rule-based", "fallback_reason": reason, "advisory": True, "analyses": base}
 
 

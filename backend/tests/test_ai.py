@@ -255,3 +255,24 @@ def test_name_resolution_is_labelled_hypothesis_in_facts():
     for label, text in ai.FACTS:
         if "resolve" in text or "dns" in text.lower():
             assert label == "hypothesis", text
+
+
+def test_every_model_call_is_logged_with_prompts_raw_response_and_validation():
+    ans = {"summary": "s", "order": [{"id": i, "rationale": "r"} for i in reversed(IDS)]}
+    prov = _provider(ans)
+    ai_plan(ENTRIES, FINDINGS, prov)
+    ai_analyse(FINDINGS, _provider({"analyses": []}))
+    (call,) = prov.calls
+    assert call["model"] and call["provider"].startswith("ollama:")
+    assert call["system_prompt"] == ai.PLAN_SYSTEM and call["user_prompt"] and call["http_status"] == 200
+    assert json.loads(json.loads(call["raw_response"])["message"]["content"]) == ans
+    assert call["validation"].startswith("accepted")
+
+
+def test_failed_and_rejected_calls_are_logged_too():
+    prov = _provider({"order": [{"id": "nope", "rationale": "x"}]})
+    ai_plan(ENTRIES, FINDINGS, prov)
+    assert prov.calls[-1]["validation"].startswith("rejected")
+    down = _provider(None, exc=httpx.ConnectError("down"))
+    ai_plan(ENTRIES, FINDINGS, down)
+    assert "unreachable" in down.calls[-1]["error"] and down.calls[-1]["validation"].startswith("rejected")
