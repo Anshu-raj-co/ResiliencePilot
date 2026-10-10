@@ -217,7 +217,8 @@ All code is in `backend/resiliencepilot/`.
 | **Recovery verifier** | After rollback, requires 3 successive advances of `createdDateTime`, each fresh (≤ 5 s) with HTTP 200, and each newer than anything seen during the fault, within 30 s. | "Container running" or "HTTP 200" is not recovery. New data is. | `orchestrator.py` (`_finish`) |
 | **Evidence store** | Saves every run (request, timeline, every observation, rollback, recovery, impact) and every baseline as JSON. | Claims must be checkable later. | `evidence.py` → `backend/data/` (local); curated real runs in `reports/day1/` |
 | **Docker wrapper** | The single place that calls the `docker` command line. | Tests replace it with a fake, so safety logic is tested without Docker. | `docker_cli.py` |
-| **CLI** | Commands: `status`, `observe`, `baseline`, `run`, `stop`, `reset`, `runs`, `show`, `deps`, `show-baseline`, `report`. Also installed as the `rp` command. | The operator's control panel. | `__main__.py`, `views.py` |
+| **CLI** | Commands: `status`, `observe`, `baseline`, `run`, `stop`, `reset`, `runs`, `show`, `deps`, `show-baseline`, `report`, `serve`. Also installed as the `rp` command. | The operator's control panel. | `__main__.py`, `views.py` |
+| **Local API + live dashboard** | `rp serve` starts a FastAPI server bound to 127.0.0.1 only. It serves one static page that polls `GET /api/status` every 500 ms and shows a data-age gauge, an HTTP status chip, a phase timeline, a live chart and Start / Kill / Reset buttons. `POST /api/run` takes **no parameters** and runs one approved template (pause `fms-forwarder` for 12 s, approver `dashboard-operator`). Kill and Reset call the same safety-controller functions as the CLI. Busy → 409, latched → 423. | Lets a person run and watch the experiment live without the terminal, without adding a second path around the safety rules. | `api.py`, `static/dashboard.html` |
 | **Explainer page** | `rp report` builds one standalone, offline HTML file from recorded runs: dependency map, baseline, and a chart of data age against the 5 s threshold while every poll was HTTP 200. It is read-only and has no buttons that start or stop anything. | Makes the impact easy to see for non-engineers. | `explainer.py` → `reports/day1/explainer.html` |
 
 ### The safety controller in detail
@@ -240,13 +241,13 @@ All code is in `backend/resiliencepilot/`.
 
 ### Is there a dashboard or UI?
 
-- The **explainer page** exists (above). It is a static report, not a control panel.
-- There is **no interactive dashboard and no HTTP API on `main`**. FastAPI and uvicorn are listed as dependencies in
-  `backend/pyproject.toml` (decision D-007), but no API module is merged. A dashboard is being worked on separately
-  on branch `feat/day1-dashboard`; it is not merged and not described here. **Planned (Day 2).**
+- **Live dashboard: yes, merged (PR #6).** `rp serve`, then open `http://127.0.0.1:8765/`. It is localhost-only and
+  shows only real values; anything missing reads "not recorded". It was run end to end from the page on 2026-10-10:
+  Start → stale while HTTP 200 → Kill → rollback and recovery verified → Reset.
+- **Explainer page:** a static, read-only report (above), not a control panel.
 - There is **no AI** in the system. **Planned (Day 2).**
 
-*source: `docs/ARCHITECTURE.md`, `backend/resiliencepilot/*.py`, `backend/pyproject.toml`, `config/*.json`,
+*source: `docs/ARCHITECTURE.md`, `backend/resiliencepilot/*.py` (incl. `api.py`), `backend/pyproject.toml`, `config/*.json`,
 `scripts/kill-switch.sh`, `docs/testing/SAFETY_REVIEW.md`, `docs/DECISIONS.md` D-009–D-011, `README.md`*
 
 ---
@@ -258,10 +259,10 @@ All code is in `backend/resiliencepilot/`.
 | **Python 3.13** | It was installed, it supports typing, and it is fast to test (D-007). |
 | **pydantic** | Validates the experiment request strictly (`extra="forbid"`: any unknown field is an error). |
 | **httpx** | Makes the HTTP calls to the rFMS API. |
-| **pytest** | The tests: 52 unit tests, plus 3 live tests that need the running stack (55 with `RP_LIVE=1`). |
+| **pytest** | The tests on `main`: 67 unit tests, plus 3 live tests that need the running stack (70 with `RP_LIVE=1`, verified 2026-10-10). Open PRs #9 and #10 add more. |
 | **`docker` command line via one wrapper** | One small file that tests can fake; no Docker socket is ever handed to any other component. |
-| **FastAPI + uvicorn** | Listed as dependencies for the future API; not used on `main` yet. |
-| **Frontend** | None on `main`. The explainer is a single generated HTML file with no server. |
+| **FastAPI + uvicorn** | Run the local API and dashboard (`rp serve`), bound to 127.0.0.1 only. |
+| **Frontend** | No framework, npm or build step. The dashboard is one static HTML file (inline CSS/JS) served by the API. The explainer is a generated HTML file that needs no server. |
 
 ### Docker and Docker Compose
 
@@ -425,13 +426,14 @@ run with a precise timestamp: 0.6 s from switch to verified rollback.
 | Application mapping (services, dependencies, data flow) | **Done**: `config/dependency_map.json` + `deps` command |
 | Monitoring baseline (error rate, latency, health) | **Done**: 2 committed baselines |
 | First failure injected and observed | **Done**: `telemetry_stall` |
-| Safety controls (automatic stop/rollback) tested | **Done**: watchdog, kill switch, latch, 52 unit + 3 live tests |
+| Safety controls (automatic stop/rollback) tested | **Done**: watchdog, kill switch, latch; 67 unit + 3 live tests on `main` |
 | Day-1 demo | **Done**: `scripts/demo-day1.sh`, `docs/demo/DAY1_DEMO.md` |
 | Visual impact report | **Done**: explainer page (`rp report`) |
 | AI experiment planner (ranks experiments from the dependency map) | **Planned (Day 2)** |
 | Three or more failure types (e.g. consumer pause, forwarder crash/restart, InfluxDB stop) | **Planned (Day 2)**; only 1 built |
 | AI findings, severity ranking, fixes, resilience score | **Planned (Day 2)** |
-| Interactive dashboard | **Planned (Day 2)**; in progress on an unmerged branch |
+| Interactive dashboard | **Done** (PR #6, merged): `rp serve`; run live from the page |
+| Windows file-race fix in the safety controller, CLI UTF-8 output | **In review**: PR #10 and PR #9 (not merged) |
 | Clean run from scratch, demo video, final README | **Planned (Day 2)** |
 
 *source: `docs/ROADMAP.md`, `docs/coordination/CURRENT_STATUS.md`, `docs/coordination/HANDOFF.md`*
@@ -440,6 +442,10 @@ run with a precise timestamp: 0.6 s from switch to verified rollback.
 
 ## 12. Run it yourself
 
+> **Test counts below are for current `main` (`843889a`, dashboard merged):** 67 unit tests, 70 with live tests
+> (verified 2026-10-10). The clean-clone re-test described next was done earlier, at `519fff8`, before the dashboard
+> was merged, when the counts were 52 and 55. The clean-clone run has not been repeated on `843889a`.
+>
 > **Re-tested from a clean clone on 2026-10-10** (fresh `git clone` of `main` at `519fff8` into a new folder):
 > steps 1–3 and 5–8 all passed: 52 unit tests, 55 with live tests, `deps`, `observe`, a 20-sample baseline, the full
 > demo (exit 0: COMPLETED stall, ABORTED kill-switch run, refused run, reset), the kill switch, `reset` and `rp report`.
@@ -483,7 +489,7 @@ python -m venv .venv
 .venv/Scripts/python -m pytest -q
 cd ..
 ```
-Success: `52 passed, 3 skipped` (the 3 skipped are the live tests).
+Success: `67 passed, 3 skipped` (the 3 skipped are the live tests).
 
 **4. Start the stack**
 ```bash
@@ -498,7 +504,7 @@ cd backend
 .venv/Scripts/python -m resiliencepilot status       # "state": "READY"
 .venv/Scripts/python -m resiliencepilot deps         # dependency map with live network checks
 .venv/Scripts/python -m resiliencepilot observe -n 6 # FRESH lines, createdDateTime advancing
-RP_LIVE=1 .venv/Scripts/python -m pytest -q          # 55 passed
+RP_LIVE=1 .venv/Scripts/python -m pytest -q          # 70 passed
 ```
 
 **6. Baseline**
@@ -534,7 +540,15 @@ Success: the kill switch prints `fms-forwarder: running=true paused=false` and e
 print `REFUSED: emergency stop engaged…`. If `status` says `LATCHED_UNSAFE`, read the reason, run
 `./scripts/stack-status.sh` to check the stack, and only then `reset`.
 
-**9. Stop the stack**
+**9. Live dashboard (optional)**
+```bash
+cd backend && .venv/Scripts/rp serve      # open http://127.0.0.1:8765/ ; Ctrl+C to stop
+```
+Success: the page shows READY, HTTP 200 and a fresh data age. Start asks you to confirm, then pauses `fms-forwarder` for
+12 s: HTTP stays 200 while the gauge passes 5 s and "STALE while HTTP 200" appears. Kill stops it; Reset (with
+confirmation) clears the stop. Don't run CLI experiments in another terminal at the same time.
+
+**10. Stop the stack**
 ```bash
 cd .. && ./scripts/stack-down.sh            # add --volumes to also delete InfluxDB/Grafana data
 ```
@@ -550,11 +564,11 @@ cd .. && ./scripts/stack-down.sh            # add --volumes to also delete Influ
 | Low disk space | Only ~18 GB free on the Day-1 machine | Use prebuilt images only (`stack-up.sh` never builds). `fleet-analysis-backend` is excluded because it would need a local Java build. *(a constraint we worked around; no failure was hit)* |
 | `port is already allocated` on 8081/8086/3000/55555/7447 | Another program or an old stack uses the port | Run `./scripts/stack-down.sh`, or stop the other program. *(not hit by us; general advice)* |
 | `fatal: cannot write keep file … Filename too long` during `git submodule update --init` | Windows' 260-character path limit; the blueprint has deep paths, so a clone inside a long folder path fails | `git -c core.longpaths=true submodule update --init`, or clone into a short path such as `C:\src`. *(hit during the clean-clone test)* |
-| `UnicodeEncodeError: 'charmap' codec can't encode characters` from `deps`, `observe` or `baseline` | On Windows, Python falls back to the cp1252 encoding when output is piped or redirected, and the CLI prints symbols like `→` and `█` | `export PYTHONIOENCODING=utf-8` before running the CLI (`demo-day1.sh` already does this). *(hit during the clean-clone test; a code fix is not part of this docs change)* |
+| `UnicodeEncodeError: 'charmap' codec can't encode characters` from `deps`, `observe` or `baseline` | On Windows, Python falls back to the cp1252 encoding when output is piped or redirected, and the CLI prints symbols like `→` and `█` | `export PYTHONIOENCODING=utf-8` before running the CLI (`demo-day1.sh` already does this). *(hit during the clean-clone test; the code fix is in PR #9, which is not merged yet)* |
 | `status` says `BUSY` | Another terminal is running an experiment | Wait for it, or stop it with `python -m resiliencepilot stop`. |
 | `status` says `LATCHED_UNSAFE` | A rollback/recovery was not verified, or the backend crashed mid-fault | Run `./scripts/kill-switch.sh`, check `./scripts/stack-status.sh`, then `reset` with your name and a note. |
 
-*source: `README.md`, `docs/coordination/HANDOFF.md`, `docs/recon.md` §1, §3, `docs/DECISIONS.md` D-002, D-005,
+*source: `README.md`, `docs/coordination/HANDOFF.md`, PR #6 description, `docs/recon.md` §1, §3, `docs/DECISIONS.md` D-002, D-005,
 D-006, `scripts/*.sh`, `backend/resiliencepilot/__main__.py`, `backend/pyproject.toml`*
 
 ---
