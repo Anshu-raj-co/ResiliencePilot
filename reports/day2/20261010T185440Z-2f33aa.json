@@ -1,0 +1,440 @@
+{
+  "run_id": "20261010T185440Z-2f33aa",
+  "request": {
+    "experiment_type": "dependency_failure",
+    "target": "influxDB",
+    "duration_s": 12,
+    "approved_by": "Anshu (Day-2 live)",
+    "hypothesis": "Stopping influxDB makes fms-server answer HTTP 500 (visible failure); no other container changes state; statuses produced during the outage are lost"
+  },
+  "state": "ABORTED",
+  "spec": {
+    "mechanism": "docker_stop",
+    "expected_symptoms": [
+      "HYPOTHESIS: fms-server answers HTTP 500 (source: fms-server/src/lib.rs maps query errors to INTERNAL_SERVER_ERROR), i.e. the failure is VISIBLE to a plain health check",
+      "HYPOTHESIS: fms-consumer keeps running but drops the statuses it cannot write (influx-client writer.rs: 'failed to write data to influx'), leaving a gap in stored data after recovery",
+      "HYPOTHESIS: no container other than influxDB changes state (fms-server, fms-consumer, grafana keep running)"
+    ],
+    "risks": [
+      "Wider blast radius in effect: InfluxDB is shared by fms-server, fms-consumer and grafana (their container state is watched by the blast-radius guard)",
+      "InfluxDB start-up time is unmeasured; recovery waits up to recovery_timeout_s (30 s) for fresh data",
+      "Data written while InfluxDB is down is lost unless the consumer buffers it (to be measured as a data gap)",
+      "Volumes (influxdb-data, influxdb-auth) persist across stop/start; the adapter never removes containers or volumes"
+    ]
+  },
+  "limits": {
+    "stale_threshold_s": 5.0,
+    "poll_interval_s": 0.5,
+    "watchdog_grace_s": 5.0,
+    "recovery_timeout_s": 30.0
+  },
+  "timeline": [
+    {
+      "at": "2026-10-10T18:54:40.575392+00:00",
+      "t_s": 0.0,
+      "event": "validated",
+      "detail": {
+        "approved_by": "Anshu (Day-2 live)",
+        "hypothesis": "Stopping influxDB makes fms-server answer HTTP 500 (visible failure); no other container changes state; statuses produced during the outage are lost"
+      },
+      "state": "VALIDATED"
+    },
+    {
+      "at": "2026-10-10T18:54:40.577691+00:00",
+      "t_s": 0.002,
+      "event": "precheck_start",
+      "detail": null,
+      "state": "PRECHECK"
+    },
+    {
+      "at": "2026-10-10T18:54:42.526275+00:00",
+      "t_s": 1.951,
+      "event": "precheck_passed",
+      "detail": {
+        "fresh_samples": 3
+      },
+      "state": "PRECHECK"
+    },
+    {
+      "at": "2026-10-10T18:54:42.680950+00:00",
+      "t_s": 2.106,
+      "event": "guardrails_armed",
+      "detail": {
+        "latency_threshold_ms": 439.35,
+        "latency_baseline": "baseline baseline-20261010T172349Z",
+        "max_error_rate": 0.0,
+        "expected_statuses": [
+          500
+        ],
+        "blast_radius_allowed": [
+          "influxDB"
+        ],
+        "watched_containers": 8
+      },
+      "state": "PRECHECK"
+    },
+    {
+      "at": "2026-10-10T18:54:42.683204+00:00",
+      "t_s": 2.108,
+      "event": "injecting",
+      "detail": {
+        "target": "influxDB",
+        "mechanism": "docker_stop"
+      },
+      "state": "INJECTING"
+    },
+    {
+      "at": "2026-10-10T18:54:43.106317+00:00",
+      "t_s": 2.531,
+      "event": "fault_active",
+      "detail": {
+        "verified_by": "docker inspect State.Running == false",
+        "injection_latency_s": 0.422,
+        "exit_code": 2
+      },
+      "state": "ACTIVE"
+    },
+    {
+      "at": "2026-10-10T18:54:45.115235+00:00",
+      "t_s": 4.54,
+      "event": "observer_lost",
+      "detail": {
+        "consecutive_failures": 1
+      },
+      "state": "ACTIVE"
+    },
+    {
+      "at": "2026-10-10T18:54:45.117902+00:00",
+      "t_s": 4.543,
+      "event": "fault_window_closed",
+      "detail": {
+        "stop_reason": "observer_lost"
+      },
+      "state": "ACTIVE"
+    },
+    {
+      "at": "2026-10-10T18:54:45.120614+00:00",
+      "t_s": 4.545,
+      "event": "rolling_back",
+      "detail": null,
+      "state": "ROLLING_BACK"
+    },
+    {
+      "at": "2026-10-10T18:54:45.627405+00:00",
+      "t_s": 5.052,
+      "event": "rollback_result",
+      "detail": {
+        "attempted": true,
+        "verified": true,
+        "by": "orchestrator",
+        "detail": "same container (id unchanged) running and unpaused"
+      },
+      "state": "ROLLING_BACK"
+    },
+    {
+      "at": "2026-10-10T18:54:45.629311+00:00",
+      "t_s": 5.054,
+      "event": "verifying_recovery",
+      "detail": null,
+      "state": "VERIFYING_RECOVERY"
+    },
+    {
+      "at": "2026-10-10T18:54:47.570219+00:00",
+      "t_s": 6.995,
+      "event": "recovery_verified",
+      "detail": {
+        "verified": true,
+        "time_to_first_fresh_s": 0.63,
+        "time_to_verified_s": 1.941,
+        "criteria": "rollback verified by docker inspect (same container (id unchanged) running and unpaused) AND 3 successive advances of createdDateTime beyond both the last pre-rollback value and the fms-server time of the last fault-window poll, each with HTTP 200 and data_age_s <= 5.0s",
+        "detail": "3 fresh advances observed"
+      },
+      "state": "VERIFYING_RECOVERY"
+    },
+    {
+      "at": "2026-10-10T18:54:47.609430+00:00",
+      "t_s": 7.034,
+      "event": "data_gap_measured",
+      "detail": {
+        "stored_statuses": 15,
+        "max_gap_s": 2.005,
+        "median_interval_s": 0.501
+      },
+      "state": "VERIFYING_RECOVERY"
+    },
+    {
+      "at": "2026-10-10T18:54:47.754619+00:00",
+      "t_s": 7.179,
+      "event": "finished",
+      "detail": {
+        "stop_reason": "observer_lost"
+      },
+      "state": "ABORTED"
+    }
+  ],
+  "observations": [
+    {
+      "phase": "precheck",
+      "t_s": 0.213,
+      "observation": {
+        "observed_at": "2026-10-10T18:54:40.788212+00:00",
+        "http_status": 200,
+        "latency_ms": 156.79,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T18:54:39.619000+00:00",
+        "received_at": "2026-10-10T18:54:40.788350+00:00",
+        "server_time": "2026-10-10T18:54:40.788357+00:00",
+        "error": null,
+        "data_age_s": 1.169
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 1.169,
+        "stalled_for_s": 0.0,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "precheck",
+      "t_s": 0.833,
+      "observation": {
+        "observed_at": "2026-10-10T18:54:41.408462+00:00",
+        "http_status": 200,
+        "latency_ms": 119.37,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T18:54:40.620000+00:00",
+        "received_at": "2026-10-10T18:54:41.408934+00:00",
+        "server_time": "2026-10-10T18:54:41.408936+00:00",
+        "error": null,
+        "data_age_s": 0.789
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 0.789,
+        "stalled_for_s": 0.0,
+        "advanced": true,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "precheck",
+      "t_s": 1.45,
+      "observation": {
+        "observed_at": "2026-10-10T18:54:42.025266+00:00",
+        "http_status": 200,
+        "latency_ms": 115.73,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T18:54:40.620000+00:00",
+        "received_at": "2026-10-10T18:54:42.023919+00:00",
+        "server_time": "2026-10-10T18:54:42.023921+00:00",
+        "error": null,
+        "data_age_s": 1.404
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 1.404,
+        "stalled_for_s": 0.617,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "fault",
+      "t_s": 4.54,
+      "observation": {
+        "observed_at": "2026-10-10T18:54:45.114866+00:00",
+        "http_status": null,
+        "latency_ms": null,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "ReadTimeout: timed out",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 3.706,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 5.075,
+      "observation": {
+        "observed_at": "2026-10-10T18:54:45.650104+00:00",
+        "http_status": 500,
+        "latency_ms": 19.36,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 4.242,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 5.684,
+      "observation": {
+        "observed_at": "2026-10-10T18:54:46.259039+00:00",
+        "http_status": 200,
+        "latency_ms": 108.29,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T18:54:42.622000+00:00",
+        "received_at": "2026-10-10T18:54:46.257533+00:00",
+        "server_time": "2026-10-10T18:54:46.257537+00:00",
+        "error": null,
+        "data_age_s": 3.636
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 3.636,
+        "stalled_for_s": 0.0,
+        "advanced": true,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 6.322,
+      "observation": {
+        "observed_at": "2026-10-10T18:54:46.897173+00:00",
+        "http_status": 200,
+        "latency_ms": 137.07,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T18:54:44.127000+00:00",
+        "received_at": "2026-10-10T18:54:46.896060+00:00",
+        "server_time": "2026-10-10T18:54:46.896062+00:00",
+        "error": null,
+        "data_age_s": 2.769
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 2.769,
+        "stalled_for_s": 0.0,
+        "advanced": true,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 6.945,
+      "observation": {
+        "observed_at": "2026-10-10T18:54:47.520262+00:00",
+        "http_status": 200,
+        "latency_ms": 122.46,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T18:54:46.632000+00:00",
+        "received_at": "2026-10-10T18:54:47.519090+00:00",
+        "server_time": "2026-10-10T18:54:47.519092+00:00",
+        "error": null,
+        "data_age_s": 0.887
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 0.887,
+        "stalled_for_s": 0.0,
+        "advanced": true,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    }
+  ],
+  "stop_reason": "observer_lost",
+  "rollback": {
+    "attempted": true,
+    "verified": true,
+    "by": "orchestrator",
+    "detail": "same container (id unchanged) running and unpaused"
+  },
+  "recovery": {
+    "verified": true,
+    "time_to_first_fresh_s": 0.63,
+    "time_to_verified_s": 1.941,
+    "criteria": "rollback verified by docker inspect (same container (id unchanged) running and unpaused) AND 3 successive advances of createdDateTime beyond both the last pre-rollback value and the fms-server time of the last fault-window poll, each with HTTP 200 and data_age_s <= 5.0s",
+    "detail": "3 fresh advances observed"
+  },
+  "impact": {
+    "fault_verified": true,
+    "fault_observations": 1,
+    "stale_detected": false,
+    "time_to_detection_s": null,
+    "precheck_max_data_age_s": 1.404,
+    "max_data_age_s": null,
+    "max_stalled_for_s": 3.706,
+    "http_ok_ratio_during_fault": 0.0,
+    "healthy_but_stale_observations": 0,
+    "http_error_rate_during_fault": 0.0,
+    "latency_p95_during_fault_ms": null,
+    "injection_latency_s": 0.422,
+    "injected_at": "2026-10-10T18:54:42.684386+00:00",
+    "time_to_first_expected_status_s": null,
+    "expected_status_observations": 0,
+    "silent_failure": false,
+    "time_to_detection_from_verified_injection_s": null
+  },
+  "guardrails": {
+    "config": {
+      "max_error_rate": 0.0,
+      "error_min_samples": 5,
+      "latency_p95_multiplier": 5.0,
+      "latency_p95_floor_ms": 250.0,
+      "latency_window": 10,
+      "latency_min_samples": 5,
+      "blast_radius_interval_s": 0.5,
+      "blast_radius_max_snapshot_failures": 3
+    },
+    "blast_radius_allowed": [
+      "influxDB"
+    ],
+    "triggered": null,
+    "latency_baseline_p95_ms": 87.87,
+    "latency_baseline_source": "baseline baseline-20261010T172349Z",
+    "latency_threshold_ms": 439.35,
+    "blast_radius_baseline": {
+      "csv-provider": "running",
+      "databroker": "running",
+      "fms-consumer": "running",
+      "fms-forwarder": "running",
+      "fms-server": "running",
+      "fms-zenoh-router": "running",
+      "grafana": "running",
+      "influxDB": "running"
+    },
+    "expected_statuses": [
+      500
+    ],
+    "final_blast_check": {
+      "clean": true,
+      "changes": []
+    }
+  },
+  "data_gap": {
+    "window_start": "2026-10-10T18:54:37.684386+00:00",
+    "window_end": "2026-10-10T18:54:47.571796+00:00",
+    "stored_statuses": 15,
+    "max_gap_s": 2.005,
+    "gap_from": "2026-10-10T18:54:44.627000+00:00",
+    "gap_to": "2026-10-10T18:54:46.632000+00:00",
+    "median_interval_s": 0.501,
+    "method": "GET /rfms/vehiclestatuses?starttime&stoptime (stored createdDateTime values)"
+  }
+}

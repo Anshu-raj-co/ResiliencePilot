@@ -67,3 +67,13 @@ keeps status `running` but changes StartedAt; verified live with Grafana).
 **D-014 — Detection time is recorded twice.** `time_to_detection_s` is measured from the fault command (as on Day 1);
 `time_to_detection_from_verified_injection_s` subtracts `injection_latency_s`. For service_crash they differ by the
 ~2.4 s stop grace because fms-forwarder ignores SIGTERM (exit code 137, verified).
+
+**D-015: The expected-status rule (dependency_failure).** An experiment may declare `expected_statuses` (HTTP
+400–599). During the fault window only, those codes count as the symptom, never as errors. Any other non-200 still
+counts for the error-rate guard. If a symptom is declared, the first poll with no response aborts (observer loss
+limit 1, instead of 4). Precheck and recovery are unchanged. Approved by the lead.
+
+**D-016: Stored-data gap as evidence.** After recovery is verified, one read-only `starttime/stoptime` query
+records the largest gap between stored `createdDateTime` values around the fault. It is evidence only: a failure here
+is recorded and never changes the run's state.
+

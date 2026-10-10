@@ -16,21 +16,23 @@
       "type": "string",
       "enum": [
         "telemetry_stall",
-        "service_crash"
+        "service_crash",
+        "dependency_failure"
       ]
     },
     "target": {
       "type": "string",
       "enum": [
-        "fms-forwarder"
+        "fms-forwarder",
+        "influxDB"
       ],
-      "description": "Exact container name; must also be in config/experiments.json for this type."
+      "description": "Exact container name; must also be allowlisted for this type in config/experiments.json."
     },
     "duration_s": {
       "type": "integer",
       "minimum": 1,
       "maximum": 30,
-      "description": "Fault-active duration. Hard cap 30 s; the catalogue may lower it per type (service_crash: 15 s)."
+      "description": "Fault-active duration. Hard cap 30 s; the catalogue lowers it per type (service_crash, dependency_failure: 15 s)."
     },
     "approved_by": {
       "type": "string",

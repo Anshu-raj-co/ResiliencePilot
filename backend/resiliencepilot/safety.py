@@ -46,7 +46,7 @@ class Latched(SafetyError):
 class ExperimentRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
 
-    experiment_type: Literal["telemetry_stall", "service_crash"]
+    experiment_type: Literal["telemetry_stall", "service_crash", "dependency_failure"]
     target: str = Field(min_length=1, max_length=63, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_.-]*$")
     duration_s: int = Field(ge=1, le=HARD_MAX_DURATION_S)
     approved_by: str = Field(min_length=1, max_length=80)

@@ -179,6 +179,36 @@
             "number",
             "null"
           ]
+        },
+        "time_to_first_expected_status_s": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "expected_status_observations": {
+          "type": "integer"
+        },
+        "silent_failure": {
+          "type": "boolean"
+        },
+        "injected_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "injection_latency_s": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "time_to_detection_from_verified_injection_s": {
+          "type": [
+            "number",
+            "null"
+          ]
         }
       }
     },
@@ -233,8 +263,18 @@
         },
         "final_blast_check": {
           "type": "object"
+        },
+        "expected_statuses": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
         }
       }
+    },
+    "data_gap": {
+      "type": "object",
+      "description": "Evidence only: stored statuses around the fault (read-only window query)."
     }
   }
 }

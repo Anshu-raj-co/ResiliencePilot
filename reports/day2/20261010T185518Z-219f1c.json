@@ -1,0 +1,226 @@
+{
+  "run_id": "20261010T185518Z-219f1c",
+  "request": {
+    "experiment_type": "dependency_failure",
+    "target": "influxDB",
+    "duration_s": 12,
+    "approved_by": "Anshu (Day-2 crash test)",
+    "hypothesis": "Kill switch starts a stopped influxDB with the backend dead"
+  },
+  "state": "LATCHED_UNSAFE",
+  "spec": {
+    "mechanism": "docker_stop",
+    "expected_symptoms": [
+      "HYPOTHESIS: fms-server answers HTTP 500 (source: fms-server/src/lib.rs maps query errors to INTERNAL_SERVER_ERROR), i.e. the failure is VISIBLE to a plain health check",
+      "HYPOTHESIS: fms-consumer keeps running but drops the statuses it cannot write (influx-client writer.rs: 'failed to write data to influx'), leaving a gap in stored data after recovery",
+      "HYPOTHESIS: no container other than influxDB changes state (fms-server, fms-consumer, grafana keep running)"
+    ],
+    "risks": [
+      "Wider blast radius in effect: InfluxDB is shared by fms-server, fms-consumer and grafana (their container state is watched by the blast-radius guard)",
+      "InfluxDB start-up time is unmeasured; recovery waits up to recovery_timeout_s (30 s) for fresh data",
+      "Data written while InfluxDB is down is lost unless the consumer buffers it (to be measured as a data gap)",
+      "Volumes (influxdb-data, influxdb-auth) persist across stop/start; the adapter never removes containers or volumes"
+    ]
+  },
+  "limits": {
+    "stale_threshold_s": 5.0,
+    "poll_interval_s": 0.5,
+    "watchdog_grace_s": 5.0,
+    "recovery_timeout_s": 30.0
+  },
+  "timeline": [
+    {
+      "at": "2026-10-10T18:55:18.462076+00:00",
+      "t_s": 0.0,
+      "event": "validated",
+      "detail": {
+        "approved_by": "Anshu (Day-2 crash test)",
+        "hypothesis": "Kill switch starts a stopped influxDB with the backend dead"
+      },
+      "state": "VALIDATED"
+    },
+    {
+      "at": "2026-10-10T18:55:18.464324+00:00",
+      "t_s": 0.002,
+      "event": "precheck_start",
+      "detail": null,
+      "state": "PRECHECK"
+    },
+    {
+      "at": "2026-10-10T18:55:20.339347+00:00",
+      "t_s": 1.877,
+      "event": "precheck_passed",
+      "detail": {
+        "fresh_samples": 3
+      },
+      "state": "PRECHECK"
+    },
+    {
+      "at": "2026-10-10T18:55:20.484104+00:00",
+      "t_s": 2.022,
+      "event": "guardrails_armed",
+      "detail": {
+        "latency_threshold_ms": 439.35,
+        "latency_baseline": "baseline baseline-20261010T172349Z",
+        "max_error_rate": 0.0,
+        "expected_statuses": [
+          500
+        ],
+        "blast_radius_allowed": [
+          "influxDB"
+        ],
+        "watched_containers": 8
+      },
+      "state": "PRECHECK"
+    },
+    {
+      "at": "2026-10-10T18:55:20.486984+00:00",
+      "t_s": 2.025,
+      "event": "injecting",
+      "detail": {
+        "target": "influxDB",
+        "mechanism": "docker_stop"
+      },
+      "state": "INJECTING"
+    },
+    {
+      "at": "2026-10-10T18:55:20.930505+00:00",
+      "t_s": 2.469,
+      "event": "fault_active",
+      "detail": {
+        "verified_by": "docker inspect State.Running == false",
+        "injection_latency_s": 0.442,
+        "exit_code": 2
+      },
+      "state": "ACTIVE"
+    },
+    {
+      "at": "2026-10-10T18:55:31.954511+00:00",
+      "event": "interrupted_process_recovered",
+      "detail": "influxDB: state running",
+      "state": "LATCHED_UNSAFE"
+    }
+  ],
+  "observations": [
+    {
+      "phase": "precheck",
+      "t_s": 0.18,
+      "observation": {
+        "observed_at": "2026-10-10T18:55:18.641549+00:00",
+        "http_status": 200,
+        "latency_ms": 120.5,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T18:55:17.704000+00:00",
+        "received_at": "2026-10-10T18:55:18.638801+00:00",
+        "server_time": "2026-10-10T18:55:18.638803+00:00",
+        "error": null,
+        "data_age_s": 0.935
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 0.935,
+        "stalled_for_s": 0.0,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "precheck",
+      "t_s": 0.787,
+      "observation": {
+        "observed_at": "2026-10-10T18:55:19.249231+00:00",
+        "http_status": 200,
+        "latency_ms": 106.66,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T18:55:18.706000+00:00",
+        "received_at": "2026-10-10T18:55:19.246805+00:00",
+        "server_time": "2026-10-10T18:55:19.246807+00:00",
+        "error": null,
+        "data_age_s": 0.541
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 0.541,
+        "stalled_for_s": 0.0,
+        "advanced": true,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "precheck",
+      "t_s": 1.376,
+      "observation": {
+        "observed_at": "2026-10-10T18:55:19.838331+00:00",
+        "http_status": 200,
+        "latency_ms": 88.36,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T18:55:18.706000+00:00",
+        "received_at": "2026-10-10T18:55:19.836059+00:00",
+        "server_time": "2026-10-10T18:55:19.836060+00:00",
+        "error": null,
+        "data_age_s": 1.13
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 1.13,
+        "stalled_for_s": 0.589,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    }
+  ],
+  "stop_reason": "error",
+  "rollback": {
+    "attempted": true,
+    "verified": false,
+    "by": "startup_recovery",
+    "detail": "influxDB: state running"
+  },
+  "recovery": {
+    "verified": false,
+    "time_to_first_fresh_s": null,
+    "time_to_verified_s": null,
+    "criteria": "rollback verified by docker inspect (same container (id unchanged) running and unpaused) AND 3 successive advances of createdDateTime beyond both the last pre-rollback value and the fms-server time of the last fault-window poll, each with HTTP 200 and data_age_s <= 5.0s",
+    "detail": null
+  },
+  "impact": {
+    "injected_at": "2026-10-10T18:55:20.488180+00:00",
+    "fault_verified": true,
+    "injection_latency_s": 0.442
+  },
+  "guardrails": {
+    "config": {
+      "max_error_rate": 0.0,
+      "error_min_samples": 5,
+      "latency_p95_multiplier": 5.0,
+      "latency_p95_floor_ms": 250.0,
+      "latency_window": 10,
+      "latency_min_samples": 5,
+      "blast_radius_interval_s": 0.5,
+      "blast_radius_max_snapshot_failures": 3
+    },
+    "blast_radius_allowed": [
+      "influxDB"
+    ],
+    "triggered": null,
+    "latency_baseline_p95_ms": 87.87,
+    "latency_baseline_source": "baseline baseline-20261010T172349Z",
+    "latency_threshold_ms": 439.35,
+    "blast_radius_baseline": {
+      "csv-provider": "running",
+      "databroker": "running",
+      "fms-consumer": "running",
+      "fms-forwarder": "running",
+      "fms-server": "running",
+      "fms-zenoh-router": "running",
+      "grafana": "running",
+      "influxDB": "running"
+    },
+    "expected_statuses": [
+      500
+    ]
+  }
+}

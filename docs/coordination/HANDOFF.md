@@ -1,8 +1,17 @@
 # Handoff
 
-_Updated: 2026-10-11 ~00:10 IST, Day 2 milestone 1 ready for review (PR from feat/day2-service-crash)_
+_Updated: 2026-10-11 ~00:35 IST, Day 2 milestone 2: dependency_failure (PR open, decisions pending)_
 
-## Day 2 milestone 1: service_crash + guardrails (branch `feat/day2-service-crash`, PR open, awaiting approval)
+## Day 2 milestone 2: dependency_failure (branch `feat/day2-dependency-failure`, PR open)
+- Implemented the expected-status rule (D-015) and stored-data-gap evidence (D-016); 18 new tests; 158 unit tests.
+- Live: 3 runs all ABORTED with `observer_lost` on the first fault poll. fms-server does not answer within 2 s while
+  InfluxDB is down. Data loss verified (2.0–4.5 s gaps). Kill switch started influxDB with the backend dead.
+- Incident: after the kill-switch restart, fms-server returned 500 ("failed to resolve host name") for about 18 s; I
+  wrongly reset during it (reset checks containers only). Details in `reports/day2/README.md`.
+- **Decisions pending (lead):** (1) how to observe slow-failing dependencies (per-experiment response envelope vs.
+  keep the abort-on-first-poll result); (2) should `reset` require fresh telemetry?
+
+## Day 2 milestone 1: service_crash + guardrails (MERGED, PR #15) (branch `feat/day2-service-crash`, PR open, awaiting approval)
 - Implemented: `StopStartFault` (same-container-id rollback), guardrails (error rate, latency p95, blast-radius
   monitor + final check), kill switch and startup recovery restore stopped targets (start only for our own marker).
 - Verified live (evidence `reports/day2/`, index `reports/day2/README.md`): 4 + 1 service_crash runs COMPLETED,

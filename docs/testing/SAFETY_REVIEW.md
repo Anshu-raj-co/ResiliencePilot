@@ -40,3 +40,21 @@ Reviewer: independent read-only subagent, 2026-10-10. Scope: `faults.py`, `guard
 | L5 | Low | A `docker stop` the daemon applies after the CLI's 15 s timeout is only caught by the recovery check. | Accepted: that path ends LATCHED_UNSAFE. Documented. | — |
 
 Result after fixes: `pytest -q` → 140 passed; `RP_LIVE=1` → 143 passed; post-fix live runs in `reports/day2/README.md`.
+
+---
+
+# Independent Safety Review — PR #16 (dependency_failure, expected-status rule)
+
+Reviewer: independent read-only subagent, 2026-10-11. **No high-severity issues.** The expected status is not
+tolerated outside the fault window, cannot be supplied in a request, and other experiment types are unchanged.
+
+| ID | Sev | Finding | Fix | Test |
+|---|---|---|---|---|
+| B | Med | With `max_error_rate > 0`, mostly-500 runs could hide a few 503s (expected codes are not counted toward `min_samples`). | A declared symptom forces zero tolerance: the orchestrator sets the rate to 0.0, and the catalogue rejects `expected_statuses` together with a tolerance. | `test_B_*` (2) |
+| D | Med | When every fault poll is a 500 (no server time), recovery's lower bound fell back to the pre-fault `createdDateTime`. | Fall back to the verified injection time + 0.5 s skew margin, recorded as `recovery.lower_bound`. Verified live (`20261010T191735Z-…`). | `test_D_*` |
+| C | Low | Only the data-gap query was guarded; the arithmetic could raise and latch a recovered run. | The whole measurement is wrapped; any failure is recorded in `data_gap.error`. | `test_C_*` (2) |
+| E | Low | `time_to_first_expected_status_s` was lost if the loop raised. | Written at detection time. | `test_E_*` |
+| — | Info | `reset` requires every allowlisted target running, so after any latch InfluxDB must also be up. | Documented. | existing |
+
+Result: `pytest -q` → 164 passed. One test was dropped because it could not fail without the fix (it gave false
+confidence).

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import time
+from datetime import datetime, timezone
 
 import httpx
 
@@ -27,6 +28,14 @@ class RfmsObserver:
             return parse_vehicle_statuses(resp.json(), resp.status_code, latency_ms)
         except (ValueError, KeyError, TypeError) as exc:
             return Observation(utcnow(), resp.status_code, latency_ms, None, None, None, None, error=f"unparseable body: {exc}")
+
+    def statuses_between(self, start: datetime, end: datetime) -> list[datetime]:
+        """createdDateTime of every status stored between start and end (read-only rFMS window query)."""
+        fmt = lambda d: d.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")  # noqa: E731
+        resp = self._client.get(VEHICLE_STATUS_PATH, params={"starttime": fmt(start), "stoptime": fmt(end)})
+        resp.raise_for_status()
+        statuses = resp.json()["vehicleStatusResponse"]["vehicleStatuses"] or []
+        return sorted(c for c in (parse_rfc3339(s.get("createdDateTime")) for s in statuses) if c is not None)
 
     def close(self) -> None:
         self._client.close()

@@ -40,5 +40,31 @@
       "Zenoh client may reconnect slowly or not at all after a cold start",
       "Telemetry for the stopped window is never produced (no backfill)"
     ]
+  },
+  "dependency_failure": {
+    "description": "Stop the shared time-series store (docker stop) and start it again. Expected symptom: the rFMS API answers with an error status instead of data.",
+    "mechanism": "docker_stop",
+    "allowed_targets": [
+      "influxDB"
+    ],
+    "blast_radius": [
+      "influxDB"
+    ],
+    "stop_timeout_s": 2,
+    "max_duration_s": 15,
+    "expected_statuses": [
+      500
+    ],
+    "expected_symptoms": [
+      "HYPOTHESIS: fms-server answers HTTP 500 (source: fms-server/src/lib.rs maps query errors to INTERNAL_SERVER_ERROR), i.e. the failure is VISIBLE to a plain health check",
+      "HYPOTHESIS: fms-consumer keeps running but drops the statuses it cannot write (influx-client writer.rs: 'failed to write data to influx'), leaving a gap in stored data after recovery",
+      "HYPOTHESIS: no container other than influxDB changes state (fms-server, fms-consumer, grafana keep running)"
+    ],
+    "risks": [
+      "Wider blast radius in effect: InfluxDB is shared by fms-server, fms-consumer and grafana (their container state is watched by the blast-radius guard)",
+      "InfluxDB start-up time is unmeasured; recovery waits up to recovery_timeout_s (30 s) for fresh data",
+      "Data written while InfluxDB is down is lost unless the consumer buffers it (to be measured as a data gap)",
+      "Volumes (influxdb-data, influxdb-auth) persist across stop/start; the adapter never removes containers or volumes"
+    ]
   }
 }
