@@ -9,7 +9,7 @@ Fallback reason: AI disabled
 Rule-based order (priority = 0.6 x information + 0.4 x risk).
 
 1. **dependency_failure** on `influxDB` (rule-based rank 1)
-   - 1 full-window run(s) so far (information 0.50); 3/4 expected symptoms still labelled HYPOTHESIS in config/experiments.json; 6/7 past runs unresolved (latched or cut short); 3 neighbouring container(s) in the dependency map: fms-consumer, fms-server, grafana; latch rate 2/7; mechanism docker_stop (severity 1.0); score so far: median 61.6 (range 61.6-61.6)
+   - 3 full-window run(s) so far (information 0.25); 3/5 expected symptoms still labelled HYPOTHESIS in config/experiments.json; 8/11 past runs unresolved (latched or cut short); 3 neighbouring container(s) in the dependency map: fms-consumer, fms-server, grafana; latch rate 2/11; mechanism docker_stop (severity 1.0); score so far: median 61.6 (range 57.5-63.2)
    - `rp run --type dependency_failure --target influxDB --duration 12 --approved-by <you>`
 2. **service_crash** on `fms-forwarder` (rule-based rank 2)
    - 5 full-window run(s) so far (information 0.17); 3/3 expected symptoms still labelled HYPOTHESIS in config/experiments.json; 3/8 past runs unresolved (latched or cut short); 2 neighbouring container(s) in the dependency map: databroker, fms-zenoh-router; latch rate 3/8; mechanism docker_stop (severity 0.7); score so far: median 65.1 (range 61.9-65.3)
@@ -24,7 +24,7 @@ Fallback reason: AI disabled
 
 ### F1. not_recovered — dependency_failure (confidence: medium, source: rule-based)
 
-Recovery criteria were not met within 30 s because the consumer was still failing name resolution after InfluxDB returned (verified log line); the DNS-cache mechanism is a hypothesis.
+Recovery criteria were not met within 30 s after InfluxDB returned (verified from the run record). Hypothesis: the consumer was still failing name resolution (log excerpts not committed); the DNS-cache mechanism is a further hypothesis.
 
 Evidence: `20261010T192839Z-179795`
 
@@ -35,9 +35,9 @@ Playbook:
 
 ### F2. silent_after_rollback — dependency_failure (confidence: medium, source: rule-based)
 
-After InfluxDB returned, fms-consumer kept failing to resolve its host name for ~27 s (logged, verified), so it wrote nothing while fms-server kept answering 200 with frozen data. Candidate mechanism: failed-DNS caching in the isahc/libcurl client (hypothesis, not verified).
+After InfluxDB returned, the API kept answering 200 with frozen data for ~21-24 s (verified from run records). Hypothesis: fms-consumer kept failing to resolve InfluxDB's host name (reported from container logs, excerpts not committed), so it wrote nothing. Candidate mechanism: failed-DNS caching in the isahc/libcurl client (hypothesis, not verified).
 
-Evidence: `20261010T192839Z-179795`
+Evidence: `20261010T192839Z-179795`, `20261010T203817Z-01d396`
 
 Playbook:
 1. [verify] Correlate `docker logs fms-consumer` 'failed to resolve host name' timestamps with InfluxDB healthy time.
@@ -69,9 +69,9 @@ Playbook:
 
 ### F5. slow_recovery — dependency_failure (confidence: medium, source: rule-based)
 
-fms-server answered HTTP 500 ('failed to resolve host name') for ~22 s after InfluxDB was back (verified), so recovery took far longer than InfluxDB's own restart. DNS caching is the candidate cause (hypothesis).
+fms-server answered HTTP 500 for ~18-22 s after InfluxDB was back (verified from run records), so recovery took far longer than InfluxDB's own restart. Suspected cause (hypothesis): name-resolution failures reported from container logs (excerpts not committed), possibly from DNS caching.
 
-Evidence: `20261010T193003Z-e2eacd`
+Evidence: `20261010T193003Z-e2eacd`, `20261010T203712Z-08b9dd`, `20261010T203817Z-01d396`, `20261010T211735Z-748875`
 
 Playbook:
 1. [verify] Time InfluxDB healthy -> first fms-server HTTP 200 across 3 runs; check logs for resolve errors.
@@ -82,7 +82,7 @@ Playbook:
 
 fms-consumer drops statuses it cannot write ('failed to write data to influx'); there is no buffer or backfill (verified). Loss happens in the fast-fail phase; writes during the blocking phase are delayed, not dropped.
 
-Evidence: `20261010T185355Z-540224`, `20261010T185440Z-2f33aa`, `20261010T185448Z-595a16`, `20261010T191733Z-7123d9`, `20261010T193003Z-e2eacd`
+Evidence: `20261010T185355Z-540224`, `20261010T185440Z-2f33aa`, `20261010T185448Z-595a16`, `20261010T191733Z-7123d9`, `20261010T193003Z-e2eacd`, `20261010T203616Z-596e45`, `20261010T203712Z-08b9dd`, `20261010T203817Z-01d396`, `20261010T211735Z-748875`
 
 Playbook:
 1. [verify] Query stored statuses for the outage window (`data_gap` in the run record).

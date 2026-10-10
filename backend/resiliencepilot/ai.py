@@ -25,17 +25,19 @@ FACTS = [
                  "receivedDateTime is the request time, so only createdDateTime shows the data is stale"),
     ("verified", "fms-forwarder ignores SIGTERM: docker stop always waits the 2 s grace and kills it (exit 137)"),
     ("verified", "with InfluxDB down, fms-server requests first block ~4 s, then fail fast with HTTP 500"),
-    ("verified", "after InfluxDB is back, fms-consumer or fms-server logged 'failed to resolve host name' for 22-27 s; "
-                 "the consumer case is silent (HTTP 200, frozen createdDateTime), the server case is visible (HTTP 500)"),
+    ("verified", "after InfluxDB is back, recovery takes 20-27 s; in some runs the API stays HTTP 200 with frozen "
+                 "createdDateTime (silent), in others it answers HTTP 500 (visible)"),
     ("verified", "fms-consumer drops statuses it cannot write ('failed to write data to influx'); no buffering or backfill"),
     ("verified", "createdDateTime advances every 1.0 s at the API although the forwarder publishes every 0.5 s"),
     ("hypothesis", "the isahc/libcurl HTTP client caches failed DNS lookups, delaying recovery after InfluxDB restarts"),
+    ("hypothesis", "during that time fms-consumer (silent case) or fms-server (visible case) kept failing to resolve "
+                   "InfluxDB's host name; reported from container logs, log excerpts not committed"),
 ]
 
 
 # Which facts are relevant to which finding rule (indices into FACTS); a narrow context keeps a small model on track.
-RELEVANT_FACTS = {"silent_during_fault": [0, 1, 5], "silent_after_rollback": [3, 6], "not_recovered": [3, 6],
-                  "slow_recovery": [2, 3, 6], "data_loss": [4, 2], "blast_radius": []}
+RELEVANT_FACTS = {"silent_during_fault": [0, 1, 5], "silent_after_rollback": [3, 7, 6], "not_recovered": [3, 7, 6],
+                  "slow_recovery": [2, 3, 7, 6], "data_loss": [4, 2], "blast_radius": []}
 
 # Deterministic grounding check for AI root causes, per (rule, experiment type or "*"):
 #   any  : the text must name at least one of these (the component the verified evidence points to)
@@ -63,6 +65,8 @@ def grounding_problem(rule: str, etype: str, text: str, notes: list[str]) -> str
         return f"blames {hit!r}, which the verified evidence rules out for this finding"
     if "cach" in t and not any(h in t for h in HEDGES):
         return "states DNS caching as fact; it is an unverified hypothesis"
+    if any(k in t for k in ("resolv", "dns")) and not any(h in t for h in HEDGES):
+        return "states the name-resolution cause as fact; it is a hypothesis (log excerpts not committed)"
     if notes and not any(k in t for k in ("operator", "deliberate", "test", "annotat")):
         return f"ignores the run annotation ({notes[0]})"
     return None
@@ -206,21 +210,24 @@ KB = {
          ("mitigate", "Alert on createdDateTime age > 5 s instead of on HTTP status or container state."),
          ("fix", "Expose data age in the rFMS response or return 503 when the newest status is older than a threshold.")]),
     ("silent_after_rollback", "dependency_failure"): (
-        "After InfluxDB returned, fms-consumer kept failing to resolve its host name for ~27 s (logged, verified), so it "
-        "wrote nothing while fms-server kept answering 200 with frozen data. Candidate mechanism: failed-DNS caching in "
+        "After InfluxDB returned, the API kept answering 200 with frozen data for ~21-24 s (verified from run records). "
+        "Hypothesis: fms-consumer kept failing to resolve InfluxDB's host name (reported from container logs, excerpts "
+        "not committed), so it wrote nothing. Candidate mechanism: failed-DNS caching in "
         "the isahc/libcurl client (hypothesis, not verified).", "medium",
         [("verify", "Correlate `docker logs fms-consumer` 'failed to resolve host name' timestamps with InfluxDB healthy time."),
          ("mitigate", "Gate readiness on fresh createdDateTime, not on HTTP 200 or container running."),
          ("fix", "Disable or shorten the HTTP client's DNS cache (e.g. CURLOPT_DNS_CACHE_TIMEOUT) or re-resolve on connect errors.")]),
     ("not_recovered", "dependency_failure"): (
-        "Recovery criteria were not met within 30 s because the consumer was still failing name resolution after "
-        "InfluxDB returned (verified log line); the DNS-cache mechanism is a hypothesis.", "medium",
+        "Recovery criteria were not met within 30 s after InfluxDB returned (verified from the run record). Hypothesis: "
+        "the consumer was still failing name resolution (log excerpts not committed); the DNS-cache mechanism is a "
+        "further hypothesis.", "medium",
         [("verify", "Re-run dependency_failure and record time from InfluxDB healthy to the consumer's first successful write."),
          ("mitigate", "Restart fms-consumer automatically when writes fail for longer than N seconds."),
          ("fix", "Make the consumer re-resolve and retry with backoff instead of reusing a failed lookup.")]),
     ("slow_recovery", "dependency_failure"): (
-        "fms-server answered HTTP 500 ('failed to resolve host name') for ~22 s after InfluxDB was back (verified), so "
-        "recovery took far longer than InfluxDB's own restart. DNS caching is the candidate cause (hypothesis).", "medium",
+        "fms-server answered HTTP 500 for ~18-22 s after InfluxDB was back (verified from run records), so recovery took "
+        "far longer than InfluxDB's own restart. Suspected cause (hypothesis): name-resolution failures reported from "
+        "container logs (excerpts not committed), possibly from DNS caching.", "medium",
         [("verify", "Time InfluxDB healthy -> first fms-server HTTP 200 across 3 runs; check logs for resolve errors."),
          ("mitigate", "Add a readiness probe on fms-server that runs a real query, and retry clients with backoff."),
          ("fix", "Configure the HTTP client to re-resolve host names after connection failures.")]),

@@ -72,7 +72,10 @@ VERIFYING_RECOVERY → COMPLETED | ABORTED | LATCHED_UNSAFE`
 2. **Safety path is deterministic:** the UI, API and AI can request, never decide. The watchdog and kill switch work
    independently of the API and UI, and the kill switch works without the backend.
 3. **AI is advisory:** no shell, Docker, credentials or safety state; it can only reorder allowlisted proposals,
-   and its root causes must match the recorded evidence or are replaced by the rule-based answer.
+   and its root causes must match the recorded evidence or are replaced by the rule-based answer. Severity ranking
+   (`findings.py`) and the Resilience Score (`scoring.py`) are deterministic; the AI computes neither. In the one
+   recorded real model call (`qwen2.5:7b`, `reports/day2/ai_advice_qwen2.5-7b.md`) the planner kept the rule-based
+   order and 1 of 7 analyst explanations passed validation.
 4. **Evidence over claims:** every number in reports and on the dashboard is read from a run record.
 
 ## Tech
