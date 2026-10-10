@@ -14,7 +14,7 @@ from typing import Callable, Protocol
 
 from .config import HARD_MAX_DURATION_S, ExperimentSpec, SafetyConfig
 from .docker_cli import Docker, DockerError
-from .evidence import EvidenceStore
+from .evidence import EvidenceStore, host_platform
 from .faults import Watchdog, make_fault
 from .guardrails import BlastRadiusMonitor, ErrorRateGuard, LatencyGuard, blast_radius_changes, latency_threshold, p95
 from .observation import Observation, utcnow
@@ -77,7 +77,7 @@ class ExperimentRunner:
         mono0 = time.monotonic()
         rec_lock = threading.Lock()
         rec: dict = {
-            "run_id": run_id, "request": req.model_dump(), "state": "VALIDATED",
+            "run_id": run_id, "request": req.model_dump(), "state": "VALIDATED", "platform": host_platform(),
             "spec": {"mechanism": spec.mechanism, "expected_symptoms": list(spec.expected_symptoms), "risks": list(spec.risks)},
             "limits": {"stale_threshold_s": cfg.stale_threshold_s, "poll_interval_s": cfg.poll_interval_s,
                        "watchdog_grace_s": cfg.watchdog_grace_s, "recovery_timeout_s": cfg.recovery_timeout_s},

@@ -54,16 +54,17 @@ databroker, Eclipse Zenoh, InfluxDB, rFMS) · Ollama (`qwen2.5:7b`, local) · va
 
 ## Team
 
-From the git history, two GitHub accounts have committed to this repository. Names, roles and contact details beyond
-that are not recorded here.
+From the git history, GitHub accounts have committed to this repository; nothing beyond names and public GitHub handles
+is recorded here. **Do not commit personal contact details (email, phone) to the repository:** enter them only in
+the submission form itself.
 
-| # | Name | GitHub | Role / ownership | Email |
-|---|---|---|---|---|
-| 1 | Anshu Raj (commit author name) | `Anshu-raj-co` | **[TO FILL]** | **[TO FILL]** |
-| 2 | **[TO FILL]** | `nishtrip14` | **[TO FILL]** | **[TO FILL]** |
-| 3 | **[TO FILL]** | **[TO FILL]** | **[TO FILL]** | **[TO FILL]** |
-| 4 | **[TO FILL]** | **[TO FILL]** | **[TO FILL]** | **[TO FILL]** |
-| 5 | **[TO FILL]** | **[TO FILL]** | **[TO FILL]** | **[TO FILL]** |
+| # | Name | GitHub | Role / ownership |
+|---|---|---|---|
+| 1 | Anshu Raj (commit author name) | `Anshu-raj-co` | **[TO FILL]** |
+| 2 | **[TO FILL]** | `nishtrip14` | **[TO FILL]** |
+| 3 | **[TO FILL]** | **[TO FILL]** | **[TO FILL]** |
+| 4 | **[TO FILL]** | **[TO FILL]** | **[TO FILL]** |
+| 5 | **[TO FILL]** | **[TO FILL]** | **[TO FILL]** |
 
 Suggested ownership areas from the project brief, if useful for the form: engineering lead and integration; SDV
 integration and setup; safety controller and fault adapters; telemetry verification, baselines and evidence; AI

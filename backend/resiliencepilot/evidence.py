@@ -3,8 +3,23 @@ from __future__ import annotations
 
 import json
 import os
+import platform
 import time
 from pathlib import Path
+
+
+def host_platform() -> dict:
+    """OS and CPU of the machine running ResiliencePilot, stored with each run so statistics can be compared fairly.
+    The Docker VM may differ (e.g. linux/amd64 images emulated on Apple Silicon, D-023)."""
+    system = platform.system()
+    release = platform.mac_ver()[0] if system == "Darwin" else platform.release()
+    return {"os": {"Darwin": "macOS"}.get(system, system), "os_release": release, "cpu": platform.machine()}
+
+
+def platform_label(p: dict | None) -> str:
+    if not p:
+        return "not recorded"
+    return " ".join(x for x in (p.get("os"), p.get("os_release")) if x) + (f" ({p['cpu']})" if p.get("cpu") else "")
 
 
 class EvidenceStore:
