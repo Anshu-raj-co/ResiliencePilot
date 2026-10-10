@@ -87,7 +87,18 @@ def build(on_event=None):
     return cfg, catalog, docker, ctl, observer, store, ExperimentRunner(cfg, catalog, ctl, docker, observer, store, on_event)
 
 
+def _utf8_stdio() -> None:
+    """Windows pipes default to the ANSI codepage (cp1252), which cannot encode the bars/arrows we print."""
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure") and (stream.encoding or "").lower().replace("-", "") != "utf8":
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except (ValueError, OSError):
+                pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _utf8_stdio()
     p = argparse.ArgumentParser(prog="resiliencepilot")
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("status")
