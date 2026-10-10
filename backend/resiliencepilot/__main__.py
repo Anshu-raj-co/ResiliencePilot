@@ -206,7 +206,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"no run records{' for ' + args.run if args.run else ''} in {d}")
             return 1
         scores = [score_run(r) for r in recs]
-        result = {"formula": "docs/SCORING.md", "source": str(d), "runs": scores, "summary": summarise(scores)}
+        src = d.relative_to(REPO_ROOT).as_posix() if d.is_relative_to(REPO_ROOT) else d.name  # never a local home path
+        result = {"formula": "docs/SCORING.md", "source": src, "runs": scores, "summary": summarise(scores)}
         print(json.dumps(result, indent=2) if args.json else render_text(scores))
         if args.out:
             out = Path(args.out)
@@ -346,7 +347,10 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         with open(path, encoding="utf-8") as f:
             print(render_baseline(json.load(f)["summary"]))
-        print(f"{C['d']}source: {path}{C['x']}")
+        from pathlib import Path
+        p = Path(path).resolve()  # print a repo-relative path: logs of this output get committed (no home paths)
+        shown = p.relative_to(REPO_ROOT).as_posix() if p.is_relative_to(REPO_ROOT) else p.name
+        print(f"{C['d']}source: {shown}{C['x']}")
         return 0
     return 1
 

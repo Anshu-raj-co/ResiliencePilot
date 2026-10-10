@@ -51,7 +51,7 @@ Load conditions (captured live with the baseline)
     influxDB          cpu  0.29%  mem 113.2MiB / 7.682GiB
     fms-zenoh-router  cpu  0.09%  mem 3.953MiB / 7.682GiB
     databroker        cpu  0.16%  mem 5.211MiB / 7.682GiB
-source: C:/Users/anshu/OneDrive/Desktop/PROJECT/ResiliencePilot/reports/day1/baseline-20261010T094007Z.json
+source: <repo>/reports/day1/baseline-20261010T094007Z.json
 
 Collecting 16 samples every 0.5s from http://127.0.0.1:8081 ...
 Baseline  16 samples every 0.5s (09:40:35–09:40:43 UTC)
@@ -166,9 +166,11 @@ Timeline (t=0 at verified injection)
 [1;36m=== 5/6  Kill switch: 25 s experiment, emergency stop fired from a separate process after 6 s ===[0m
 
 [1;31m>>> KILL SWITCH (separate process)[0m
-EMERGENCY_STOP written to C:/Users/anshu/OneDrive/Desktop/PROJECT/ResiliencePilot/backend/data
-unpause fms-forwarder failed (attempt 1)
-fms-forwarder: running=true paused=false
+EMERGENCY_STOP written to <repo>/backend/data
+unpause fms-forwarder
+ failed (attempt 1)
+fms-forwarder
+: running=true paused=false
 Experiment plan
   type: telemetry_stall (docker_pause)
   target: fms-forwarder
