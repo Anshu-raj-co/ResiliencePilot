@@ -157,5 +157,6 @@ def test_cli_score(tmp_path, monkeypatch, capsys):
     assert cli.main(["score", "--dir", str(tmp_path), "--run", "20261010T180001Z-b", "--out", str(out)]) == 0
     saved = json.loads(out.read_text(encoding="utf-8"))
     assert [r["run_id"] for r in saved["runs"]] == ["20261010T180001Z-b"] and saved["summary"]["telemetry_stall"]["n"] == 1
+    assert saved["source"] == tmp_path.name                    # never an absolute (home) path in committed output
     assert cli.main(["score", "--dir", str(tmp_path), "--run", "missing"]) == 1
     assert "no run records for missing" in capsys.readouterr().out
