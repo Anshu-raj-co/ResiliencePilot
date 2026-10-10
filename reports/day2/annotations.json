@@ -1,0 +1,7 @@
+{
+  "_about": "Human notes shown beside runs by `rp findings`. Never used for scoring. Source: reports/day2/README.md.",
+  "20261010T182400Z-6f6559": "deliberate crash test: backend hard-killed mid-fault, kill switch started fms-forwarder",
+  "20261010T182429Z-b10eff": "deliberate crash test: backend hard-killed mid-fault, startup recovery started fms-forwarder",
+  "20261010T182500Z-4aa9f7": "deliberate guard test: operator ran `docker restart grafana` during the fault",
+  "20261010T185518Z-219f1c": "deliberate crash test: backend hard-killed ~0.4 s after stopping influxDB"
+}

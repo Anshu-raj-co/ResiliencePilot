@@ -117,6 +117,12 @@ def main(argv: list[str] | None = None) -> int:
     sc.add_argument("--dir", help="run-record directory (default: the evidence store's runs/)")
     sc.add_argument("--run", help="score only this run id"); sc.add_argument("--json", action="store_true")
     sc.add_argument("--out", help="also write the JSON result here")
+    spl = sub.add_parser("plan", help="read-only: rank allowlisted experiments (rule-based)")
+    spl.add_argument("--dir", help="run-record directory (default: the evidence store's runs/)")
+    spl.add_argument("--json", action="store_true")
+    sfi = sub.add_parser("findings", help="read-only: write a findings report from stored runs")
+    sfi.add_argument("--dir", help="run-record directory (default: the evidence store's runs/)")
+    sfi.add_argument("--out", default="reports/generated/findings.md")
     sd = sub.add_parser("discover", help="read-only: derive the dependency graph from docker inspect, diff vs the map")
     sd.add_argument("--json", action="store_true"); sd.add_argument("--out", help="also write the JSON result here")
     sbs = sub.add_parser("show-baseline"); sbs.add_argument("file", nargs="?")
@@ -135,6 +141,31 @@ def main(argv: list[str] | None = None) -> int:
         out = Path(args.out)
         out = out if out.is_absolute() else REPO_ROOT / out
         print(f"wrote {build_report(REPO_ROOT, args.run, out)}")
+        return 0
+
+    if args.cmd in ("plan", "findings"):  # read-only: catalog + dependency map + stored runs; no Docker, no safety objects
+        from pathlib import Path
+        from .findings import render_markdown
+        from .planner import plan, render_text as render_plan
+        from .scoring import load_runs
+        d = Path(args.dir) if args.dir else load_safety_config().data_dir / "runs"
+        d = d if d.is_absolute() else REPO_ROOT / d
+        runs = load_runs(d) if d.is_dir() else []
+        catalog = json.loads((REPO_ROOT / "config" / "experiments.json").read_text(encoding="utf-8"))
+        dep_map = json.loads((REPO_ROOT / "config" / "dependency_map.json").read_text(encoding="utf-8"))
+        entries = plan(catalog, dep_map, runs, load_safety_config().max_duration_s)
+        if args.cmd == "plan":
+            print(json.dumps(entries, indent=2) if args.json else render_plan(entries))
+            return 0
+        out = Path(args.out)
+        out = out if out.is_absolute() else REPO_ROOT / out
+        out.parent.mkdir(parents=True, exist_ok=True)
+        src = d.relative_to(REPO_ROOT).as_posix() if d.is_relative_to(REPO_ROOT) else d.name
+        ann_file = d / "annotations.json"
+        ann = json.loads(ann_file.read_text(encoding="utf-8")) if ann_file.is_file() else {}
+        out.write_text(render_markdown(runs, entries, src, {k: v for k, v in ann.items() if not k.startswith("_")}),
+                       encoding="utf-8")
+        print(f"wrote {out} ({len(runs)} run records)")
         return 0
 
     if args.cmd == "score":  # read-only: stored run records only; no Docker, no safety objects

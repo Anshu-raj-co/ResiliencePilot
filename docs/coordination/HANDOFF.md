@@ -14,7 +14,12 @@ _Updated: 2026-10-11, Phase C (discovery) done on macOS; next: Phase D scoring_
   [--json] [--out]`. Day-2 full-window medians: telemetry_stall 62.2 (n=2), service_crash 65.1 (n=5),
   dependency_failure 61.6 (n=1); lowest = partial run 179795 (14.3, silent after recovery). `reports/day2/scores.json`.
   Tests: 211 unit pass on macOS (+17 scoring).
-- Next: rule-based planner + `reports/day2/findings.md`, then the AI provider
+- Planner + findings done: `rp plan [--dir] [--json]` (planner.py: priority = 0.6 info + 0.4 risk, allowlist-only,
+  every entry needs a human approver) and `rp findings [--dir] [--out]` (findings.py: 6 rules, severity-ordered,
+  run ids cited; optional `annotations.json` for human notes, never scored). `reports/day2/findings.md` generated
+  from the 17 committed runs; `reports/day2/annotations.json` marks the 4 deliberate crash/guard tests (from README).
+  Tests: 220 unit pass on macOS (+9).
+- Next: the AI provider
   layer (local Ollama `qwen2.5:7b` / `qwen2.5-coder:14b`, advisory only, deterministic fallback when unreachable).
 - Mac notes: PR #7 (databroker host port 55557, scripts executable) and PR #8 (CLI "Nones") are open. `main` already
   prints "not detected" for detection time, so #8 only still adds `n/a` for unverified recovery timings.
