@@ -1,0 +1,14 @@
+{
+  "compose_project": "resiliencepilot-sdv",
+  "rfms_base_url": "http://127.0.0.1:8081",
+  "max_duration_s": 30,
+  "poll_interval_s": 0.5,
+  "http_timeout_s": 2.0,
+  "stale_threshold_s": 5.0,
+  "observer_loss_max_consecutive": 4,
+  "precheck_fresh_consecutive": 3,
+  "recovery_timeout_s": 30.0,
+  "recovery_consecutive": 3,
+  "watchdog_grace_s": 5.0,
+  "data_dir": "backend/data"
+}
