@@ -35,7 +35,7 @@ Full dependency map with source evidence: `config/dependency_map.json` (`python 
 
 ### Setup (Windows + Docker Desktop, Git Bash)
 ```bash
-git submodule update --init                      # fresh clone only
+git -c core.longpaths=true submodule update --init   # fresh clone only; long paths needed on Windows (deep blueprint paths)
 ./scripts/stack-up.sh                            # pulls prebuilt images, starts 8 containers
 cd backend && python -m venv .venv && .venv/Scripts/python -m pip install -e ".[test]"
 .venv/Scripts/python -m pytest -q                # unit tests (RP_LIVE=1 adds live read-only tests)
