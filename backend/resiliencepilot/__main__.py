@@ -123,6 +123,10 @@ def main(argv: list[str] | None = None) -> int:
     sfi = sub.add_parser("findings", help="read-only: write a findings report from stored runs")
     sfi.add_argument("--dir", help="run-record directory (default: the evidence store's runs/)")
     sfi.add_argument("--out", default="reports/generated/findings.md")
+    sad = sub.add_parser("advise", help="advisory AI planner + analyst (local Ollama; rule-based fallback)")
+    sad.add_argument("--dir", help="run-record directory (default: the evidence store's runs/)")
+    sad.add_argument("--offline", action="store_true", help="skip the AI; deterministic rule-based answers only")
+    sad.add_argument("--json", action="store_true"); sad.add_argument("--out", help="also write a Markdown report here")
     sd = sub.add_parser("discover", help="read-only: derive the dependency graph from docker inspect, diff vs the map")
     sd.add_argument("--json", action="store_true"); sd.add_argument("--out", help="also write the JSON result here")
     sbs = sub.add_parser("show-baseline"); sbs.add_argument("file", nargs="?")
@@ -143,7 +147,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"wrote {build_report(REPO_ROOT, args.run, out)}")
         return 0
 
-    if args.cmd in ("plan", "findings"):  # read-only: catalog + dependency map + stored runs; no Docker, no safety objects
+    if args.cmd in ("plan", "findings", "advise"):  # read-only: catalog + dependency map + stored runs; no Docker, no safety objects
         from pathlib import Path
         from .findings import render_markdown
         from .planner import plan, render_text as render_plan
@@ -156,6 +160,27 @@ def main(argv: list[str] | None = None) -> int:
         entries = plan(catalog, dep_map, runs, load_safety_config().max_duration_s)
         if args.cmd == "plan":
             print(json.dumps(entries, indent=2) if args.json else render_plan(entries))
+            return 0
+        if args.cmd == "advise":  # the AI sees only derived data; it can reorder candidates, never run them
+            from .ai import OllamaProvider, ai_analyse, ai_plan, load_ai_config, render_markdown as render_ai
+            from .findings import derive_findings
+            findings = derive_findings(runs)
+            ann_file = d / "annotations.json"
+            ann = json.loads(ann_file.read_text(encoding="utf-8")) if ann_file.is_file() else {}
+            for f in findings:
+                for h in f["runs"]:
+                    if h["run"] in ann and not h["run"].startswith("_"):
+                        h["note"] = ann[h["run"]]
+            provider = None if args.offline else OllamaProvider(load_ai_config(REPO_ROOT))
+            result = {"plan": ai_plan(entries, findings, provider), "analysis": ai_analyse(findings, provider)}
+            md = render_ai(result["plan"], result["analysis"])
+            print(json.dumps(result, indent=2) if args.json else md)
+            if args.out:
+                out = Path(args.out)
+                out = out if out.is_absolute() else REPO_ROOT / out
+                out.parent.mkdir(parents=True, exist_ok=True)
+                out.write_text(md, encoding="utf-8")
+                print(f"wrote {out}")
             return 0
         out = Path(args.out)
         out = out if out.is_absolute() else REPO_ROOT / out

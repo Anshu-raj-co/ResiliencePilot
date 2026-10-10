@@ -19,7 +19,13 @@ _Updated: 2026-10-11, Phase C (discovery) done on macOS; next: Phase D scoring_
   run ids cited; optional `annotations.json` for human notes, never scored). `reports/day2/findings.md` generated
   from the 17 committed runs; `reports/day2/annotations.json` marks the 4 deliberate crash/guard tests (from README).
   Tests: 220 unit pass on macOS (+9).
-- Next: the AI provider
+- AI layer done: `rp advise [--dir] [--offline] [--json] [--out]` (ai.py, D-020, `docs/AI_LAYER.md`). Local Ollama
+  0.40.2 + `qwen2.5:7b` (pulled 2026-10-11). Live: planner valid (same order as rules); analyst 1/7 accepted after the
+  grounding check, 6/7 fell back to rules (reasons + model text in `reports/day2/ai_advice_qwen2.5-7b.md`).
+  Tests: 257 unit pass on macOS (+37 AI).
+- Possible next: try `qwen2.5-coder:14b`; dashboard panel for score/plan; more full-window dependency_failure runs
+  (planner rank 1; only n=1).
+- (done) the AI provider
   layer (local Ollama `qwen2.5:7b` / `qwen2.5-coder:14b`, advisory only, deterministic fallback when unreachable).
 - Mac notes: PR #7 (databroker host port 55557, scripts executable) and PR #8 (CLI "Nones") are open. `main` already
   prints "not detected" for detection time, so #8 only still adds `n/a` for unverified recovery timings.

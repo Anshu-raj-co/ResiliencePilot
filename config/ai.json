@@ -1,0 +1,9 @@
+{
+  "_about": "Advisory AI layer (Phase D). Local Ollama only: base_url must be loopback. The AI never gets shell, Docker, credentials or safety state; when it is unreachable or its answer fails validation, the deterministic rule-based answer is used.",
+  "provider": "ollama",
+  "base_url": "http://127.0.0.1:11434",
+  "model": "qwen2.5:7b",
+  "timeout_s": 120,
+  "temperature": 0,
+  "seed": 42
+}
