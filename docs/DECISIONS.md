@@ -100,3 +100,11 @@ enforced); `ai.py` may not import anything that reaches Docker, the shell or saf
 planner may only reorder rule-based candidates (exact permutation, else fallback). Analyst items must cite their own
 finding's runs and pass a deterministic grounding check against the verified facts; failures fall back per item to
 the rule-based knowledge base with the reason and the model's text recorded. Rule-based answers are always available.
+
+**D-022: Response envelope ceilings widened to 8 s / 7500 ms (approved by the user, 2026-10-11).** Under D-017's
+5 s, 3 of 5 `dependency_failure` runs aborted on the first fault poll (fms-server blocked > 5 s while InfluxDB was
+down). Raising only the timeout would not help: the latency guard's nearest-rank p95 over 5–10 samples equals that one
+slow poll, so a 4.5 s cap would abort the same runs. Both ceilings rise together: `MAX_FAULT_OBSERVER_TIMEOUT_S` 8.0,
+`MAX_FAULT_LATENCY_P95_MS` 7500 (cap still strictly below the timeout); `dependency_failure` uses 8 s / 7.5 s.
+Unchanged: fault-window polls only; duration + timeout ≤ 30 s (15 + 8 = 23); precheck and recovery keep the global
+2 s timeout; recovery rule 6 and all other guards are untouched.
