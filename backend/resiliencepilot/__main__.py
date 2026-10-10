@@ -11,6 +11,7 @@
   deps                       verified dependency map with a live shared-network check
   show-baseline [FILE]       print a stored baseline (default: newest)
   report [--run ID] [--out FILE]  read-only Day-1 explainer HTML (default: latest full-length COMPLETED run)
+  serve [--port N]           live dashboard + local API on http://127.0.0.1:N/ (localhost only)
 """
 from __future__ import annotations
 
@@ -102,8 +103,14 @@ def main(argv: list[str] | None = None) -> int:
     sh = sub.add_parser("show"); sh.add_argument("run_id"); sh.add_argument("--json", action="store_true")
     sub.add_parser("deps")
     sbs = sub.add_parser("show-baseline"); sbs.add_argument("file", nargs="?")
+    sv = sub.add_parser("serve"); sv.add_argument("--port", type=int, default=8765)
     rp_ = sub.add_parser("report"); rp_.add_argument("--run"); rp_.add_argument("--out", default="reports/day1/explainer.html")
     args = p.parse_args(argv)
+
+    if args.cmd == "serve":  # the app performs startup recovery itself, exactly like other commands
+        from .api import serve
+        serve(args.port)
+        return 0
 
     if args.cmd == "report":  # read-only: handled before any Docker / safety-controller object is created
         from pathlib import Path

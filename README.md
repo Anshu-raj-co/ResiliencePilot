@@ -62,6 +62,15 @@ start, stop or reset experiments.
 
 ![Explainer: data age vs. stale threshold while every poll returns HTTP 200](docs/demo/explainer-chart.png)
 
+**Live dashboard** (local only, bound to 127.0.0.1):
+```bash
+cd backend && .venv/Scripts/rp serve        # then open http://127.0.0.1:8765/
+```
+Start runs the single approved template: pause `fms-forwarder` for 12 s, approver `dashboard-operator`. Kill and Reset
+call the same safety-controller code as the CLI. API: `GET /api/status`, `GET /api/runs/latest`,
+`POST /api/run` (no parameters), `POST /api/kill`, `POST /api/reset` (`{"confirm": true}`, only when blocked).
+Screenshots from real runs: `docs/demo/dashboard-stale.png`, `docs/demo/dashboard-after-kill.png`.
+
 ### Results
 Measured on Day 1 (details and per-run evidence: `docs/demo/DAY1_REPORT.md`, `reports/day1/`):
 HTTP 200 on 100 % of polls while the forwarder was paused. Stale data was detected 4.77–5.27 s after injection.
