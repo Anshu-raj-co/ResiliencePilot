@@ -12,6 +12,9 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 packages = ["resiliencepilot"]   # explicit: backend/data/ holds runtime evidence, not code
 
+[tool.setuptools.package-data]
+resiliencepilot = ["static/*.html"]
+
 [project.scripts]
 rp = "resiliencepilot.__main__:main"
 

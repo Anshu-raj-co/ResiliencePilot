@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from pathlib import Path
 
 
@@ -15,7 +16,16 @@ class EvidenceStore:
     def _write(self, path: Path, payload: dict) -> Path:
         tmp = path.with_suffix(path.suffix + ".tmp")
         tmp.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
-        os.replace(tmp, path)
+        # On Windows, os.replace fails with "Access is denied" while a reader (e.g. the dashboard API) has the
+        # target open for a moment. Retry briefly instead of losing evidence.
+        for attempt in range(40):
+            try:
+                os.replace(tmp, path)
+                return path
+            except PermissionError:
+                if attempt == 39:
+                    raise
+                time.sleep(0.025)
         return path
 
     def save_run(self, run: dict) -> Path:

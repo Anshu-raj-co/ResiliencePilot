@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ResiliencePilot Live</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--fg:#14171c;--muted:#5b6472;--line:#d9dee6;--accent:#2457c5;--ok:#1f8a4c;--bad:#c8323b;
+--warn:#b7791f;--grid:#e8ecf2;--chipbg:#eef1f5}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1216;--card:#171b21;--fg:#e7eaef;--muted:#9aa3b2;--line:#2a313b;--accent:#7aa2ff;
+--ok:#4cc38a;--bad:#ff6b73;--warn:#e7b562;--grid:#232a33;--chipbg:#20262e}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:18px 16px 48px}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+h1{font-size:20px;margin:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-top:14px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:14px}
+.row .card{margin-top:0}
+.k{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.big{font-size:28px;font-weight:700}
+.chip{display:inline-block;border-radius:999px;padding:3px 12px;font-weight:700;background:var(--chipbg);border:1px solid var(--line)}
+.chip.ok{color:var(--ok);border-color:var(--ok)}.chip.bad{color:var(--bad);border-color:var(--bad)}.chip.warn{color:var(--warn);border-color:var(--warn)}
+.na{color:var(--muted);font-style:italic;font-weight:400}
+.mono{font:12.5px/1.5 ui-monospace,Consolas,monospace;overflow-wrap:anywhere}
+.steps{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.step{border:1px solid var(--line);border-radius:10px;padding:8px;text-align:center;font-size:13px;color:var(--muted);background:var(--chipbg)}
+.step.done{color:var(--fg);border-color:var(--accent)}
+.step.now{color:#fff;background:var(--accent);border-color:var(--accent)}
+.step.alarm.now{background:var(--bad);border-color:var(--bad)}
+.step small{display:block;font-size:11px;opacity:.85}
+@media (max-width:640px){.steps{grid-template-columns:1fr 1fr}}
+.btns{display:flex;flex-wrap:wrap;gap:10px}
+button{font:inherit;font-weight:650;border-radius:10px;padding:9px 18px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--fg)}
+button:disabled{opacity:.4;cursor:not-allowed}
+#bStart{border-color:var(--accent);color:var(--accent)}#bKill{background:var(--bad);border-color:var(--bad);color:#fff}
+#bReset{border-color:var(--warn);color:var(--warn)}
+#msg{margin-top:8px;font-size:13px;min-height:1.5em}
+.banner{display:none;border:2px solid var(--bad);color:var(--bad);border-radius:10px;padding:8px 12px;margin-top:14px;font-weight:650}
+table{width:100%;border-collapse:collapse;font-size:14px}td{padding:5px 6px;border-bottom:1px solid var(--line)}td:first-child{color:var(--muted);width:55%}
+svg text{fill:var(--fg);font-family:inherit}
+#chart{overflow-x:auto}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>ResiliencePilot · live dashboard <span class="k" style="margin-left:6px">Day 1 · localhost</span></h1>
+  <div>Controller <span class="chip" id="ctl">…</span> &nbsp;Phase <span class="chip" id="phase">…</span></div>
+</header>
+<div class="banner" id="banner"></div>
+
+<div class="row" style="margin-top:14px">
+  <div class="card"><div class="k">Data age (vehicle createdDateTime)</div><div id="gauge"></div></div>
+  <div class="card"><div class="k">rFMS API HTTP status</div>
+    <div style="margin:14px 0 8px"><span class="chip big" id="http">…</span></div>
+    <div style="font-size:13px;color:var(--muted)">A plain health check sees only this value.</div>
+    <div style="margin-top:10px" id="stale"></div></div>
+  <div class="card"><div class="k">Latest observation (polled every 0.5 s)</div>
+    <table><tr><td>createdDateTime (vehicle)</td><td class="mono" id="created"></td></tr>
+    <tr><td>receivedDateTime (server clock)</td><td class="mono" id="received"></td></tr>
+    <tr><td>observed at</td><td class="mono" id="observed"></td></tr></table></div>
+</div>
+
+<div class="card"><div class="k" style="margin-bottom:8px">Phase timeline (current / last run)</div>
+  <div class="steps" id="steps"></div></div>
+
+<div class="card"><div class="k">Data age, last 60 s (red = stale)</div><div id="chart"></div></div>
+
+<div class="row" style="margin-top:14px">
+  <div class="card"><div class="k" style="margin-bottom:8px">Controls</div>
+    <div class="btns"><button id="bStart">Start</button><button id="bKill">Kill</button><button id="bReset">Reset</button></div>
+    <div style="font-size:12.5px;color:var(--muted);margin-top:8px" id="tmpl"></div>
+    <div id="msg"></div></div>
+  <div class="card"><div class="k" style="margin-bottom:6px">Last run (from its evidence record)</div><table id="last"></table></div>
+</div>
+<p style="font-size:12px;color:var(--muted)">All values come from the rFMS API or recorded run files. Missing values show "not recorded".
+Every button goes through the same safety controller as the CLI.</p>
+</main>
+<script>
+(function(){
+"use strict";
+var NR='<span class="na">not recorded</span>';
+function $(id){return document.getElementById(id);}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+function num(v,d,u){return (v===null||v===undefined)?NR:Number(v).toFixed(d)+(u||"");}
+function svgEl(t,a,txt){var e=document.createElementNS("http://www.w3.org/2000/svg",t);for(var k in a)e.setAttribute(k,a[k]);if(txt!==undefined)e.textContent=txt;return e;}
+var S=null, busyReq=false;
+
+function gauge(age,thr){
+  var max=thr*2.5, W=260,H=150,cx=130,cy=130,r=100;
+  function pt(v){var a=Math.PI*(1-Math.min(Math.max(v,0),max)/max);return [cx+r*Math.cos(a),cy-r*Math.sin(a)];}
+  function arc(v0,v1,col,w){var p0=pt(v0),p1=pt(v1);return svgEl("path",{d:"M"+p0[0]+","+p0[1]+" A"+r+","+r+" 0 0 1 "+p1[0]+","+p1[1],fill:"none",stroke:col,"stroke-width":w,"stroke-linecap":"butt"});}
+  var s=svgEl("svg",{viewBox:"0 0 "+W+" "+H,width:"100%",style:"max-width:320px;display:block;margin:auto"});
+  s.appendChild(arc(0,thr,css("--ok"),14)); s.appendChild(arc(thr,max,css("--bad"),14));
+  var tp=pt(thr); s.appendChild(svgEl("text",{x:tp[0],y:tp[1]-14,"text-anchor":"middle","font-size":"11",fill:css("--warn")},"stale "+thr+"s"));
+  if(age!==null&&age!==undefined){var p=pt(age);
+    s.appendChild(svgEl("line",{x1:cx,y1:cy,x2:p[0],y2:p[1],stroke:css("--fg"),"stroke-width":3}));
+    s.appendChild(svgEl("circle",{cx:cx,cy:cy,r:5,fill:css("--fg")}));}
+  s.appendChild(svgEl("text",{x:cx,y:cy-28,"text-anchor":"middle","font-size":"30","font-weight":"700",fill:(age>thr)?css("--bad"):css("--fg")},
+    (age===null||age===undefined)?"not recorded":age.toFixed(2)+" s"));
+  s.appendChild(svgEl("text",{x:cx-r,y:cy+16,"text-anchor":"middle","font-size":"10",fill:css("--muted")},"0"));
+  s.appendChild(svgEl("text",{x:cx+r,y:cy+16,"text-anchor":"middle","font-size":"10",fill:css("--muted")},max+"s+"));
+  $("gauge").innerHTML="";$("gauge").appendChild(s);
+}
+
+function chart(recent,thr){
+  var W=1000,H=200,ml=40,mr=12,mt=10,mb=24,pw=W-ml-mr,ph=H-mt-mb;
+  var s=svgEl("svg",{viewBox:"0 0 "+W+" "+H,width:"100%",style:"min-width:520px"});
+  var pts=recent.filter(function(p){return p.observed_at;});
+  if(!pts.length){$("chart").innerHTML=NR;return;}
+  var tEnd=Date.parse(pts[pts.length-1].observed_at), tStart=tEnd-60000;
+  var ages=pts.map(function(p){return p.data_age_s||0;}); var ymax=Math.max(Math.ceil(Math.max.apply(null,ages)*1.15),Math.ceil(thr*1.6));
+  function X(t){return ml+(t-tStart)/60000*pw;} function Y(a){return mt+ph-a/ymax*ph;}
+  for(var g=0;g<=ymax;g+=Math.max(1,Math.round(ymax/5))){s.appendChild(svgEl("line",{x1:ml,x2:ml+pw,y1:Y(g),y2:Y(g),stroke:css("--grid")}));
+    s.appendChild(svgEl("text",{x:ml-6,y:Y(g)+4,"text-anchor":"end","font-size":"11",fill:css("--muted")},g+"s"));}
+  s.appendChild(svgEl("line",{x1:ml,x2:ml+pw,y1:Y(thr),y2:Y(thr),stroke:css("--warn"),"stroke-dasharray":"7 5","stroke-width":1.5}));
+  var d="",first=true;pts.forEach(function(p){var t=Date.parse(p.observed_at);if(t<tStart||p.data_age_s===null){first=true;return;}
+    d+=(first?"M":"L")+X(t).toFixed(1)+","+Y(p.data_age_s).toFixed(1);first=false;});
+  s.appendChild(svgEl("path",{d:d,fill:"none",stroke:css("--accent"),"stroke-width":2}));
+  pts.forEach(function(p){var t=Date.parse(p.observed_at);if(t<tStart||p.data_age_s===null)return;
+    s.appendChild(svgEl("circle",{cx:X(t),cy:Y(p.data_age_s),r:2.6,fill:p.stale?css("--bad"):css("--ok")}));
+    if(p.http_status!==200) s.appendChild(svgEl("text",{x:X(t),y:mt+10,"font-size":"9","text-anchor":"middle",fill:css("--bad")},p.http_status===null?"ERR":p.http_status));});
+  s.appendChild(svgEl("text",{x:ml+pw,y:H-6,"text-anchor":"end","font-size":"11",fill:css("--muted")},"now"));
+  s.appendChild(svgEl("text",{x:ml,y:H-6,"font-size":"11",fill:css("--muted")},"−60 s"));
+  $("chart").innerHTML="";$("chart").appendChild(s);
+}
+
+var STEPS=[["normal","Normal",null],["fault_active","Fault active","fault_active"],["stale_detected","Stale detected","stale_detected"],
+  ["rolling_back","Rolling back","rolling_back"],["recovered","Recovered","recovery_verified"]];
+function steps(s){
+  var ev={}; (s.current_run&&s.current_run.events||[]).forEach(function(e){ if(!(e.event in ev)) ev[e.event]=e.at; });
+  var phase=s.phase, order=["normal","precheck","fault_active","stale_detected","rolling_back","verifying_recovery","recovered"];
+  var map={precheck:"normal",verifying_recovery:"rolling_back"}; var cur=map[phase]||phase;
+  var curIdx=STEPS.findIndex(function(x){return x[0]===cur;});
+  $("steps").innerHTML=STEPS.map(function(x,i){
+    var cls="step"+(x[0]==="stale_detected"?" alarm":"");
+    if(phase!=="latched"){ if(i===curIdx) cls+=" now"; else if(i<curIdx||(x[2]&&ev[x[2]]&&curIdx>=i)) cls+=" done"; }
+    var at=x[2]&&ev[x[2]]?ev[x[2]].substr(11,8)+" UTC":(i===0?"":"—");
+    var label=x[1]+(x[0]==="rolling_back"&&phase==="verifying_recovery"?" → verifying":"");
+    return '<div class="'+cls+'">'+label+'<small>'+at+'</small></div>';}).join("");
+}
+
+function lastRun(r){
+  if(!r){$("last").innerHTML='<tr><td>last run</td><td>'+NR+'</td></tr>';return;}
+  var rows=[["run",'<span class="mono">'+esc(r.run_id)+'</span>'],["state / stop reason",esc(r.state)+" / "+esc(r.stop_reason)],
+    ["approved by",esc(r.approved_by)],["time to detection",num(r.time_to_detection_s,2," s")],
+    ["HTTP 200 during fault",r.http_ok_ratio_during_fault===null||r.http_ok_ratio_during_fault===undefined?NR:(r.http_ok_ratio_during_fault*100).toFixed(0)+"%"],
+    ["max data age",num(r.max_data_age_s,2," s")],["rollback verified",r.rollback_verified===undefined?NR:(r.rollback_verified?"yes":"NO")+" (by "+esc(r.rollback_by)+")"],
+    ["rollback → first fresh data",num(r.time_to_first_fresh_s,2," s")],["rollback → recovery verified",num(r.time_to_verified_s,2," s")]];
+  $("last").innerHTML=rows.map(function(x){return "<tr><td>"+x[0]+"</td><td>"+x[1]+"</td></tr>";}).join("");
+}
+
+function render(s){
+  S=s; var L=s.latest||{};
+  var ctl=s.state+(s.emergency_stop_engaged?" · STOP ENGAGED":"");
+  $("ctl").textContent=ctl; $("ctl").className="chip "+(s.state==="READY"&&!s.blocked?"ok":(s.state==="BUSY"?"warn":"bad"));
+  $("phase").textContent=s.phase.replace(/_/g," "); $("phase").className="chip "+({normal:"ok",recovered:"ok",stale_detected:"bad",latched:"bad"}[s.phase]||"warn");
+  gauge(L.data_age_s,s.stale_threshold_s);
+  var h=$("http"); if(L.http_status===undefined){h.innerHTML=NR;h.className="chip big";}
+  else{h.textContent=L.http_status===null?"no response":L.http_status;h.className="chip big "+(L.http_status===200?"ok":"bad");}
+  $("stale").innerHTML=L.freshness===undefined?NR:(L.stale?'<span class="chip bad">STALE'+(L.healthy_but_stale?" while HTTP 200":"")+'</span>':'<span class="chip ok">'+esc(L.freshness)+'</span>');
+  $("created").innerHTML=L.created_at?esc(L.created_at):NR; $("received").innerHTML=L.received_at?esc(L.received_at):NR;
+  $("observed").innerHTML=L.observed_at?esc(L.observed_at):NR;
+  steps(s); chart(s.recent||[],s.stale_threshold_s); lastRun(s.last_run);
+  var b=$("banner"); if(s.blocked){b.style.display="block";b.textContent="Blocked: "+(s.latched_reason||"emergency stop engaged")+". Check the stack, then Reset.";} else b.style.display="none";
+  $("bStart").disabled=busyReq||s.state!=="READY"||s.blocked; $("bReset").disabled=busyReq||!s.blocked||s.state==="BUSY";
+  var t=s.template; $("tmpl").textContent="Start runs the single approved template: "+t.experiment_type+" on "+t.target+" for "+t.duration_s+" s, approver \""+t.approved_by+"\". Watchdog and kill switch always apply.";
+}
+
+function poll(){fetch("/api/status",{cache:"no-store"}).then(function(r){return r.json();}).then(render)
+  .catch(function(){$("ctl").textContent="backend unreachable";$("ctl").className="chip bad";}).finally(function(){setTimeout(poll,500);});}
+
+function post(path,body,label){
+  busyReq=true; $("msg").textContent=label+"…";
+  fetch(path,{method:"POST",headers:body?{"Content-Type":"application/json"}:{},body:body?JSON.stringify(body):null})
+    .then(function(r){return r.json().then(function(j){return [r.status,j];});})
+    .then(function(x){$("msg").innerHTML=(x[0]<300?'<span style="color:var(--ok)">':'<span style="color:var(--bad)">')+label+": HTTP "+x[0]+" · "+esc(x[1].detail||x[1].run_id||JSON.stringify(x[1]))+"</span>";})
+    .catch(function(e){$("msg").textContent=label+" failed: "+e;}).finally(function(){busyReq=false;});
+}
+$("bStart").onclick=function(){var t=S&&S.template; if(!t)return;
+  if(confirm("Approve and start?\n\n"+t.experiment_type+": pause "+t.target+" for "+t.duration_s+" s\nHypothesis: "+t.hypothesis)) post("/api/run",null,"Start");};
+$("bKill").onclick=function(){post("/api/kill",null,"Kill");};
+$("bReset").onclick=function(){if(confirm("Reset the safety latch? Only do this after checking the stack is healthy.")) post("/api/reset",{confirm:true},"Reset");};
+poll();
+})();
+</script>
+</body>
+</html>
