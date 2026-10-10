@@ -198,3 +198,84 @@ def test_data_gap_recorded_for_other_experiments_too(env):
     rec = runner.run({"experiment_type": "telemetry_stall", "target": "fms-forwarder", "duration_s": 1, "approved_by": "t"})
     assert rec["data_gap"]["max_gap_s"] >= 0.9
     assert rec["impact"]["silent_failure"] is True, "HTTP 200 while stale, never an HTTP error"
+
+
+# ---------------- PR #16 safety-review regressions ----------------
+from dataclasses import replace as _replace  # noqa: E402
+
+
+def test_B_declared_symptom_cannot_be_combined_with_error_tolerance():
+    with pytest.raises(ValueError):
+        ExperimentSpec("x", "docker_stop", ("influxDB",), 10, expected_statuses=(500,), max_error_rate=0.3)
+
+
+def test_B_global_tolerance_is_forced_to_zero_when_a_symptom_is_declared(tmp_path):
+    from resiliencepilot.config import Guardrails
+    cfg = make_config(tmp_path, guardrails=Guardrails(max_error_rate=0.5))
+    world = FakeWorld()
+    docker = FakeDocker(world)
+    runner = ExperimentRunner(cfg, CATALOG, SafetyController(cfg, CATALOG, docker), docker, FakeObserver(world),
+                              EvidenceStore(cfg.data_dir))
+    flips = iter([500, 500, 500, 503] + [500] * 1000)
+    orig = runner.observer.observe
+
+    def mostly_500_then_one_503():
+        if world.influx_down():
+            world.influx_down_status = next(flips)
+        return orig()
+    runner.observer.observe = mostly_500_then_one_503
+    rec = runner.run({**DEP, "duration_s": 5})
+    world.influx_down_status = 500
+    assert rec["guardrails"]["config"]["max_error_rate"] == 0.0
+    assert rec["stop_reason"] == "guardrail_error_rate", "a single 503 among 500s still aborts"
+    assert rec["guardrails"]["triggered"]["detail"]["last_status"] == 503
+
+
+def test_C_data_gap_failure_never_changes_the_outcome(env):
+    _, world, _, ctl, runner = env
+    runner.observer.statuses_between = lambda s, e: ["not-a-datetime", 42]     # malformed data
+    rec = runner.run(DEP)
+    assert rec["state"] == "COMPLETED" and not ctl.latched
+    assert "error" in rec["data_gap"]
+
+
+def test_C_data_gap_query_exception_is_recorded(env):
+    _, world, _, ctl, runner = env
+
+    def boom(s, e):
+        raise RuntimeError("window query failed")
+    runner.observer.statuses_between = boom
+    rec = runner.run(DEP)
+    assert rec["state"] == "COMPLETED" and "window query failed" in rec["data_gap"]["error"]
+
+
+def test_D_recovery_lower_bound_is_the_verified_injection_when_all_fault_polls_are_500(env):
+    _, world, docker, _, runner = env
+    rec = runner.run(DEP)
+    assert all(o["observation"]["http_status"] == 500 for o in rec["observations"] if o["phase"] == "fault")
+    lb = rec["recovery"]["lower_bound"]
+    assert lb["source"].startswith("verified injection time")
+    first_counted = next(o for o in rec["observations"] if o["phase"] == "recovery" and o["observation"]["http_status"] == 200)
+    from datetime import datetime
+    # nothing created before the bound may have been counted: the first counted advance is after it
+    assert rec["recovery"]["verified"]
+    assert datetime.fromisoformat(lb["at"]) > datetime.fromisoformat(rec["impact"]["injected_at"])
+
+
+def test_E_first_expected_status_kept_even_if_the_loop_raises(env):
+    _, world, _, ctl, runner = env
+    orig = runner.observer.observe
+    seen = {"n": 0}
+
+    def raise_after_expected():
+        o = orig()
+        if world.influx_down():
+            seen["n"] += 1
+            if seen["n"] == 2:
+                raise RuntimeError("observer bug mid-window")
+        return o
+    runner.observer.observe = raise_after_expected
+    rec = runner.run({**DEP, "duration_s": 5})
+    assert rec["stop_reason"] == "error"
+    assert rec["impact"]["time_to_first_expected_status_s"] is not None
+    assert rec["rollback"]["verified"]

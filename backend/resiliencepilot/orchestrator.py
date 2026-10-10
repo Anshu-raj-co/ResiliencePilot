@@ -88,8 +88,8 @@ class ExperimentRunner:
                                                               n=cfg.recovery_consecutive, thr=cfg.stale_threshold_s),
                          "detail": None},
             "impact": {},
-            "guardrails": {"config": {**vars(g), "max_error_rate": spec.max_error_rate if spec.max_error_rate is not None
-                                      else g.max_error_rate},
+            "guardrails": {"config": {**vars(g), "max_error_rate": 0.0 if spec.expected_statuses  # D-015: zero tolerance
+                                      else spec.max_error_rate if spec.max_error_rate is not None else g.max_error_rate},
                            "blast_radius_allowed": list(spec.effective_blast_radius), "triggered": None},
         }
 
@@ -245,6 +245,7 @@ class ExperimentRunner:
                     break
                 if o.http_status in spec.expected_statuses and first_expected is None:
                     first_expected = round(time.monotonic() - inject_mono, 3)
+                    rec["impact"]["time_to_first_expected_status_s"] = first_expected
                     event("expected_symptom", {"time_s": first_expected, "http_status": o.http_status})
                 if a.freshness is Freshness.OBSERVER_ERROR and o.http_status is None:  # no response at all
                     losses += 1
@@ -259,7 +260,6 @@ class ExperimentRunner:
                     event("stale_detected", {"time_to_detection_s": ttd, "http_status": o.http_status,
                                              "data_age_s": a.data_age_s, "healthy_but_stale": a.healthy_but_stale})
                 time.sleep(max(0.0, min(cfg.poll_interval_s, req.duration_s - (time.monotonic() - inject_mono))))
-            rec["impact"]["time_to_first_expected_status_s"] = first_expected
             event("fault_window_closed", {"stop_reason": rec["stop_reason"]})
         except SafetyError as exc:
             rec["stop_reason"] = rec["stop_reason"] or "precheck_failed"
@@ -288,14 +288,17 @@ class ExperimentRunner:
         injected_at = rec["impact"].get("injected_at")
         if query is None or injected_at is None:
             return
+        try:
+            self._data_gap_unsafe(rec, event, query, injected_at)
+        except Exception as exc:  # noqa: BLE001 - evidence collection must never affect safety or the outcome
+            rec["data_gap"] = {"error": repr(exc)}
+
+    @staticmethod
+    def _data_gap_unsafe(rec: dict, event, query, injected_at: str) -> None:
         from datetime import datetime, timedelta
         start = datetime.fromisoformat(injected_at) - timedelta(seconds=5)
         end = utcnow()
-        try:
-            created = query(start, end)
-        except Exception as exc:  # noqa: BLE001 - evidence collection must never affect safety
-            rec["data_gap"] = {"error": repr(exc)}
-            return
+        created = query(start, end)
         gaps = [(b - a).total_seconds() for a, b in zip(created, created[1:])]
         biggest = max(range(len(gaps)), key=gaps.__getitem__) if gaps else None
         rec["data_gap"] = {
@@ -351,6 +354,14 @@ class ExperimentRunner:
             fault_srv = [o.server_time for o, _ in phase_obs["fault"] if o.server_time is not None]
             if fault_srv:  # anything stamped before this instant may be an in-flight pre-fault message
                 prev = max(prev, fault_srv[-1]) if prev is not None else fault_srv[-1]
+            elif rec["impact"].get("injected_at"):
+                # no fault poll carried a server time (e.g. every poll was an HTTP 500): bound recovery by the moment
+                # the fault was verified (+0.5 s margin for host/VM clock skew) instead of the pre-fault value
+                from datetime import datetime, timedelta
+                bound = (datetime.fromisoformat(rec["impact"]["injected_at"])
+                         + timedelta(seconds=(rec["impact"].get("injection_latency_s") or 0.0) + 0.5))
+                prev = max(prev, bound) if prev is not None else bound
+                rec["recovery"]["lower_bound"] = {"source": "verified injection time + 0.5 s", "at": bound.isoformat()}
             advances, first_fresh = 0, None
             deadline = rollback_mono + cfg.recovery_timeout_s
             while time.monotonic() < deadline:

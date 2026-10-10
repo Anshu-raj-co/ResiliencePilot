@@ -102,6 +102,8 @@ class ExperimentSpec:
             raise ValueError(f"{self.name}: stop_timeout_s must be within 0..5")
         if any(not 400 <= int(c) <= 599 for c in self.expected_statuses):
             raise ValueError(f"{self.name}: expected_statuses must be HTTP error codes (400..599)")
+        if self.expected_statuses and self.max_error_rate not in (None, 0.0):
+            raise ValueError(f"{self.name}: a declared expected status requires zero tolerance for any other error")
         if self.max_error_rate is not None and not 0.0 <= self.max_error_rate <= MAX_ERROR_RATE:
             raise ValueError(f"{self.name}: max_error_rate must be within [0, {MAX_ERROR_RATE}]")
 
