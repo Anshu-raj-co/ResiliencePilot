@@ -1,6 +1,6 @@
 # Current Status
 
-- **Milestone:** Day 1 — Phases 0, 1, 2 implemented and verified live; safety review + demo script in progress
+- **Milestone:** Day 1 COMPLETE — Phases 0, 1, 2 verified live; safety review fixes applied; demo rehearsed
 - **Branch:** `wip/day1-recon` (pushed). `main` unchanged at `38588a5`.
 
 ## Acceptance criteria
@@ -21,9 +21,12 @@ Phase 2
 - [x] Kill switch tested live (0.6 s to verified rollback) and with the backend hard-killed
 
 ## Tests (last run)
-- `pytest -q` → 38 passed; `RP_LIVE=1 pytest -q` → 41 passed.
+- `pytest -q` → 49 passed; `RP_LIVE=1 pytest -q` → 52 passed.
+- `scripts/demo-day1.sh` → exit 0, 40 s (log: `docs/demo/day1-demo-run.log`).
+- Live cross-process check: second terminal `status` shows BUSY, `run` refused, live run unaffected.
 
 ## Known limitations
+- Safety review: `docs/testing/SAFETY_REVIEW.md` (H1, M1–M5, L1–L4 fixed; L5 documented).
 - Watchdog is in-process; a hard-killed backend leaves the fault until `kill-switch.sh` or the next backend start.
 - TTD is bounded below by the 5 s threshold (chosen from baseline headroom).
 - No AI, UI or API server yet (Phases 4–5). Only one experiment type.

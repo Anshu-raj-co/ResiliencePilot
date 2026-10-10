@@ -48,6 +48,7 @@ class FakeWorld:
         self.stay_stale_after_unpause = False
         self.unpause_fails = False
         self.pause_is_noop = False
+        self.pause_delay_s = 0.0
         self.block_observe_s = 0.0
         self.calls: list[tuple[float, str, str]] = []
 
@@ -64,6 +65,8 @@ class FakeDocker:
             return self.w.containers.get(name, ContainerState(name, False))
 
     def pause(self, name: str) -> None:
+        if self.w.pause_delay_s:
+            time.sleep(self.w.pause_delay_s)  # docker pause that lands late
         with self.w.lock:
             self.w.calls.append((time.monotonic(), "pause", name))
             if not self.w.pause_is_noop:

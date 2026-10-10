@@ -7,6 +7,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 HARD_MAX_DURATION_S = 30  # non-negotiable ceiling; config may only lower it
+MAX_WATCHDOG_GRACE_S = 10.0
 
 
 @dataclass(frozen=True)
@@ -30,6 +31,8 @@ class SafetyConfig:
         for name in ("poll_interval_s", "http_timeout_s", "stale_threshold_s", "recovery_timeout_s", "watchdog_grace_s"):
             if getattr(self, name) <= 0:
                 raise ValueError(f"{name} must be > 0")
+        if self.watchdog_grace_s > MAX_WATCHDOG_GRACE_S:
+            raise ValueError(f"watchdog_grace_s must be <= {MAX_WATCHDOG_GRACE_S}")
         if min(self.observer_loss_max_consecutive, self.recovery_consecutive, self.precheck_fresh_consecutive) < 1:
             raise ValueError("consecutive counters must be >= 1")
 

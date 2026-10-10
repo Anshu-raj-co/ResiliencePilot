@@ -114,6 +114,7 @@ def test_emergency_stop_rolls_back_early_and_blocks_new_runs_until_reset(env):
     runner.threads[run_id].join(10)
     rec = runner.store.load_run(run_id)
     assert rec["stop_reason"] == "emergency_stop"
+    assert rec["state"] == "ABORTED", "only an as-planned run may be COMPLETED"
     assert calls(world, "unpause")[0][0] - t_stop < 0.5  # rolled back promptly, not after 10 s
     assert rec["rollback"]["verified"] and rec["recovery"]["verified"]
     with pytest.raises(Latched):
@@ -230,7 +231,7 @@ def test_startup_recovery_unpauses_and_latches_after_crash(env):
     docker.pause("fms-forwarder")
     fresh_ctl = SafetyController(cfg, CATALOG, docker)    # simulates a new process
     out = fresh_ctl.startup_recovery()
-    assert out["outcome"] == "unpaused"
+    assert out["outcome"] == "fms-forwarder: unpaused"
     assert not world.forwarder_paused()
     assert fresh_ctl.latched
     fresh_ctl.reset("tester", "post-crash check")
@@ -247,3 +248,122 @@ def test_reset_requires_operator(env):
     *_, ctl, _ = env
     with pytest.raises(SafetyError):
         ctl.reset("  ", "x")
+
+
+# ---------------- safety-review regressions (docs/testing/SAFETY_REVIEW.md) ----------------
+import json
+import os
+
+from resiliencepilot.safety import pid_alive
+
+
+def _write_lock(cfg, pid, run_id="other-run"):
+    (cfg.data_dir / "run.lock").write_text(json.dumps({"pid": pid, "run_id": run_id}))
+
+
+def test_pid_alive_never_kills_and_detects_dead():
+    assert pid_alive(os.getpid())
+    assert not pid_alive(2_000_000_000)
+
+
+def test_H1_run_lock_excludes_other_process(env):
+    cfg, world, docker, _, ctl, runner = env
+    _write_lock(cfg, os.getppid())                      # a live process that is not us
+    with pytest.raises(Busy):
+        runner.run(GOOD)
+    with pytest.raises(Busy):
+        ctl.reset("tester", "must not reset under a live run")
+    assert world.calls == []
+
+
+def test_H1_second_controller_same_process_is_busy(env):
+    cfg, _, docker, _, ctl, _ = env
+    ctl.begin("run-a")
+    other = SafetyController(cfg, CATALOG, docker)
+    with pytest.raises(Busy):
+        other.begin("run-b")
+    ctl.end("run-a")
+    assert not (cfg.data_dir / "run.lock").exists()
+
+
+def test_H1_stale_lock_from_dead_process_latches(env):
+    cfg, world, docker, _, ctl, runner = env
+    _write_lock(cfg, 2_000_000_000, "dead-run")
+    with pytest.raises(Latched):
+        runner.run(GOOD)
+    out = ctl.startup_recovery()
+    assert out is not None and ctl.latched
+    ctl.reset("tester", "checked")
+    assert runner.run(GOOD)["state"] == "COMPLETED"
+
+
+def test_M1_startup_recovery_does_not_touch_a_live_run(env):
+    cfg, world, docker, _, ctl, _ = env
+    _write_lock(cfg, os.getppid(), "live-run")
+    ctl.mark_fault_active("live-run", "fms-forwarder", "docker_pause")
+    docker.pause("fms-forwarder")
+    assert SafetyController(cfg, CATALOG, docker).startup_recovery() is None
+    assert world.forwarder_paused() and not ctl.latched
+
+
+def test_M2_late_landing_pause_is_still_rolled_back(env):
+    _, world, _, _, _, runner = env
+    world.pause_delay_s = 2.0          # watchdog fires at +1.5 s while `docker pause` is still in flight
+    rec = runner.run(GOOD)
+    assert not world.forwarder_paused(), "container must not be left paused"
+    assert rec["rollback"]["verified"]
+    assert len(calls(world, "unpause")) >= 1
+
+
+def test_M3_watchdog_grace_is_bounded(tmp_path):
+    with pytest.raises(ValueError):
+        make_config(tmp_path, watchdog_grace_s=1000)
+
+
+def test_M4_corrupt_marker_and_state_are_unsafe(env):
+    cfg, world, docker, _, ctl, runner = env
+    (cfg.data_dir / "active_fault.json").write_text('{"run_id": "x", "tar')   # truncated write
+    docker.pause("fms-forwarder")
+    out = ctl.startup_recovery()
+    assert "unpaused" in out["outcome"] and ctl.latched and not world.forwarder_paused()
+    (cfg.data_dir / "safety_state.json").write_text("not json")
+    assert ctl.latched
+    with pytest.raises(Latched):
+        runner.run(GOOD)
+    ctl.reset("tester", "repaired")
+    assert not ctl.latched
+
+
+def test_M5_signal_stop_is_lock_free(env):
+    _, world, _, _, ctl, runner = env
+    run_id = runner.start({**GOOD, "duration_s": 10})
+    for _ in range(100):
+        if world.forwarder_paused():
+            break
+        time.sleep(0.02)
+    with ctl._lock:                     # even while the controller lock is held...
+        ctl.signal_stop()               # ...the signal path must not block
+    runner.threads[run_id].join(10)
+    assert runner.store.load_run(run_id)["stop_reason"] == "emergency_stop"
+
+
+def test_watchdog_rollback_failure_latches(env):
+    _, world, _, observer, ctl, runner = env
+    world.unpause_fails = True
+    world.block_observe_s = 2.0
+    observer.block_once_when_paused = True
+    rec = runner.run(GOOD)
+    assert rec["state"] == "LATCHED_UNSAFE" and ctl.latched
+
+
+def test_L1_completed_only_when_as_planned(env):
+    _, world, docker, _, _, runner = env
+    orig = docker.pause
+
+    def pause_and_break(name):
+        orig(name)
+        world.api_down = True
+    docker.pause = pause_and_break
+    docker.unpause = (lambda n, _u=docker.unpause: (setattr(world, "api_down", False), _u(n)))
+    rec = runner.run({**GOOD, "duration_s": 5})
+    assert rec["stop_reason"] == "observer_lost" and rec["state"] == "ABORTED"

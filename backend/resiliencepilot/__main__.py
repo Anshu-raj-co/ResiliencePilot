@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import signal
 import sys
 import time
@@ -27,7 +28,9 @@ from .safety import SafetyController, SafetyError
 from .sdv_adapter import RfmsObserver
 from .telemetry import FreshnessTracker
 
-C = {"g": "\033[32m", "r": "\033[31m", "y": "\033[33m", "b": "\033[1m", "d": "\033[2m", "x": "\033[0m"}
+_COLOR = sys.stdout.isatty() and "NO_COLOR" not in os.environ
+C = {k: (v if _COLOR else "") for k, v in
+     {"g": "\033[32m", "r": "\033[31m", "y": "\033[33m", "b": "\033[1m", "d": "\033[2m", "x": "\033[0m"}.items()}
 
 
 def _fmt_obs(entry: dict) -> str:
@@ -76,6 +79,11 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
 
     cfg, catalog, docker, ctl, observer, store, runner = build(_printer)
+    if args.cmd == "stop":  # first, before anything that reads possibly-corrupt state files
+        out = ctl.emergency_stop("cli")
+        print(f"emergency stop engaged ({out}); an active run will roll back at its next poll. Run `reset` afterwards.")
+        return 0
+
     recovered = ctl.startup_recovery()
     if recovered:
         rec = store.load_run(recovered["marker"].get("run_id", ""))
@@ -132,7 +140,7 @@ def main(argv: list[str] | None = None) -> int:
         if not args.yes and input(f"Approve as {args.approved_by}? [y/N] ").strip().lower() != "y":
             print("not approved; nothing executed")
             return 1
-        signal.signal(signal.SIGINT, lambda *_: ctl.emergency_stop("ctrl-c"))
+        signal.signal(signal.SIGINT, lambda *_: ctl.signal_stop())  # lock-free, I/O-free
         try:
             rec = runner.run(req)
         except SafetyError as exc:
@@ -149,11 +157,6 @@ def main(argv: list[str] | None = None) -> int:
               f"first fresh after {rc['time_to_first_fresh_s']}s, verified after {rc['time_to_verified_s']}s")
         print(f"  evidence: {store.data_dir / 'runs' / (rec['run_id'] + '.json')}")
         return 0 if ok else 3
-
-    if args.cmd == "stop":
-        out = ctl.emergency_stop("cli")
-        print(f"emergency stop engaged ({out}); an active run will roll back at its next poll. Run `reset` afterwards.")
-        return 0
 
     if args.cmd == "reset":
         try:

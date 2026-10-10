@@ -20,7 +20,8 @@ class RollbackResult:
 class PauseFault:
     """telemetry_stall: freeze a container with the cgroup freezer (`docker pause`); roll back with `docker unpause`.
 
-    rollback() is idempotent and serialised so the watchdog and the orchestrator can both call it safely.
+    rollback() is idempotent, serialised, and always re-inspects the container, so the watchdog and the
+    orchestrator can both call it safely and a late-landing pause is still undone.
     """
 
     mechanism = "docker_pause"
@@ -44,14 +45,16 @@ class PauseFault:
 
     def rollback(self, by: str) -> RollbackResult:
         with self._lock:
-            if self.result is not None and self.result.verified:
-                return self.result
+            # deliberately no cached shortcut: a pause that lands late must be seen and undone
             last_err = None
             for _ in range(self.retries):
                 try:
                     st = self.docker.inspect(self.target)
                     if st.exists and st.running and not st.paused:
-                        self.result = RollbackResult(True, True, by, last_err or "target running and unpaused")
+                        if self.result is not None and self.result.verified:  # keep who actually rolled back
+                            self.result = RollbackResult(True, True, self.result.by, f"re-verified by {by}")
+                        else:
+                            self.result = RollbackResult(True, True, by, last_err or "target running and unpaused")
                         return self.result
                     if st.paused:
                         self.docker.unpause(self.target)

@@ -31,10 +31,12 @@ verifies recovery from advancing telemetry — never from HTTP 200 or "container
 1. Faults only against containers of the local Compose project `resiliencepilot-sdv`, by **exact allowlisted
    container name** AND matching `com.docker.compose.project` label. Never anything else.
 2. Only predefined experiment types (`contracts/experiment_request.schema.json`). Strict validation; unknown fields rejected.
-3. One active experiment at a time. Hard max duration 30 s (config may set lower, never higher).
+3. One active experiment at a time, across processes (`backend/data/run.lock` with owner PID). Total fault time
+   ≤ 30 s including watchdog grace (config may set lower, never higher).
 4. Watchdog thread enforces deadline independent of API/UI/AI. Emergency stop always available (API + CLI + `scripts/kill-switch`).
 5. Rollback on: completion, cancel, timeout, safety-threshold violation, observer loss, any exception (`finally`).
-6. Recovery = telemetry `createdDateTime` advancing again past the rollback instant, N consecutive times. HTTP 200 alone is never recovery.
+6. Recovery = rollback verified by `docker inspect` AND `createdDateTime` advancing 3 successive times past both the
+   last frozen value and the server time of the last fault-window poll, each fresh (≤ 5 s) with HTTP 200. HTTP 200 alone is never recovery.
 7. Rollback or recovery not verified → **LATCHED_UNSAFE**. No new experiments until an explicit, logged reset after a human checks the stack.
 8. The LLM (Phase 4+) never gets shell, Docker socket, credentials, or the ability to inject/rollback/decide recovery. Advisory only.
 9. Never claim injection, recovery, test results, or measurements that were not actually observed.

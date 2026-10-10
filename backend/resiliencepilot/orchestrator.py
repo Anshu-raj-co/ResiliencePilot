@@ -11,7 +11,7 @@ import time
 import uuid
 from typing import Callable, Protocol
 
-from .config import ExperimentSpec, SafetyConfig
+from .config import HARD_MAX_DURATION_S, ExperimentSpec, SafetyConfig
 from .docker_cli import Docker
 from .evidence import EvidenceStore
 from .faults import PauseFault, Watchdog
@@ -20,7 +20,8 @@ from .safety import ExperimentRequest, SafetyController, SafetyError
 from .telemetry import Freshness, FreshnessTracker
 
 RECOVERY_CRITERIA = ("rollback verified by docker inspect (running, not paused) AND {n} successive advances of "
-                     "createdDateTime beyond the last pre-rollback value, each with HTTP 200 and data_age_s <= {thr}s")
+                     "createdDateTime beyond both the last pre-rollback value and the fms-server time of the last fault-window "
+                     "poll, each with HTTP 200 and data_age_s <= {thr}s")
 
 
 class Observer(Protocol):
@@ -154,7 +155,9 @@ class ExperimentRunner:
             self.ctl.mark_fault_active(run_id, req.target, fault.mechanism)  # before the fault: crash-recoverable
             event("injecting", {"target": req.target, "mechanism": fault.mechanism}, state="INJECTING")
             inject_mono = time.monotonic()
-            watchdog = Watchdog(inject_mono + req.duration_s + cfg.watchdog_grace_s, watchdog_fire)
+            # total fault time is capped at 30 s even including grace (brief: hard max 30 s)
+            watchdog = Watchdog(inject_mono + min(req.duration_s + cfg.watchdog_grace_s, HARD_MAX_DURATION_S),
+                                watchdog_fire)
             watchdog.start()
             fault.inject()
             if not fault.verify_injected():
@@ -230,6 +233,9 @@ class ExperimentRunner:
             # ---- VERIFYING_RECOVERY: independent of the fault adapter's own claim ----
             event("verifying_recovery", state="VERIFYING_RECOVERY")
             prev = tracker.last_created
+            fault_srv = [o.server_time for o, _ in phase_obs["fault"] if o.server_time is not None]
+            if fault_srv:  # anything stamped before this instant may be an in-flight pre-fault message
+                prev = max(prev, fault_srv[-1]) if prev is not None else fault_srv[-1]
             advances, first_fresh = 0, None
             deadline = rollback_mono + cfg.recovery_timeout_s
             while time.monotonic() < deadline:
@@ -257,7 +263,11 @@ class ExperimentRunner:
                 event("latched", "recovery not verified", state="LATCHED_UNSAFE")
                 return
             event("recovery_verified", rec["recovery"])
-            final = "COMPLETED" if rec["impact"].get("fault_verified") else "ABORTED"
+            as_planned = rec["impact"].get("fault_verified") and rec["stop_reason"] == "duration_elapsed"
+            if self.ctl.latched:  # e.g. the watchdog latched even though a later retry succeeded
+                event("latched", "controller latched during run", state="LATCHED_UNSAFE")
+                return
+            final = "COMPLETED" if as_planned else "ABORTED"
             event("finished", {"stop_reason": rec["stop_reason"]}, state=final)
         except Exception as exc:  # noqa: BLE001 - never leave the system in an unknown state silently
             self.ctl.latch(f"run {run_id}: error during rollback/recovery: {exc!r}")

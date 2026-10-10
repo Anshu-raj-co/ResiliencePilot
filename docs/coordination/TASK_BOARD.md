@@ -22,7 +22,7 @@ Human teammates are not yet connected; roles below are placeholders (no identiti
 | 4 | Telemetry verifier + baseline collector + tests | H4 | DONE | stale/non-advancing detection unit-tested; real baseline file |
 | 5 | Safety controller, watchdog, kill switch, recovery gate + negative tests | H3 | DONE | all Phase 2 negative cases tested |
 | 6 | Telemetry-stall experiment (pause forwarder) live run | H3/H4 | DONE | impact + rollback + verified recovery recorded |
-| 7 | Independent safety review (subagent) | H1 | IN PROGRESS | findings addressed or documented |
-| 8 | Day 1 demo script | H1 | TODO | `docs/demo/DAY1_DEMO.md` runnable in ~2 min |
+| 7 | Independent safety review (subagent) | H1 | DONE (1 high + 5 med fixed) | findings addressed or documented |
+| 8 | Day 1 demo script | H1 | DONE (rehearsed live) | `docs/demo/DAY1_DEMO.md` runnable in ~2 min |
 
 Phases 3–6: see `docs/ROADMAP.md`.
