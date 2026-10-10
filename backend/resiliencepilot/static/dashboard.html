@@ -40,12 +40,24 @@ button:disabled{opacity:.4;cursor:not-allowed}
 table{width:100%;border-collapse:collapse;font-size:14px}td{padding:5px 6px;border-bottom:1px solid var(--line)}td:first-child{color:var(--muted);width:55%}
 svg text{fill:var(--fg);font-family:inherit}
 #chart{overflow-x:auto}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:6px 12px;font-weight:600}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+.bars{display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center;font-size:13.5px;margin-top:10px}
+.bar{height:10px;border-radius:5px;background:var(--grid);overflow:hidden}.bar i{display:block;height:100%;background:var(--accent)}
+.plan li,.find li{margin:6px 0}.plan ol,.find ol{padding-left:20px;margin:6px 0}
+.small{font-size:12.5px;color:var(--muted)}
+.lv{font-size:11px;font-weight:700;text-transform:uppercase;border-radius:6px;padding:1px 6px;border:1px solid}
+.lv.high{color:var(--bad);border-color:var(--bad)}.lv.medium{color:var(--warn);border-color:var(--warn)}
+.cmd{font:12px/1.4 ui-monospace,Consolas,monospace;background:var(--chipbg);border:1px solid var(--line);border-radius:6px;padding:3px 6px;display:inline-block;overflow-wrap:anywhere}
+#recent td:first-child{width:auto}
+#recent .mono{white-space:nowrap;overflow-wrap:normal}
 </style>
 </head>
 <body>
 <main>
 <header>
-  <h1>ResiliencePilot · live dashboard <span class="k" style="margin-left:6px">Day 1 · localhost</span></h1>
+  <h1>ResiliencePilot · live dashboard <span class="k" style="margin-left:6px">Day 2 · localhost</span></h1>
   <div>Controller <span class="chip" id="ctl">…</span> &nbsp;Phase <span class="chip" id="phase">…</span></div>
 </header>
 <div class="banner" id="banner"></div>
@@ -73,6 +85,27 @@ svg text{fill:var(--fg);font-family:inherit}
     <div style="font-size:12.5px;color:var(--muted);margin-top:8px" id="tmpl"></div>
     <div id="msg"></div></div>
   <div class="card"><div class="k" style="margin-bottom:6px">Last run (from its evidence record)</div><table id="last"></table></div>
+</div>
+
+<div class="card" style="margin-top:22px">
+  <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between">
+    <div class="k">Insights from stored run records (read-only)</div>
+    <div class="seg" role="group" aria-label="Run source">
+      <button id="srcLocal" data-src="local">Local runs</button><button id="srcDay2" data-src="day2">Committed Day-2 evidence</button></div>
+  </div>
+  <div class="small" id="insMeta" style="margin-top:6px"></div>
+</div>
+<div class="row" style="margin-top:14px">
+  <div class="card"><div class="k">Resilience Score · latest scored run</div><div id="score"></div></div>
+  <div class="card"><div class="k" style="margin-bottom:6px">Score by experiment (full-window runs only)</div><table id="summary"></table>
+    <div class="small" style="margin-top:8px">Formula: docs/SCORING.md. Partial runs (fault window cut short) and operator/tool stops are not in the medians.</div></div>
+</div>
+<div class="card"><div class="k" style="margin-bottom:6px">Recent runs</div><div style="overflow-x:auto"><table id="recent"></table></div></div>
+<div class="row" style="margin-top:14px">
+  <div class="card plan"><div class="k">Next experiments · rule-based planner (proposals only)</div>
+    <div class="small" style="margin-top:4px">Nothing here runs. A proposal needs a human approver on the CLI; the Start button only runs its fixed template.</div>
+    <ol id="plan"></ol></div>
+  <div class="card find"><div class="k">Findings (most severe first)</div><ol id="findings"></ol></div>
 </div>
 <p style="font-size:12px;color:var(--muted)">All values come from the rFMS API or recorded run files. Missing values show "not recorded".
 Every button goes through the same safety controller as the CLI.</p>
@@ -164,6 +197,7 @@ function render(s){
   $("created").innerHTML=L.created_at?esc(L.created_at):NR; $("received").innerHTML=L.received_at?esc(L.received_at):NR;
   $("observed").innerHTML=L.observed_at?esc(L.observed_at):NR;
   steps(s); chart(s.recent||[],s.stale_threshold_s); lastRun(s.last_run);
+  var lr=s.last_run&&s.last_run.run_id; if(lr!==lastSeenRun){if(lastSeenRun!==null&&SRC==="local")loadInsights(); lastSeenRun=lr;}
   var b=$("banner"); if(s.blocked){b.style.display="block";b.textContent="Blocked: "+(s.latched_reason||"emergency stop engaged")+". Check the stack, then Reset.";} else b.style.display="none";
   $("bStart").disabled=busyReq||s.state!=="READY"||s.blocked; $("bReset").disabled=busyReq||!s.blocked||s.state==="BUSY";
   var t=s.template; $("tmpl").textContent="Start runs the single approved template: "+t.experiment_type+" on "+t.target+" for "+t.duration_s+" s, approver \""+t.approved_by+"\". Watchdog and kill switch always apply.";
@@ -183,6 +217,46 @@ $("bStart").onclick=function(){var t=S&&S.template; if(!t)return;
   if(confirm("Approve and start?\n\n"+t.experiment_type+": pause "+t.target+" for "+t.duration_s+" s\nHypothesis: "+t.hypothesis)) post("/api/run",null,"Start");};
 $("bKill").onclick=function(){post("/api/kill",null,"Kill");};
 $("bReset").onclick=function(){if(confirm("Reset the safety latch? Only do this after checking the stack is healthy.")) post("/api/reset",{confirm:true},"Reset");};
+
+// ---- insights (read-only): scores, planner proposals, findings ----
+var SRC="local", lastSeenRun=null;
+try{SRC=localStorage.getItem("rp-src")||"local";}catch(e){}
+function fmt(c){return c&&c.measured?Number(c.score).toFixed(2):null;}
+function scoreCard(s){
+  if(!s){$("score").innerHTML='<div style="margin-top:10px">'+NR+'</div>';return;}
+  var c=s.components, parts=[["Detection (MTTD)",c.detection,c.detection.ttd_s===null?"not detected":c.detection.ttd_s+" s, "+c.detection.kind],
+    ["Recovery (MTTR)",c.recovery,c.recovery.ttr_s===null?"not recovered":c.recovery.ttr_s+" s"],
+    ["Data integrity",c.data_integrity,c.data_integrity.measured?c.data_integrity.lost_s+" s lost":"not measured"],
+    ["Blast radius",c.blast_radius,c.blast_radius.measured?(c.blast_radius.changed.length?"changed: "+c.blast_radius.changed.join(", "):"clean"):"not measured"]];
+  var h='<div style="display:flex;align-items:baseline;gap:10px;margin-top:8px"><span class="big">'+s.score.toFixed(1)+'</span><span class="small">/ 100'+(s.partial?' · <b>partial</b> (window cut short: '+esc(s.stop_reason)+')':'')+'</span></div>'+
+    '<div class="small mono">'+esc(s.run_id)+' · '+esc(s.experiment_type)+' · '+esc(s.state)+'</div><div class="bars">';
+  parts.forEach(function(p){var v=fmt(p[1]);h+='<span>'+p[0]+'</span><span class="bar">'+(v===null?'':'<i style="width:'+(v*100)+'%"></i>')+'</span><span class="mono">'+(v===null?'n/m':v)+'</span>'+
+    '<span></span><span class="small" style="grid-column:2/4;margin-top:-4px">'+esc(p[2])+'</span>';});
+  var sil=s.silent; h+='</div><div style="margin-top:10px">Silent polls (HTTP 200 but stale): <b>'+sil.silent_polls+'/'+sil.polls+'</b> '+
+    '<span class="small">(fault '+sil.by_phase.fault+', after rollback '+sil.by_phase.recovery+'; penalty ×'+(1-0.5*sil.ratio).toFixed(2)+')</span></div>';
+  $("score").innerHTML=h;
+}
+function renderInsights(d){
+  $("insMeta").textContent=d.runs+" run records from "+(d.source==="day2"?"reports/day2 (committed)":"the local evidence store")+". Same rules as rp score / rp plan / rp findings.";
+  scoreCard(d.latest_scored);
+  var rows=Object.keys(d.summary).map(function(t){var v=d.summary[t];return "<tr><td>"+esc(t)+"</td><td>median <b>"+v.median+"</b> · n="+v.n+" · "+v.min+"–"+v.max+"</td></tr>";});
+  $("summary").innerHTML=rows.length?rows.join(""):"<tr><td>full-window runs</td><td>"+NR+"</td></tr>";
+  $("recent").innerHTML="<tr><td class=small>run</td><td class=small>type</td><td class=small>state</td><td class=small>score</td></tr>"+d.recent.map(function(r){
+    var sc=r.scorable?r.score.toFixed(1)+(r.partial?' <span class="small">partial</span>':''):'<span class="na">'+esc(r.reason)+'</span>';
+    return '<tr><td class="mono">'+esc(r.run_id)+'</td><td>'+esc(r.experiment_type)+'</td><td>'+esc(r.state)+'</td><td>'+sc+(r.note?'<div class="small">note: '+esc(r.note)+'</div>':'')+'</td></tr>';}).join("");
+  $("plan").innerHTML=d.plan.map(function(e){return '<li><b>'+esc(e.experiment_type)+'</b> on <span class="mono">'+esc(e.target)+'</span> · priority '+e.priority.toFixed(3)+
+    ' <span class="small">(information '+e.information.toFixed(3)+', risk '+e.risk.toFixed(3)+')</span><div class="small">'+e.rationale.map(esc).join("; ")+'</div><span class="cmd">'+esc(e.command)+'</span></li>';}).join("");
+  $("findings").innerHTML=d.findings.length?d.findings.map(function(f){return '<li><span class="lv '+f.level+'">'+f.level+'</span> <b>'+esc(f.title)+'</b> · '+esc(f.experiment_type)+
+    '<div class="small">'+f.runs.map(function(h){return '<span class="mono">'+esc(h.run)+'</span>: '+esc(h.detail)+(h.note?' <i>(note: '+esc(h.note)+')</i>':'');}).join("<br>")+'</div></li>';}).join(""):'<li>No rule fired.</li>';
+}
+function loadInsights(){
+  ["srcLocal","srcDay2"].forEach(function(id){$(id).setAttribute("aria-pressed",String($(id).dataset.src===SRC));});
+  fetch("/api/insights?source="+encodeURIComponent(SRC),{cache:"no-store"}).then(function(r){return r.json();})
+    .then(function(d){if(d.detail){$("insMeta").textContent=d.detail;return;} renderInsights(d);})
+    .catch(function(e){$("insMeta").textContent="insights unavailable: "+e;});
+}
+["srcLocal","srcDay2"].forEach(function(id){$(id).onclick=function(){SRC=this.dataset.src;try{localStorage.setItem("rp-src",SRC);}catch(e){} loadInsights();};});
+loadInsights();
 poll();
 })();
 </script>

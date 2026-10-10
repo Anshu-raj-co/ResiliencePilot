@@ -1,0 +1,1602 @@
+{
+  "run_id": "20261010T203712Z-08b9dd",
+  "request": {
+    "experiment_type": "dependency_failure",
+    "target": "influxDB",
+    "duration_s": 12,
+    "approved_by": "nishtrip14 (Day-2 M2 minimum, run 2/2)",
+    "hypothesis": "Full-window InfluxDB outage under the 5 s envelope: visible HTTP 500s, stored-data gap, recovery delayed by name-resolution failures"
+  },
+  "state": "COMPLETED",
+  "spec": {
+    "mechanism": "docker_stop",
+    "expected_symptoms": [
+      "HYPOTHESIS: fms-server answers HTTP 500 (source: fms-server/src/lib.rs maps query errors to INTERNAL_SERVER_ERROR), i.e. the failure is VISIBLE to a plain health check",
+      "HYPOTHESIS: fms-consumer keeps running but drops the statuses it cannot write (influx-client writer.rs: 'failed to write data to influx'), leaving a gap in stored data after recovery",
+      "HYPOTHESIS: no container other than influxDB changes state (fms-server, fms-consumer, grafana keep running)",
+      "MEASURED Day 2 (strict 2 s rule): fms-server does not answer within 2 s while influxDB is down (~2 s connect failure, or blocks until influxDB returns); envelope 5 s added to observe the full profile"
+    ],
+    "risks": [
+      "Wider blast radius in effect: InfluxDB is shared by fms-server, fms-consumer and grafana (their container state is watched by the blast-radius guard)",
+      "InfluxDB start-up time is unmeasured; recovery waits up to recovery_timeout_s (30 s) for fresh data",
+      "Data written while InfluxDB is down is lost unless the consumer buffers it (to be measured as a data gap)",
+      "Volumes (influxdb-data, influxdb-auth) persist across stop/start; the adapter never removes containers or volumes"
+    ]
+  },
+  "limits": {
+    "stale_threshold_s": 5.0,
+    "poll_interval_s": 0.5,
+    "watchdog_grace_s": 5.0,
+    "recovery_timeout_s": 30.0
+  },
+  "timeline": [
+    {
+      "at": "2026-10-10T20:37:12.721420+00:00",
+      "t_s": 0.0,
+      "event": "validated",
+      "detail": {
+        "approved_by": "nishtrip14 (Day-2 M2 minimum, run 2/2)",
+        "hypothesis": "Full-window InfluxDB outage under the 5 s envelope: visible HTTP 500s, stored-data gap, recovery delayed by name-resolution failures"
+      },
+      "state": "VALIDATED"
+    },
+    {
+      "at": "2026-10-10T20:37:12.721847+00:00",
+      "t_s": 0.0,
+      "event": "precheck_start",
+      "detail": null,
+      "state": "PRECHECK"
+    },
+    {
+      "at": "2026-10-10T20:37:14.423412+00:00",
+      "t_s": 1.702,
+      "event": "precheck_passed",
+      "detail": {
+        "fresh_samples": 3
+      },
+      "state": "PRECHECK"
+    },
+    {
+      "at": "2026-10-10T20:37:14.505248+00:00",
+      "t_s": 1.784,
+      "event": "guardrails_armed",
+      "detail": {
+        "latency_threshold_ms": 4500.0,
+        "latency_baseline": "baseline baseline-20261010T203606Z",
+        "max_error_rate": 0.0,
+        "expected_statuses": [
+          500
+        ],
+        "blast_radius_allowed": [
+          "influxDB"
+        ],
+        "watched_containers": 8
+      },
+      "state": "PRECHECK"
+    },
+    {
+      "at": "2026-10-10T20:37:14.506193+00:00",
+      "t_s": 1.785,
+      "event": "injecting",
+      "detail": {
+        "target": "influxDB",
+        "mechanism": "docker_stop"
+      },
+      "state": "INJECTING"
+    },
+    {
+      "at": "2026-10-10T20:37:14.661071+00:00",
+      "t_s": 1.94,
+      "event": "fault_active",
+      "detail": {
+        "verified_by": "docker inspect State.Running == false",
+        "injection_latency_s": 0.155,
+        "exit_code": 2
+      },
+      "state": "ACTIVE"
+    },
+    {
+      "at": "2026-10-10T20:37:14.820452+00:00",
+      "t_s": 2.099,
+      "event": "expected_symptom",
+      "detail": {
+        "time_s": 0.314,
+        "http_status": 500
+      },
+      "state": "ACTIVE"
+    },
+    {
+      "at": "2026-10-10T20:37:26.511598+00:00",
+      "t_s": 13.79,
+      "event": "fault_window_closed",
+      "detail": {
+        "stop_reason": "duration_elapsed"
+      },
+      "state": "ACTIVE"
+    },
+    {
+      "at": "2026-10-10T20:37:26.513664+00:00",
+      "t_s": 13.792,
+      "event": "rolling_back",
+      "detail": null,
+      "state": "ROLLING_BACK"
+    },
+    {
+      "at": "2026-10-10T20:37:26.904672+00:00",
+      "t_s": 14.183,
+      "event": "rollback_result",
+      "detail": {
+        "attempted": true,
+        "verified": true,
+        "by": "orchestrator",
+        "detail": "same container (id unchanged) running and unpaused"
+      },
+      "state": "ROLLING_BACK"
+    },
+    {
+      "at": "2026-10-10T20:37:26.905440+00:00",
+      "t_s": 14.184,
+      "event": "verifying_recovery",
+      "detail": null,
+      "state": "VERIFYING_RECOVERY"
+    },
+    {
+      "at": "2026-10-10T20:37:47.393247+00:00",
+      "t_s": 34.672,
+      "event": "recovery_verified",
+      "detail": {
+        "verified": true,
+        "time_to_first_fresh_s": 18.293,
+        "time_to_verified_s": 20.488,
+        "criteria": "rollback verified by docker inspect (same container (id unchanged) running and unpaused) AND 3 successive advances of createdDateTime beyond both the last pre-rollback value and the fms-server time of the last fault-window poll, each with HTTP 200 and data_age_s <= 5.0s",
+        "detail": "3 fresh advances observed",
+        "lower_bound": {
+          "source": "verified injection time + 0.5 s",
+          "at": "2026-10-10T20:37:15.161481+00:00"
+        }
+      },
+      "state": "VERIFYING_RECOVERY"
+    },
+    {
+      "at": "2026-10-10T20:37:47.415411+00:00",
+      "t_s": 34.694,
+      "event": "data_gap_measured",
+      "detail": {
+        "stored_statuses": 54,
+        "max_gap_s": 10.065,
+        "median_interval_s": 0.503
+      },
+      "state": "VERIFYING_RECOVERY"
+    },
+    {
+      "at": "2026-10-10T20:37:47.468018+00:00",
+      "t_s": 34.747,
+      "event": "finished",
+      "detail": {
+        "stop_reason": "duration_elapsed"
+      },
+      "state": "COMPLETED"
+    }
+  ],
+  "observations": [
+    {
+      "phase": "precheck",
+      "t_s": 0.071,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:12.792648+00:00",
+        "http_status": 200,
+        "latency_ms": 52.14,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T20:37:11.799000+00:00",
+        "received_at": "2026-10-10T20:37:12.791209+00:00",
+        "server_time": "2026-10-10T20:37:12.791212+00:00",
+        "error": null,
+        "data_age_s": 0.992
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 0.992,
+        "stalled_for_s": 0.0,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "precheck",
+      "t_s": 0.629,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:13.350775+00:00",
+        "http_status": 200,
+        "latency_ms": 57.26,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T20:37:12.802000+00:00",
+        "received_at": "2026-10-10T20:37:13.349344+00:00",
+        "server_time": "2026-10-10T20:37:13.349348+00:00",
+        "error": null,
+        "data_age_s": 0.547
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 0.547,
+        "stalled_for_s": 0.0,
+        "advanced": true,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "precheck",
+      "t_s": 1.201,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:13.922427+00:00",
+        "http_status": 200,
+        "latency_ms": 66.15,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T20:37:12.802000+00:00",
+        "received_at": "2026-10-10T20:37:13.920981+00:00",
+        "server_time": "2026-10-10T20:37:13.920984+00:00",
+        "error": null,
+        "data_age_s": 1.119
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 1.119,
+        "stalled_for_s": 0.572,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "fault",
+      "t_s": 2.099,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:14.820203+00:00",
+        "http_status": 500,
+        "latency_ms": 158.49,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 1.469,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "fault",
+      "t_s": 2.608,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:15.328898+00:00",
+        "http_status": 500,
+        "latency_ms": 4.25,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 1.978,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "fault",
+      "t_s": 3.113,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:15.834019+00:00",
+        "http_status": 500,
+        "latency_ms": 3.05,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 2.483,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "fault",
+      "t_s": 3.615,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:16.335957+00:00",
+        "http_status": 500,
+        "latency_ms": 1.58,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 2.985,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "fault",
+      "t_s": 4.125,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:16.846423+00:00",
+        "http_status": 500,
+        "latency_ms": 4.99,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 3.496,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "fault",
+      "t_s": 4.63,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:17.351097+00:00",
+        "http_status": 500,
+        "latency_ms": 3.62,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 4.0,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "fault",
+      "t_s": 5.139,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:17.860065+00:00",
+        "http_status": 500,
+        "latency_ms": 4.48,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 4.509,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "fault",
+      "t_s": 5.644,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:18.365060+00:00",
+        "http_status": 500,
+        "latency_ms": 2.71,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 5.014,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "fault",
+      "t_s": 6.155,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:18.875990+00:00",
+        "http_status": 500,
+        "latency_ms": 5.31,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 5.525,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "fault",
+      "t_s": 6.665,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:19.386089+00:00",
+        "http_status": 500,
+        "latency_ms": 4.32,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 6.035,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "fault",
+      "t_s": 7.172,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:19.892856+00:00",
+        "http_status": 500,
+        "latency_ms": 4.26,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 6.542,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "fault",
+      "t_s": 7.674,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:20.395327+00:00",
+        "http_status": 500,
+        "latency_ms": 1.82,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 7.045,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "fault",
+      "t_s": 8.186,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:20.906899+00:00",
+        "http_status": 500,
+        "latency_ms": 6.11,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 7.556,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "fault",
+      "t_s": 8.696,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:21.417493+00:00",
+        "http_status": 500,
+        "latency_ms": 4.96,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 8.067,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 14.189,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:26.910015+00:00",
+        "http_status": 500,
+        "latency_ms": 4.24,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 13.559,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 14.691,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:27.411893+00:00",
+        "http_status": 500,
+        "latency_ms": 1.65,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 14.061,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 15.193,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:27.913814+00:00",
+        "http_status": 500,
+        "latency_ms": 1.16,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 14.563,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 15.695,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:28.416713+00:00",
+        "http_status": 500,
+        "latency_ms": 2.43,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 15.066,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 16.202,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:28.923148+00:00",
+        "http_status": 500,
+        "latency_ms": 5.56,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 15.572,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 16.711,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:29.431892+00:00",
+        "http_status": 500,
+        "latency_ms": 3.46,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 16.081,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 17.221,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:29.942046+00:00",
+        "http_status": 500,
+        "latency_ms": 4.87,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 16.591,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 17.73,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:30.451217+00:00",
+        "http_status": 500,
+        "latency_ms": 4.63,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 17.1,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 18.238,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:30.959001+00:00",
+        "http_status": 500,
+        "latency_ms": 4.3,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 17.608,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 18.743,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:31.464503+00:00",
+        "http_status": 500,
+        "latency_ms": 3.78,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 18.114,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 19.247,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:31.968057+00:00",
+        "http_status": 500,
+        "latency_ms": 1.78,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 18.617,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 19.754,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:32.474981+00:00",
+        "http_status": 500,
+        "latency_ms": 3.01,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 19.124,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 20.264,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:32.985002+00:00",
+        "http_status": 500,
+        "latency_ms": 4.79,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 19.634,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 20.773,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:33.493937+00:00",
+        "http_status": 500,
+        "latency_ms": 3.85,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 20.143,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 21.28,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:34.001468+00:00",
+        "http_status": 500,
+        "latency_ms": 4.37,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 20.651,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 21.788,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:34.509480+00:00",
+        "http_status": 500,
+        "latency_ms": 3.84,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 21.159,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 22.294,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:35.015003+00:00",
+        "http_status": 500,
+        "latency_ms": 4.24,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 21.664,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 22.802,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:35.522962+00:00",
+        "http_status": 500,
+        "latency_ms": 2.67,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 22.172,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 23.307,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:36.028179+00:00",
+        "http_status": 500,
+        "latency_ms": 3.7,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 22.677,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 23.815,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:36.536368+00:00",
+        "http_status": 500,
+        "latency_ms": 3.15,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 23.186,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 24.319,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:37.040484+00:00",
+        "http_status": 500,
+        "latency_ms": 2.35,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 23.69,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 24.829,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:37.550142+00:00",
+        "http_status": 500,
+        "latency_ms": 5.69,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 24.199,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 25.338,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:38.059591+00:00",
+        "http_status": 500,
+        "latency_ms": 4.11,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 24.709,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 25.848,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:38.568761+00:00",
+        "http_status": 500,
+        "latency_ms": 3.85,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 25.218,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 26.356,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:39.077474+00:00",
+        "http_status": 500,
+        "latency_ms": 3.42,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 25.727,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 26.866,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:39.587479+00:00",
+        "http_status": 500,
+        "latency_ms": 8.11,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 26.237,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 27.374,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:40.094682+00:00",
+        "http_status": 500,
+        "latency_ms": 3.74,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 26.744,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 27.881,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:40.602579+00:00",
+        "http_status": 500,
+        "latency_ms": 3.3,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 27.252,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 28.39,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:41.111632+00:00",
+        "http_status": 500,
+        "latency_ms": 3.81,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 27.761,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 28.894,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:41.615178+00:00",
+        "http_status": 500,
+        "latency_ms": 2.41,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 28.264,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 29.397,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:42.118336+00:00",
+        "http_status": 500,
+        "latency_ms": 1.68,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 28.768,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 29.904,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:42.624879+00:00",
+        "http_status": 500,
+        "latency_ms": 3.42,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 29.274,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 30.408,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:43.128748+00:00",
+        "http_status": 500,
+        "latency_ms": 3.42,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 29.778,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 30.912,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:43.633279+00:00",
+        "http_status": 500,
+        "latency_ms": 3.11,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 30.283,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 31.421,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:44.142521+00:00",
+        "http_status": 500,
+        "latency_ms": 3.95,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 30.792,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 31.929,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:44.649994+00:00",
+        "http_status": 500,
+        "latency_ms": 4.05,
+        "vin": null,
+        "created_at": null,
+        "received_at": null,
+        "server_time": null,
+        "error": "HTTP 500",
+        "data_age_s": null
+      },
+      "assessment": {
+        "freshness": "OBSERVER_ERROR",
+        "data_age_s": null,
+        "stalled_for_s": 31.299,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 32.477,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:45.197802+00:00",
+        "http_status": 200,
+        "latency_ms": 42.82,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T20:37:44.502000+00:00",
+        "received_at": "2026-10-10T20:37:45.195890+00:00",
+        "server_time": "2026-10-10T20:37:45.195893+00:00",
+        "error": null,
+        "data_age_s": 0.694
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 0.694,
+        "stalled_for_s": 0.0,
+        "advanced": true,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 33.02,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:45.740999+00:00",
+        "http_status": 200,
+        "latency_ms": 39.3,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T20:37:44.502000+00:00",
+        "received_at": "2026-10-10T20:37:45.739076+00:00",
+        "server_time": "2026-10-10T20:37:45.739081+00:00",
+        "error": null,
+        "data_age_s": 1.237
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 1.237,
+        "stalled_for_s": 0.543,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 33.562,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:46.282993+00:00",
+        "http_status": 200,
+        "latency_ms": 40.65,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T20:37:45.507000+00:00",
+        "received_at": "2026-10-10T20:37:46.281058+00:00",
+        "server_time": "2026-10-10T20:37:46.281061+00:00",
+        "error": null,
+        "data_age_s": 0.774
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 0.774,
+        "stalled_for_s": 0.0,
+        "advanced": true,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 34.103,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:46.824377+00:00",
+        "http_status": 200,
+        "latency_ms": 36.01,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T20:37:45.507000+00:00",
+        "received_at": "2026-10-10T20:37:46.822497+00:00",
+        "server_time": "2026-10-10T20:37:46.822500+00:00",
+        "error": null,
+        "data_age_s": 1.315
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 1.315,
+        "stalled_for_s": 0.541,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "recovery",
+      "t_s": 34.643,
+      "observation": {
+        "observed_at": "2026-10-10T20:37:47.364302+00:00",
+        "http_status": 200,
+        "latency_ms": 35.59,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T20:37:46.512000+00:00",
+        "received_at": "2026-10-10T20:37:47.362632+00:00",
+        "server_time": "2026-10-10T20:37:47.362635+00:00",
+        "error": null,
+        "data_age_s": 0.851
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 0.851,
+        "stalled_for_s": 0.0,
+        "advanced": true,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    }
+  ],
+  "stop_reason": "duration_elapsed",
+  "rollback": {
+    "attempted": true,
+    "verified": true,
+    "by": "orchestrator",
+    "detail": "same container (id unchanged) running and unpaused"
+  },
+  "recovery": {
+    "verified": true,
+    "time_to_first_fresh_s": 18.293,
+    "time_to_verified_s": 20.488,
+    "criteria": "rollback verified by docker inspect (same container (id unchanged) running and unpaused) AND 3 successive advances of createdDateTime beyond both the last pre-rollback value and the fms-server time of the last fault-window poll, each with HTTP 200 and data_age_s <= 5.0s",
+    "detail": "3 fresh advances observed",
+    "lower_bound": {
+      "source": "verified injection time + 0.5 s",
+      "at": "2026-10-10T20:37:15.161481+00:00"
+    }
+  },
+  "impact": {
+    "fault_verified": true,
+    "fault_observations": 14,
+    "stale_detected": false,
+    "time_to_detection_s": null,
+    "precheck_max_data_age_s": 1.119,
+    "max_data_age_s": null,
+    "max_stalled_for_s": 8.067,
+    "http_ok_ratio_during_fault": 0.0,
+    "healthy_but_stale_observations": 0,
+    "http_error_rate_during_fault": 1.0,
+    "latency_p95_during_fault_ms": 158.49,
+    "injection_latency_s": 0.155,
+    "injected_at": "2026-10-10T20:37:14.506481+00:00",
+    "time_to_first_expected_status_s": 0.314,
+    "expected_status_observations": 14,
+    "silent_failure": false,
+    "time_to_detection_from_verified_injection_s": null
+  },
+  "guardrails": {
+    "config": {
+      "max_error_rate": 0.0,
+      "error_min_samples": 5,
+      "latency_p95_multiplier": 5.0,
+      "latency_p95_floor_ms": 250.0,
+      "latency_window": 10,
+      "latency_min_samples": 5,
+      "blast_radius_interval_s": 0.5,
+      "blast_radius_max_snapshot_failures": 3
+    },
+    "blast_radius_allowed": [
+      "influxDB"
+    ],
+    "triggered": null,
+    "latency_baseline_p95_ms": 83.39,
+    "latency_baseline_source": "baseline baseline-20261010T203606Z",
+    "latency_threshold_ms": 4500.0,
+    "latency_threshold_source": "experiment envelope (fault window only)",
+    "fault_observer_timeout_s": 5.0,
+    "blast_radius_baseline": {
+      "csv-provider": "running",
+      "databroker": "running",
+      "fms-consumer": "running",
+      "fms-forwarder": "running",
+      "fms-server": "running",
+      "fms-zenoh-router": "running",
+      "grafana": "running",
+      "influxDB": "running"
+    },
+    "expected_statuses": [
+      500
+    ],
+    "final_blast_check": {
+      "clean": true,
+      "changes": []
+    }
+  },
+  "data_gap": {
+    "window_start": "2026-10-10T20:37:09.506481+00:00",
+    "window_end": "2026-10-10T20:37:47.394209+00:00",
+    "stored_statuses": 54,
+    "max_gap_s": 10.065,
+    "gap_from": "2026-10-10T20:37:18.337000+00:00",
+    "gap_to": "2026-10-10T20:37:28.402000+00:00",
+    "median_interval_s": 0.503,
+    "method": "GET /rfms/vehiclestatuses?starttime&stoptime (stored createdDateTime values)"
+  }
+}

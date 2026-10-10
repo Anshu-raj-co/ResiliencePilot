@@ -5,9 +5,12 @@ It calls exactly the code paths the CLI uses:
   kill  -> SafetyController.emergency_stop()
   reset -> SafetyController.reset()
 It adds no safety logic of its own and cannot change the experiment: POST /api/run takes no parameters.
+GET /api/insights is read-only (scores, planner proposals, findings from stored run records); proposals are shown,
+never executed.
 """
 from __future__ import annotations
 
+import json
 import threading
 from collections import deque
 from contextlib import asynccontextmanager
@@ -16,7 +19,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from .config import ExperimentSpec, SafetyConfig
+from .config import REPO_ROOT, ExperimentSpec, SafetyConfig
 from .evidence import EvidenceStore
 from .observation import utcnow
 from .orchestrator import ExperimentRunner
@@ -113,7 +116,8 @@ def _run_summary(rec: dict | None) -> dict | None:
 
 
 def create_app(cfg: SafetyConfig, catalog: dict[str, ExperimentSpec], ctl: SafetyController, docker, observer,
-               store: EvidenceStore, *, run_template: dict | None = None, monitor: bool = True) -> FastAPI:
+               store: EvidenceStore, *, run_template: dict | None = None, monitor: bool = True,
+               insight_sources: dict[str, Path] | None = None, dep_map_path: Path | None = None) -> FastAPI:
     live = LiveState(cfg.stale_threshold_s)
     runner = ExperimentRunner(cfg, catalog, ctl, docker, observer, store, on_event=live.on_event)
     template = dict(run_template or DASHBOARD_TEMPLATE)
@@ -194,6 +198,22 @@ def create_app(cfg: SafetyConfig, catalog: dict[str, ExperimentSpec], ctl: Safet
     def latest_run():
         rec = _latest_record()
         return rec if rec is not None else JSONResponse({"detail": "no runs recorded"}, status_code=404)
+
+    # fixed names only: the query parameter never becomes a path
+    sources = insight_sources or {"local": store.data_dir / "runs", "day2": REPO_ROOT / "reports" / "day2"}
+    dep_map_file = dep_map_path or REPO_ROOT / "config" / "dependency_map.json"
+
+    @app.get("/api/insights")
+    def insights(source: str = "local"):
+        if source not in sources:
+            return JSONResponse({"detail": f"source must be one of {sorted(sources)}"}, status_code=422)
+        from .insights import build_insights
+        try:
+            dep_map = json.loads(dep_map_file.read_text(encoding="utf-8"))
+            out = build_insights(sources[source], catalog, dep_map, cfg.max_duration_s)
+        except Exception as exc:  # noqa: BLE001 - display-only; never break the server or the controls
+            return JSONResponse({"detail": f"insights unavailable: {type(exc).__name__}: {exc}"}, status_code=500)
+        return {"source": source, "sources": sorted(sources), **out}
 
     @app.post("/api/run", status_code=202)
     async def run(request: Request):
