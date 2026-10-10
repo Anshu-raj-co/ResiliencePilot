@@ -367,3 +367,9 @@ def test_L1_completed_only_when_as_planned(env):
     docker.unpause = (lambda n, _u=docker.unpause: (setattr(world, "api_down", False), _u(n)))
     rec = runner.run({**GOOD, "duration_s": 5})
     assert rec["stop_reason"] == "observer_lost" and rec["state"] == "ABORTED"
+
+
+def test_run_record_states_the_host_platform(env):
+    *_, runner = env
+    rec = runner.run(GOOD)
+    assert set(rec["platform"]) == {"os", "os_release", "cpu"} and rec["platform"]["cpu"]

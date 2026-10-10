@@ -127,3 +127,13 @@ def test_cli_plan_and_findings_are_read_only(tmp_path, monkeypatch, capsys):
     assert cli.main(["findings", "--dir", str(tmp_path), "--out", str(out)]) == 0
     md = out.read_text(encoding="utf-8")
     assert "_(note: first try)_" in md and "_about" not in md and "## Next experiments" in md
+
+
+def test_platform_column_uses_record_then_documented_label_then_not_recorded():
+    new = _rec(STALL, run_id="20261011T000000Z-new")
+    new["platform"] = {"os": "macOS", "os_release": "27.0.1", "cpu": "arm64"}
+    labelled, unknown = _rec(STALL, run_id="20261010T000001Z-lab"), _rec(STALL, run_id="20261010T000002Z-unk")
+    md = render_markdown([new, labelled, unknown], [], "x", None, {"20261010T000001Z-lab": "macOS (CPU not recorded)"})
+    row = next(line for line in md.splitlines() if line.startswith("| telemetry_stall"))
+    assert "macOS 27.0.1 (arm64) ×1" in row and "macOS (CPU not recorded) ×1" in row and "not recorded ×1" in row
+    assert "Platform (full-window runs)" in md and "D-023" in md

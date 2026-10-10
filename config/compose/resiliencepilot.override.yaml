@@ -15,3 +15,10 @@ services:
   databroker:
     ports: !override
       - "${FMS_DATABROKER_BIND_HOST:-127.0.0.1}:${RP_DATABROKER_HOST_PORT:-55557}:55556"
+
+  # fms-server and fms-consumer are published for linux/amd64 only (no arm64 manifest). Pinning the platform lets
+  # Apple Silicon pull them and run them under emulation; it is a no-op on x86-64 hosts (see DECISIONS D-023).
+  fms-server:
+    platform: linux/amd64
+  fms-consumer:
+    platform: linux/amd64
