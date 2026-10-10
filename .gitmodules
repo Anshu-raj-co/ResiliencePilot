@@ -1,0 +1,3 @@
+[submodule "Fleet Management/fleet-management"]
+	path = Fleet Management/fleet-management
+	url = https://github.com/eclipse-sdv-blueprints/fleet-management.git
