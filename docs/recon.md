@@ -108,3 +108,22 @@ forwarder → zenoh → consumer → InfluxDB chain breaks.
 - [Q] Zenoh lease/reconnect behaviour after a 10–30 s pause of the forwarder.
 - [Q] Real observed cadence/jitter of `createdDateTime` (expected ~500 ms) — measured in baseline.
 - [Q] Memory footprint of the running stack on the 7.68 GiB VM.
+
+## 8. Measured on the live stack (Day 1, 2026-10-10) [V]
+
+Evidence files are committed in `reports/day1/`.
+
+- **Baseline** (`baseline-20261010T084740Z.json`, 60 samples @ 0.5 s): HTTP 200 100 %; data age median 0.80 s,
+  p95 1.24 s, max 1.30 s; `createdDateTime` advance interval 1.001–1.004 s (31 distinct values, 0 regressions);
+  rFMS latency median 11.9 ms, max 20.5 ms. Whole stack ≈ 180 MiB RAM.
+- [Q→partly answered] Cadence is ~1.0 s in the API although `TIMER_INTERVAL=500ms`. Cause not yet verified (candidates:
+  forwarder processing, the Flux `last()`/pivot in fms-server, InfluxDB timestamp precision). Does not affect results.
+- **telemetry_stall, 10 s** (`20261010T084750Z-2a256d.json`): fault verified (`State.Paused=true`); 20/20 fault-window
+  polls HTTP 200 with `receivedDateTime` = request time; `createdDateTime` frozen at 08:47:51.779; STALE detected at
+  5.26 s; max age 10.06 s; 10 healthy-but-stale observations; rollback verified; first fresh data 1.04 s after unpause;
+  recovery criteria met at 3.14 s. → [Q] Zenoh lease: no reconnect delay observed for a 10 s pause.
+- **Kill switch** (`20261010T084814Z-b17ca6.json`): 25 s run; `scripts/kill-switch.sh` from a separate process at
+  t≈5.6 s → loop exited in 0.25 s, rollback verified 0.6 s after the switch; recovery verified.
+- **Crash test** (`20261010T084842Z-baf896.json`): backend process tree hard-killed (`taskkill /F`) mid-fault →
+  forwarder stayed paused (expected: watchdog is in-process). `kill-switch.sh` unpaused it; the next CLI start found
+  the fault marker, latched, annotated the run as LATCHED_UNSAFE and refused a new run until `reset`.

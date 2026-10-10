@@ -31,8 +31,23 @@ clones got an empty directory. Now `git submodule update --init` restores the pi
 Why: available locally, typed, fast to test; CLI wrapper is one small module that tests replace with a fake.
 No Docker socket is ever exposed to an LLM.
 
-**D-008 — Freshness = age of newest `createdDateTime` vs. local clock; progression = strictly increasing `createdDateTime`.**
-Why: it is the only data-derived timestamp; there is no sequence id. `receivedDateTime`/`requestServerDateTime` are
-`Utc::now()` at request time and are recorded only to demonstrate the misleading-health discrepancy.
-Clock note: forwarder and backend run on the same host (Docker Desktop VM clock syncs to Windows), so absolute age is
-meaningful; we also record progression, which is clock-independent.
+**D-008 — Two stale signals from `createdDateTime`: age and progression.**
+- age = `requestServerDateTime − createdDateTime`. Both are stamped on the Docker VM clock (fms-server and
+  fms-forwarder), so no host↔VM clock skew enters the measurement.
+- progression = local time since `createdDateTime` last advanced (clock-independent; catches a stall even if
+  the server clock were wrong).
+STALE if either exceeds `stale_threshold_s` (5 s). There is no sequence id. `receivedDateTime` is `Utc::now()` at
+request time and is recorded only to demonstrate the misleading-health discrepancy.
+Threshold justification: Day-1 baseline max age 1.30 s, advance interval 1.002 s → 5 s is ~3.8× headroom (no false
+positives in 60 baseline samples). Cost: time-to-detection ≈ 5 s minus the age at injection.
+
+**D-009 — Recovery = rollback verified by `docker inspect` AND 3 successive advances of `createdDateTime` beyond the
+last pre-rollback value, each with HTTP 200 and age ≤ 5 s, within 30 s.** Otherwise LATCHED_UNSAFE.
+
+**D-010 — Emergency stop is persistent.** Any stop (CLI, Ctrl+C, kill-switch file) blocks new runs until a checked
+`reset` (all allowlisted targets running + unpaused). Conservative by design.
+
+**D-011 — Crash safety is layered:** fault marker written *before* `docker pause`; external `scripts/kill-switch.sh`
+unpauses without the backend; next backend start runs `startup_recovery` (unpause if needed + latch + annotate the
+run record). Known limit: the in-process watchdog dies with a hard-killed process (verified live), so between crash
+and kill-switch/restart the fault persists.
