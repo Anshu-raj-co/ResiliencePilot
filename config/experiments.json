@@ -1,0 +1,17 @@
+{
+  "telemetry_stall": {
+    "description": "Freeze the vehicle-side publisher so createdDateTime stops advancing while the rFMS API stays up.",
+    "mechanism": "docker_pause",
+    "allowed_targets": ["fms-forwarder"],
+    "max_duration_s": 30,
+    "expected_symptoms": [
+      "fms-server keeps returning HTTP 200",
+      "receivedDateTime keeps tracking request time",
+      "createdDateTime stops advancing; data age grows past stale_threshold_s"
+    ],
+    "risks": [
+      "Zenoh session lease may expire during a long pause and require reconnect on unpause",
+      "Telemetry for the paused window is not produced (no backfill)"
+    ]
+  }
+}

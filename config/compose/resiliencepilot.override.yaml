@@ -1,0 +1,10 @@
+# ResiliencePilot local override for the Eclipse SDV Fleet Management Blueprint.
+# The upstream compose files declare `overlay` networks, which require Docker Swarm.
+# For a single-host local sandbox we use plain bridge networks instead (see docs/DECISIONS.md D-002).
+networks:
+  fms-backend:
+    driver: bridge
+    attachable: false
+  fms-vehicle:
+    driver: bridge
+    attachable: false

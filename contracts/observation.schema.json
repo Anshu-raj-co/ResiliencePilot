@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "resiliencepilot/observation.schema.json",
+  "title": "Observation",
+  "description": "One poll of GET /rfms/vehiclestatuses?latestOnly=true. Null means the signal was unavailable in that poll.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["observed_at", "http_status", "latency_ms", "vin", "created_at", "server_time", "data_age_s", "error"],
+  "properties": {
+    "observed_at": { "type": "string", "format": "date-time", "description": "Local wall clock when the response arrived." },
+    "http_status": { "type": ["integer", "null"], "description": "null = no HTTP response (connection error/timeout)." },
+    "latency_ms": { "type": ["number", "null"] },
+    "vin": { "type": ["string", "null"] },
+    "created_at": { "type": ["string", "null"], "format": "date-time", "description": "createdDateTime (stamped by fms-forwarder)." },
+    "received_at": { "type": ["string", "null"], "format": "date-time", "description": "receivedDateTime = fms-server Utc::now(); recorded only to show it is always fresh." },
+    "server_time": { "type": ["string", "null"], "format": "date-time", "description": "requestServerDateTime (fms-server clock)." },
+    "data_age_s": { "type": ["number", "null"], "description": "server_time - created_at; same Docker VM clock on both sides, so skew-free." },
+    "error": { "type": ["string", "null"] }
+  }
+}

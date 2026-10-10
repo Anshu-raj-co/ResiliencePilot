@@ -1,0 +1,170 @@
+{
+  "run_id": "20261010T084842Z-baf896",
+  "request": {
+    "experiment_type": "telemetry_stall",
+    "target": "fms-forwarder",
+    "duration_s": 25,
+    "approved_by": "eng-lead (Day-1 brief authorization)",
+    "hypothesis": "Crash test: backend hard-killed mid-fault"
+  },
+  "state": "LATCHED_UNSAFE",
+  "spec": {
+    "mechanism": "docker_pause",
+    "expected_symptoms": [
+      "fms-server keeps returning HTTP 200",
+      "receivedDateTime keeps tracking request time",
+      "createdDateTime stops advancing; data age grows past stale_threshold_s"
+    ],
+    "risks": [
+      "Zenoh session lease may expire during a long pause and require reconnect on unpause",
+      "Telemetry for the paused window is not produced (no backfill)"
+    ]
+  },
+  "limits": {
+    "stale_threshold_s": 5.0,
+    "poll_interval_s": 0.5,
+    "watchdog_grace_s": 5.0,
+    "recovery_timeout_s": 30.0
+  },
+  "timeline": [
+    {
+      "at": "2026-10-10T08:48:42.479760+00:00",
+      "t_s": 0.0,
+      "event": "validated",
+      "detail": {
+        "approved_by": "eng-lead (Day-1 brief authorization)",
+        "hypothesis": "Crash test: backend hard-killed mid-fault"
+      },
+      "state": "VALIDATED"
+    },
+    {
+      "at": "2026-10-10T08:48:42.482237+00:00",
+      "t_s": 0.003,
+      "event": "precheck_start",
+      "detail": null,
+      "state": "PRECHECK"
+    },
+    {
+      "at": "2026-10-10T08:48:44.080323+00:00",
+      "t_s": 1.601,
+      "event": "precheck_passed",
+      "detail": {
+        "fresh_samples": 3
+      },
+      "state": "PRECHECK"
+    },
+    {
+      "at": "2026-10-10T08:48:44.083730+00:00",
+      "t_s": 1.604,
+      "event": "injecting",
+      "detail": {
+        "target": "fms-forwarder",
+        "mechanism": "docker_pause"
+      },
+      "state": "INJECTING"
+    },
+    {
+      "at": "2026-10-10T08:48:44.193459+00:00",
+      "t_s": 1.714,
+      "event": "fault_active",
+      "detail": {
+        "verified_by": "docker inspect State.Paused == true"
+      },
+      "state": "ACTIVE"
+    },
+    {
+      "at": "2026-10-10T08:49:14.117150+00:00",
+      "event": "interrupted_process_recovered",
+      "detail": "target state running",
+      "state": "LATCHED_UNSAFE"
+    }
+  ],
+  "observations": [
+    {
+      "phase": "precheck",
+      "t_s": 0.073,
+      "observation": {
+        "observed_at": "2026-10-10T08:48:42.552643+00:00",
+        "http_status": 200,
+        "latency_ms": 15.44,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T08:48:41.955000+00:00",
+        "received_at": "2026-10-10T08:48:42.551054+00:00",
+        "server_time": "2026-10-10T08:48:42.551060+00:00",
+        "error": null,
+        "data_age_s": 0.596
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 0.596,
+        "stalled_for_s": 0.0,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "precheck",
+      "t_s": 0.586,
+      "observation": {
+        "observed_at": "2026-10-10T08:48:43.065669+00:00",
+        "http_status": 200,
+        "latency_ms": 12.06,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T08:48:42.957000+00:00",
+        "received_at": "2026-10-10T08:48:43.064372+00:00",
+        "server_time": "2026-10-10T08:48:43.064377+00:00",
+        "error": null,
+        "data_age_s": 0.107
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 0.107,
+        "stalled_for_s": 0.0,
+        "advanced": true,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    },
+    {
+      "phase": "precheck",
+      "t_s": 1.1,
+      "observation": {
+        "observed_at": "2026-10-10T08:48:43.579399+00:00",
+        "http_status": 200,
+        "latency_ms": 12.02,
+        "vin": "YV2E4C3A5VB180691",
+        "created_at": "2026-10-10T08:48:42.957000+00:00",
+        "received_at": "2026-10-10T08:48:43.578279+00:00",
+        "server_time": "2026-10-10T08:48:43.578285+00:00",
+        "error": null,
+        "data_age_s": 0.621
+      },
+      "assessment": {
+        "freshness": "FRESH",
+        "data_age_s": 0.621,
+        "stalled_for_s": 0.514,
+        "advanced": false,
+        "regressed": false,
+        "healthy_but_stale": false
+      }
+    }
+  ],
+  "stop_reason": "error",
+  "rollback": {
+    "attempted": true,
+    "verified": false,
+    "by": "startup_recovery",
+    "detail": "target state running"
+  },
+  "recovery": {
+    "verified": false,
+    "time_to_first_fresh_s": null,
+    "time_to_verified_s": null,
+    "criteria": "rollback verified by docker inspect (running, not paused) AND 3 successive advances of createdDateTime beyond the last pre-rollback value, each with HTTP 200 and data_age_s <= 5.0s",
+    "detail": null
+  },
+  "impact": {
+    "fault_verified": true
+  }
+}

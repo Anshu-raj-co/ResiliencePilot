@@ -1,0 +1,112 @@
+
+[1;36m=== 1/5  The real Eclipse SDV Fleet Management stack is running ===[0m
+csv-provider	Up 20 minutes
+databroker	Up 20 minutes
+fms-consumer	Up 20 minutes
+fms-forwarder	Up 20 minutes
+fms-server	Up 20 minutes
+fms-zenoh-router	Up 20 minutes
+grafana	Up 20 minutes
+influxDB	Up 20 minutes (healthy)
+{
+  "state": "READY",
+
+[1;36m=== 2/5  Healthy now: createdDateTime (vehicle) advances; receivedDateTime is just the server's clock ===[0m
+  [ observe t=  0.03s] HTTP 200  createdDateTime=08:57:26.575  receivedDateTime=08:57:27.303  age=0.729s  FRESH
+  [ observe t=  0.55s] HTTP 200  createdDateTime=08:57:26.575  receivedDateTime=08:57:27.818  age=1.243s  FRESH
+  [ observe t=  1.06s] HTTP 200  createdDateTime=08:57:27.578  receivedDateTime=08:57:28.334  age=0.756s  FRESH
+  [ observe t=  1.58s] HTTP 200  createdDateTime=08:57:27.578  receivedDateTime=08:57:28.849  age=1.271s  FRESH
+
+[1;36m=== 3/5  Baseline: 16 samples over 8 s ===[0m
+  "samples": 16,
+  "http_ok_ratio": 1.0,
+    "FRESH": 16,
+    "STALE": 0,
+    "median": 0.917,
+    "max": 1.419
+    "median": 1.003,
+    "max": 1.003
+    "median": 13.855,
+    "max": 17.94
+saved C:\Users\anshu\OneDrive\Desktop\PROJECT\ResiliencePilot\backend\data\baselines\baseline-20261010T085737Z.json
+
+[1;36m=== 4/5  Approved experiment: freeze fms-forwarder for 12 s. Watch HTTP stay 200 while data goes stale ===[0m
+Experiment plan
+» validated  [VALIDATED]  {"approved_by": "demo-operator", "hypothesis": "Pausing fms-forwarder stalls createdDateTime while the rFMS API keeps returning HTTP 200"}
+» precheck_start  [PRECHECK]
+  [precheck t=  0.07s] HTTP 200  createdDateTime=08:57:36.599  receivedDateTime=08:57:37.809  age=1.211s  FRESH
+  [precheck t=  0.59s] HTTP 200  createdDateTime=08:57:37.601  receivedDateTime=08:57:38.324  age=0.723s  FRESH
+  [precheck t=  1.10s] HTTP 200  createdDateTime=08:57:37.601  receivedDateTime=08:57:38.838  age=1.238s  FRESH
+» precheck_passed  [PRECHECK]  {"fresh_samples": 3}
+» injecting  [INJECTING]  {"target": "fms-forwarder", "mechanism": "docker_pause"}
+» fault_active  [ACTIVE]  {"verified_by": "docker inspect State.Paused == true"}
+  [   fault t=  1.74s] HTTP 200  createdDateTime=08:57:38.603  receivedDateTime=08:57:39.472  age=0.869s  FRESH
+  [   fault t=  2.25s] HTTP 200  createdDateTime=08:57:38.603  receivedDateTime=08:57:39.988  age=1.386s  FRESH
+  [   fault t=  2.77s] HTTP 200  createdDateTime=08:57:39.104  receivedDateTime=08:57:40.503  age=1.4s  FRESH
+  [   fault t=  3.29s] HTTP 200  createdDateTime=08:57:39.104  receivedDateTime=08:57:41.020  age=1.916s  FRESH
+  [   fault t=  3.80s] HTTP 200  createdDateTime=08:57:39.104  receivedDateTime=08:57:41.534  age=2.431s  FRESH
+  [   fault t=  4.31s] HTTP 200  createdDateTime=08:57:39.104  receivedDateTime=08:57:42.049  age=2.946s  FRESH
+  [   fault t=  4.83s] HTTP 200  createdDateTime=08:57:39.104  receivedDateTime=08:57:42.563  age=3.46s  FRESH
+  [   fault t=  5.35s] HTTP 200  createdDateTime=08:57:39.104  receivedDateTime=08:57:43.080  age=3.977s  FRESH
+  [   fault t=  5.86s] HTTP 200  createdDateTime=08:57:39.104  receivedDateTime=08:57:43.595  age=4.492s  FRESH
+  [   fault t=  6.38s] HTTP 200  createdDateTime=08:57:39.104  receivedDateTime=08:57:44.111  age=5.007s  STALE  <- HTTP 200 but STALE
+» stale_detected  [ACTIVE]  {"time_to_detection_s": 4.768, "http_status": 200, "data_age_s": 5.007493, "healthy_but_stale": true}
+  [   fault t=  6.89s] HTTP 200  createdDateTime=08:57:39.104  receivedDateTime=08:57:44.628  age=5.524s  STALE  <- HTTP 200 but STALE
+  [   fault t=  7.41s] HTTP 200  createdDateTime=08:57:39.104  receivedDateTime=08:57:45.142  age=6.038s  STALE  <- HTTP 200 but STALE
+  [   fault t=  7.92s] HTTP 200  createdDateTime=08:57:39.104  receivedDateTime=08:57:45.656  age=6.552s  STALE  <- HTTP 200 but STALE
+  [   fault t=  8.44s] HTTP 200  createdDateTime=08:57:39.104  receivedDateTime=08:57:46.171  age=7.068s  STALE  <- HTTP 200 but STALE
+  [   fault t=  8.95s] HTTP 200  createdDateTime=08:57:39.104  receivedDateTime=08:57:46.686  age=7.583s  STALE  <- HTTP 200 but STALE
+  [   fault t=  9.47s] HTTP 200  createdDateTime=08:57:39.104  receivedDateTime=08:57:47.201  age=8.098s  STALE  <- HTTP 200 but STALE
+  [   fault t=  9.98s] HTTP 200  createdDateTime=08:57:39.104  receivedDateTime=08:57:47.716  age=8.612s  STALE  <- HTTP 200 but STALE
+  [   fault t= 10.49s] HTTP 200  createdDateTime=08:57:39.104  receivedDateTime=08:57:48.230  age=9.127s  STALE  <- HTTP 200 but STALE
+  [   fault t= 11.01s] HTTP 200  createdDateTime=08:57:39.104  receivedDateTime=08:57:48.745  age=9.642s  STALE  <- HTTP 200 but STALE
+  [   fault t= 11.53s] HTTP 200  createdDateTime=08:57:39.104  receivedDateTime=08:57:49.262  age=10.159s  STALE  <- HTTP 200 but STALE
+  [   fault t= 12.04s] HTTP 200  createdDateTime=08:57:39.104  receivedDateTime=08:57:49.778  age=10.675s  STALE  <- HTTP 200 but STALE
+  [   fault t= 12.56s] HTTP 200  createdDateTime=08:57:39.104  receivedDateTime=08:57:50.296  age=11.192s  STALE  <- HTTP 200 but STALE
+  [   fault t= 13.07s] HTTP 200  createdDateTime=08:57:39.104  receivedDateTime=08:57:50.810  age=11.707s  STALE  <- HTTP 200 but STALE
+  [   fault t= 13.59s] HTTP 200  createdDateTime=08:57:39.104  receivedDateTime=08:57:51.326  age=12.223s  STALE  <- HTTP 200 but STALE
+» fault_window_closed  [ACTIVE]  {"stop_reason": "duration_elapsed"}
+» rolling_back  [ROLLING_BACK]
+» rollback_result  [ROLLING_BACK]  {"attempted": true, "verified": true, "by": "orchestrator", "detail": "target running and unpaused"}
+» verifying_recovery  [VERIFYING_RECOVERY]
+  [recovery t= 13.98s] HTTP 200  createdDateTime=08:57:39.104  receivedDateTime=08:57:51.711  age=12.608s  STALE  <- HTTP 200 but STALE
+  [recovery t= 14.49s] HTTP 200  createdDateTime=08:57:51.938  receivedDateTime=08:57:52.226  age=0.289s  FRESH
+  [recovery t= 15.01s] HTTP 200  createdDateTime=08:57:51.938  receivedDateTime=08:57:52.740  age=0.803s  FRESH
+  [recovery t= 15.52s] HTTP 200  createdDateTime=08:57:52.940  receivedDateTime=08:57:53.254  age=0.315s  FRESH
+  [recovery t= 16.03s] HTTP 200  createdDateTime=08:57:52.940  receivedDateTime=08:57:53.769  age=0.829s  FRESH
+  [recovery t= 16.55s] HTTP 200  createdDateTime=08:57:53.942  receivedDateTime=08:57:54.283  age=0.341s  FRESH
+» recovery_verified  [VERIFYING_RECOVERY]  {"verified": true, "time_to_first_fresh_s": 0.532, "time_to_verified_s": 2.637, "criteria": "rollback verified by docker inspect (running, not paused) AND 3 successive advances of createdDateTime beyond the last pre-rollback value, each with HTTP 200 and data_age_s <= 5.0s", "detail": "3 fresh advances observed"}
+» finished  [COMPLETED]  {"stop_reason": "duration_elapsed"}
+
+Result: COMPLETED  stop_reason=duration_elapsed
+  fault verified: True   stale detected: True (time to detection 4.768s)
+  during fault: HTTP-200 ratio 1.0, max data age 12.223s, 15 healthy-but-stale observations
+  rollback: verified=True by=orchestrator   recovery: verified=True first fresh after 0.532s, verified after 2.637s
+  evidence: C:\Users\anshu\OneDrive\Desktop\PROJECT\ResiliencePilot\backend\data\runs\20261010T085737Z-c9bda7.json
+
+[1;36m=== 5/5  Kill switch: 25 s experiment, emergency stop fired from a separate process after 6 s ===[0m
+
+[1;31m>>> KILL SWITCH[0m
+EMERGENCY_STOP written to C:/Users/anshu/OneDrive/Desktop/PROJECT/ResiliencePilot/backend/data
+fms-forwarder: running=true paused=false
+» validated  [VALIDATED]  {"approved_by": "demo-operator", "hypothesis": "Kill switch rolls back well before 25 s"}
+» precheck_start  [PRECHECK]
+» precheck_passed  [PRECHECK]  {"fresh_samples": 3}
+» injecting  [INJECTING]  {"target": "fms-forwarder", "mechanism": "docker_pause"}
+» fault_active  [ACTIVE]  {"verified_by": "docker inspect State.Paused == true"}
+» fault_window_closed  [ACTIVE]  {"stop_reason": "emergency_stop"}
+» rolling_back  [ROLLING_BACK]
+» rollback_result  [ROLLING_BACK]  {"attempted": true, "verified": true, "by": "orchestrator", "detail": "target running and unpaused"}
+» verifying_recovery  [VERIFYING_RECOVERY]
+» recovery_verified  [VERIFYING_RECOVERY]  {"verified": true, "time_to_first_fresh_s": 0.017, "time_to_verified_s": 2.123, "criteria": "rollback verified by docker inspect (running, not paused) AND 3 successive advances of createdDateTime beyond the last pre-rollback value, each with HTTP 200 and data_age_s <= 5.0s", "detail": "3 fresh advances observed"}
+» finished  [ABORTED]  {"stop_reason": "emergency_stop"}
+Result: ABORTED  stop_reason=emergency_stop
+  during fault: HTTP-200 ratio 1.0, max data age 3.852s, 0 healthy-but-stale observations
+  rollback: verified=True by=orchestrator   recovery: verified=True first fresh after 0.017s, verified after 2.123s
+
+New runs are refused until a human resets after checking the stack:
+REFUSED: emergency stop engaged; run `reset` after checking the stack
+{
+  "state": "READY",
+
+[1;36m=== Done. Evidence: backend/data/runs/  (rp runs / rp show <id>) ===[0m
