@@ -174,6 +174,15 @@ def main(argv: list[str] | None = None) -> int:
             provider = None if args.offline else OllamaProvider(load_ai_config(REPO_ROOT))
             result = {"plan": ai_plan(entries, findings, provider), "analysis": ai_analyse(findings, provider)}
             md = render_ai(result["plan"], result["analysis"])
+            if provider is not None:  # log every prompt, raw response, model and validation result
+                from datetime import datetime, timezone
+                from .evidence import EvidenceStore
+                stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+                log = EvidenceStore(load_safety_config().data_dir).save_ai_calls(stamp, {
+                    "logged_at": datetime.now(timezone.utc).isoformat(), "command": "rp advise",
+                    "runs_dir": d.name, "n_runs": len(runs), "calls": provider.calls})
+                result["ai_call_log"] = str(log)
+                md += f"\nModel calls (prompts, raw responses, validation): `{log.name}` in the evidence store's ai_calls/.\n"
             print(json.dumps(result, indent=2) if args.json else md)
             if args.out:
                 out = Path(args.out)

@@ -49,6 +49,9 @@ svg text{fill:var(--fg);font-family:inherit}
 .small{font-size:12.5px;color:var(--muted)}
 .lv{font-size:11px;font-weight:700;text-transform:uppercase;border-radius:6px;padding:1px 6px;border:1px solid}
 .lv.high{color:var(--bad);border-color:var(--bad)}.lv.medium{color:var(--warn);border-color:var(--warn)}
+.pick{list-style:none;padding:0;margin:8px 0}.pick li{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:6px 0}
+.pick li.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}.pick label{display:flex;gap:8px;align-items:baseline;cursor:pointer}
+.pick ul{margin:4px 0 0 18px;padding:0}input[type=text]{font:inherit;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--fg);min-width:0;width:100%;box-sizing:border-box}
 .cmd{font:12px/1.4 ui-monospace,Consolas,monospace;background:var(--chipbg);border:1px solid var(--line);border-radius:6px;padding:3px 6px;display:inline-block;overflow-wrap:anywhere}
 #recent td:first-child{width:auto}
 #recent .mono{white-space:nowrap;overflow-wrap:normal}
@@ -80,9 +83,13 @@ svg text{fill:var(--fg);font-family:inherit}
 <div class="card"><div class="k">Data age, last 60 s (red = stale)</div><div id="chart"></div></div>
 
 <div class="row" style="margin-top:14px">
-  <div class="card"><div class="k" style="margin-bottom:8px">Controls</div>
-    <div class="btns"><button id="bStart">Start</button><button id="bKill">Kill</button><button id="bReset">Reset</button></div>
-    <div style="font-size:12.5px;color:var(--muted);margin-top:8px" id="tmpl"></div>
+  <div class="card"><div class="k" style="margin-bottom:4px">Controls · pick one experiment, approve with your name</div>
+    <div class="small">Ranked by the rule-based planner (most informative / riskiest first). Target and duration come from the
+      catalogue on the server; validation, the one-run lock, the watchdog and the kill switch always apply.</div>
+    <ol class="pick" id="pick"><li class="na">loading proposals…</li></ol>
+    <label class="small" for="approver">Approver (your name, recorded with the run)</label>
+    <input type="text" id="approver" maxlength="80" autocomplete="name" placeholder="e.g. Jane Doe">
+    <div class="btns" style="margin-top:10px"><button id="bStart">Approve &amp; start</button><button id="bKill">Kill</button><button id="bReset">Reset</button></div>
     <div id="msg"></div></div>
   <div class="card"><div class="k" style="margin-bottom:6px">Last run (from its evidence record)</div><table id="last"></table></div>
 </div>
@@ -103,7 +110,7 @@ svg text{fill:var(--fg);font-family:inherit}
 <div class="card"><div class="k" style="margin-bottom:6px">Recent runs</div><div style="overflow-x:auto"><table id="recent"></table></div></div>
 <div class="row" style="margin-top:14px">
   <div class="card plan"><div class="k">Next experiments · rule-based planner (proposals only)</div>
-    <div class="small" style="margin-top:4px">Nothing here runs. A proposal needs a human approver on the CLI; the Start button only runs its fixed template.</div>
+    <div class="small" style="margin-top:4px">Read-only view for the selected evidence source. To run one, pick it in Controls and approve it with your name.</div>
     <ol id="plan"></ol></div>
   <div class="card find"><div class="k">Findings (most severe first)</div><ol id="findings"></ol></div>
 </div>
@@ -197,11 +204,28 @@ function render(s){
   $("created").innerHTML=L.created_at?esc(L.created_at):NR; $("received").innerHTML=L.received_at?esc(L.received_at):NR;
   $("observed").innerHTML=L.observed_at?esc(L.observed_at):NR;
   steps(s); chart(s.recent||[],s.stale_threshold_s); lastRun(s.last_run);
-  var lr=s.last_run&&s.last_run.run_id; if(lr!==lastSeenRun){if(lastSeenRun!==null&&SRC==="local")loadInsights(); lastSeenRun=lr;}
+  var lr=s.last_run&&s.last_run.run_id; if(lr!==lastSeenRun){if(lastSeenRun!==null){if(SRC==="local")loadInsights(); loadProposals();} lastSeenRun=lr;}
   var b=$("banner"); if(s.blocked){b.style.display="block";b.textContent="Blocked: "+(s.latched_reason||"emergency stop engaged")+". Check the stack, then Reset.";} else b.style.display="none";
-  $("bStart").disabled=busyReq||s.state!=="READY"||s.blocked; $("bReset").disabled=busyReq||!s.blocked||s.state==="BUSY";
-  var t=s.template; $("tmpl").textContent="Start runs the single approved template: "+t.experiment_type+" on "+t.target+" for "+t.duration_s+" s, approver \""+t.approved_by+"\". Watchdog and kill switch always apply.";
+  READY=!busyReq&&s.state==="READY"&&!s.blocked; startState(); $("bReset").disabled=busyReq||!s.blocked||s.state==="BUSY";
 }
+var READY=false, PICK=null, PROPS=[];
+function startState(){$("bStart").disabled=!(READY&&PICK&&/[A-Za-z\u00C0-\uFFFF]/.test($("approver").value));}
+function loadProposals(){
+  fetch("/api/proposals",{cache:"no-store"}).then(function(r){return r.json();}).then(function(d){
+    if(d.detail){$("pick").innerHTML='<li class="na">'+esc(d.detail)+'</li>';return;}
+    PROPS=d.proposals; if(PICK&&!PROPS.some(function(p){return p.experiment_id===PICK;}))PICK=null;
+    $("pick").innerHTML=PROPS.map(function(p){var sel=p.experiment_id===PICK;
+      return '<li'+(sel?' class="sel"':'')+'><label><input type="radio" name="exp" value="'+esc(p.experiment_id)+'"'+(sel?' checked':'')+'>'+
+        '<span><b>#'+p.rank+' '+esc(p.experiment_id)+'</b> · '+esc(p.mechanism)+' <span class="mono">'+esc(p.target)+'</span> for '+p.duration_s+' s'+
+        ' <span class="small">(priority '+p.priority.toFixed(3)+')</span></span></label>'+
+        '<div class="small"><b>Why:</b> '+p.rationale.map(esc).join("; ")+'</div>'+
+        '<div class="small"><b>Predicted:</b><ul>'+p.predicted_symptoms.map(function(x){return "<li>"+esc(x)+"</li>";}).join("")+'</ul></div>'+
+        '<div class="small"><b>Risks:</b><ul>'+p.risks.map(function(x){return "<li>"+esc(x)+"</li>";}).join("")+'</ul></div></li>';}).join("");
+    Array.prototype.forEach.call(document.querySelectorAll('input[name=exp]'),function(r){r.onchange=function(){PICK=this.value;loadProposals();startState();};});
+    startState();
+  }).catch(function(e){$("pick").innerHTML='<li class="na">proposals unavailable: '+esc(String(e))+'</li>';});
+}
+$("approver").oninput=startState;
 
 function poll(){fetch("/api/status",{cache:"no-store"}).then(function(r){return r.json();}).then(render)
   .catch(function(){$("ctl").textContent="backend unreachable";$("ctl").className="chip bad";}).finally(function(){setTimeout(poll,500);});}
@@ -213,8 +237,9 @@ function post(path,body,label){
     .then(function(x){$("msg").innerHTML=(x[0]<300?'<span style="color:var(--ok)">':'<span style="color:var(--bad)">')+label+": HTTP "+x[0]+" · "+esc(x[1].detail||x[1].run_id||JSON.stringify(x[1]))+"</span>";})
     .catch(function(e){$("msg").textContent=label+" failed: "+e;}).finally(function(){busyReq=false;});
 }
-$("bStart").onclick=function(){var t=S&&S.template; if(!t)return;
-  if(confirm("Approve and start?\n\n"+t.experiment_type+": pause "+t.target+" for "+t.duration_s+" s\nHypothesis: "+t.hypothesis)) post("/api/run",null,"Start");};
+$("bStart").onclick=function(){var p=PROPS.find(function(x){return x.experiment_id===PICK;}), name=$("approver").value.trim(); if(!p||!name)return;
+  if(confirm("Approve and start as \""+name+"\"?\n\n#"+p.rank+" "+p.experiment_id+": "+p.mechanism+" "+p.target+" for "+p.duration_s+" s\n\nPredicted:\n- "+p.predicted_symptoms.join("\n- ")+"\n\nRisks:\n- "+p.risks.join("\n- ")))
+    post("/api/run",{experiment_id:p.experiment_id,approved_by:name},"Start");};
 $("bKill").onclick=function(){post("/api/kill",null,"Kill");};
 $("bReset").onclick=function(){if(confirm("Reset the safety latch? Only do this after checking the stack is healthy.")) post("/api/reset",{confirm:true},"Reset");};
 
@@ -257,6 +282,7 @@ function loadInsights(){
 }
 ["srcLocal","srcDay2"].forEach(function(id){$(id).onclick=function(){SRC=this.dataset.src;try{localStorage.setItem("rp-src",SRC);}catch(e){} loadInsights();};});
 loadInsights();
+loadProposals();
 poll();
 })();
 </script>

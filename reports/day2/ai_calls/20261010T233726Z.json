@@ -1,0 +1,165 @@
+{
+  "logged_at": "2026-10-10T23:37:26.873870+00:00",
+  "command": "rp advise",
+  "runs_dir": "day2",
+  "n_runs": 21,
+  "calls": [
+    {
+      "provider": "ollama:qwen2.5:7b",
+      "model": "qwen2.5:7b",
+      "base_url": "http://127.0.0.1:11434",
+      "options": {
+        "temperature": 0,
+        "seed": 42
+      },
+      "system_prompt": "You are an advisory reliability engineer for a local test sandbox of the Eclipse SDV Fleet Management Blueprint. You may ONLY reorder the candidate experiments given to you, by id. You cannot add, remove or modify experiments, durations or commands, and a human approves every run. Put the most informative and riskiest experiment first. Give a short technical rationale per candidate that cites the evidence numbers provided. Answer with JSON only.",
+      "user_prompt": "{\n \"candidates\": [\n  {\n   \"id\": \"dependency_failure@influxDB\",\n   \"mechanism\": \"docker_stop\",\n   \"rule_based_rank\": 1,\n   \"priority\": 0.601,\n   \"evidence\": {\n    \"runs\": 11,\n    \"full_window_runs\": 3,\n    \"latched\": 2,\n    \"unresolved\": 8,\n    \"untested_hypotheses\": 3,\n    \"dependents\": [\n     \"fms-consumer\",\n     \"fms-server\",\n     \"grafana\"\n    ]\n   },\n   \"rationale\": [\n    \"3 full-window run(s) so far (information 0.25)\",\n    \"3/5 expected symptoms still labelled HYPOTHESIS in config/experiments.json\",\n    \"8/11 past runs unresolved (latched or cut short)\",\n    \"3 neighbouring container(s) in the dependency map: fms-consumer, fms-server, grafana\",\n    \"latch rate 2/11\",\n    \"mechanism docker_stop (severity 1.0)\",\n    \"score so far: median 61.6 (range 57.5-63.2)\"\n   ]\n  },\n  {\n   \"id\": \"service_crash@fms-forwarder\",\n   \"mechanism\": \"docker_stop\",\n   \"rule_based_rank\": 2,\n   \"priority\": 0.522,\n   \"evidence\": {\n    \"runs\": 8,\n    \"full_window_runs\": 5,\n    \"latched\": 3,\n    \"unresolved\": 3,\n    \"untested_hypotheses\": 3,\n    \"dependents\": [\n     \"databroker\",\n     \"fms-zenoh-router\"\n    ]\n   },\n   \"rationale\": [\n    \"5 full-window run(s) so far (information 0.17)\",\n    \"3/3 expected symptoms still labelled HYPOTHESIS in config/experiments.json\",\n    \"3/8 past runs unresolved (latched or cut short)\",\n    \"2 neighbouring container(s) in the dependency map: databroker, fms-zenoh-router\",\n    \"latch rate 3/8\",\n    \"mechanism docker_stop (severity 0.7)\",\n    \"score so far: median 65.1 (range 61.9-65.3)\"\n   ]\n  },\n  {\n   \"id\": \"telemetry_stall@fms-forwarder\",\n   \"mechanism\": \"docker_pause\",\n   \"rule_based_rank\": 3,\n   \"priority\": 0.237,\n   \"evidence\": {\n    \"runs\": 2,\n    \"full_window_runs\": 2,\n    \"latched\": 0,\n    \"unresolved\": 0,\n    \"untested_hypotheses\": 0,\n    \"dependents\": [\n     \"databroker\",\n     \"fms-zenoh-router\"\n    ]\n   },\n   \"rationale\": [\n    \"2 full-window run(s) so far (information 0.33)\",\n    \"0/3 expected symptoms still labelled HYPOTHESIS in config/experiments.json\",\n    \"0/2 past runs unresolved (latched or cut short)\",\n    \"2 neighbouring container(s) in the dependency map: databroker, fms-zenoh-router\",\n    \"latch rate 0/2\",\n    \"mechanism docker_pause (severity 0.3)\",\n    \"score so far: median 62.2 (range 60.9-63.5)\"\n   ]\n  }\n ],\n \"findings\": [\n  {\n   \"rule\": \"not_recovered\",\n   \"level\": \"high\",\n   \"experiment\": \"dependency_failure\",\n   \"runs\": 1\n  },\n  {\n   \"rule\": \"silent_after_rollback\",\n   \"level\": \"high\",\n   \"experiment\": \"dependency_failure\",\n   \"runs\": 2\n  },\n  {\n   \"rule\": \"silent_during_fault\",\n   \"level\": \"high\",\n   \"experiment\": \"service_crash\",\n   \"runs\": 5\n  },\n  {\n   \"rule\": \"silent_during_fault\",\n   \"level\": \"high\",\n   \"experiment\": \"telemetry_stall\",\n   \"runs\": 2\n  },\n  {\n   \"rule\": \"slow_recovery\",\n   \"level\": \"medium\",\n   \"experiment\": \"dependency_failure\",\n   \"runs\": 4\n  },\n  {\n   \"rule\": \"data_loss\",\n   \"level\": \"medium\",\n   \"experiment\": \"dependency_failure\",\n   \"runs\": 9\n  },\n  {\n   \"rule\": \"blast_radius\",\n   \"level\": \"medium\",\n   \"experiment\": \"service_crash\",\n   \"runs\": 1\n  }\n ],\n \"facts\": [\n  \"[verified] fms-server answers HTTP 200 with the last stored status while the forwarder is paused or stopped; receivedDateTime is the request time, so only createdDateTime shows the data is stale\",\n  \"[verified] fms-forwarder ignores SIGTERM: docker stop always waits the 2 s grace and kills it (exit 137)\",\n  \"[verified] with InfluxDB down, fms-server requests first block ~4 s, then fail fast with HTTP 500\",\n  \"[verified] after InfluxDB is back, recovery takes 20-27 s; in some runs the API stays HTTP 200 with frozen createdDateTime (silent), in others it answers HTTP 500 (visible)\",\n  \"[verified] fms-consumer drops statuses it cannot write ('failed to write data to influx'); no buffering or backfill\",\n  \"[verified] createdDateTime advances every 1.0 s at the API although the forwarder publishes every 0.5 s\",\n  \"[hypothesis] the isahc/libcurl HTTP client caches failed DNS lookups, delaying recovery after InfluxDB restarts\",\n  \"[hypothesis] during that time fms-consumer (silent case) or fms-server (visible case) kept failing to resolve InfluxDB's host name; reported from container logs, log excerpts not committed\"\n ]\n}",
+      "schema": {
+        "type": "object",
+        "required": [
+          "order",
+          "summary"
+        ],
+        "properties": {
+          "summary": {
+            "type": "string"
+          },
+          "order": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "rationale"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "rationale": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "http_status": 200,
+      "raw_response": "{\"model\":\"qwen2.5:7b\",\"created_at\":\"2026-10-10T23:35:48.473705Z\",\"message\":{\"role\":\"assistant\",\"content\":\"{\\n  \\\"summary\\\": \\\"Reordered experiments based on risk and informativeness, prioritizing the most risky and informative first.\\\",\\n  \\\"order\\\": [\\n    {\\n      \\\"id\\\": \\\"dependency_failure@influxDB\\\",\\n      \\\"rationale\\\": \\\"This experiment has the highest risk due to multiple unresolved runs, high latch rate, and critical dependencies. It also has the highest priority score and evidence of high severity issues.\\\"\\n    },\\n    {\\n      \\\"id\\\": \\\"service_crash@fms-forwarder\\\",\\n      \\\"rationale\\\": \\\"This experiment has a high number of full-window runs and unresolved issues, indicating significant risk. It also has a high priority score and critical dependencies.\\\"\\n    },\\n    {\\n      \\\"id\\\": \\\"telemetry_stall@fms-forwarder\\\",\\n      \\\"rationale\\\": \\\"While this experiment has the least unresolved issues, it still provides valuable information about the system's behavior under stress. It has a lower priority score but is still informative.\\\"\\n    }\\n  ]\\n}\"},\"done\":true,\"done_reason\":\"stop\",\"total_duration\":22013350750,\"load_duration\":4340931959,\"prompt_eval_count\":1415,\"prompt_eval_cached_count\":0,\"prompt_eval_duration\":7960310000,\"eval_count\":204,\"eval_duration\":9689992000}",
+      "error": null,
+      "validation": "accepted: exact permutation of the allowlisted candidates"
+    },
+    {
+      "provider": "ollama:qwen2.5:7b",
+      "model": "qwen2.5:7b",
+      "base_url": "http://127.0.0.1:11434",
+      "options": {
+        "temperature": 0,
+        "seed": 42
+      },
+      "system_prompt": "You are an advisory reliability engineer analysing measured fault-injection results from a local sandbox of the Eclipse SDV Fleet Management Blueprint. For each finding id, state the most likely root cause using ONLY that finding's own facts and runs; name the component the facts name; say 'hypothesis' when you rely on a fact labelled hypothesis; if a run has an operator_note, take it into account. Cite only run ids that appear in that finding. Give a ranked remediation playbook (verify, mitigate, fix steps). You never execute anything. Answer with JSON only.",
+      "user_prompt": "{\n \"findings\": [\n  {\n   \"id\": \"F1\",\n   \"rule\": \"not_recovered\",\n   \"level\": \"high\",\n   \"experiment\": \"dependency_failure\",\n   \"runs\": [\n    {\n     \"run\": \"20261010T192839Z-179795\",\n     \"detail\": \"not recovered within 30 s (criteria not met within 30.0s (advances=1))\"\n    }\n   ],\n   \"facts\": [\n    \"[verified] after InfluxDB is back, recovery takes 20-27 s; in some runs the API stays HTTP 200 with frozen createdDateTime (silent), in others it answers HTTP 500 (visible)\",\n    \"[hypothesis] during that time fms-consumer (silent case) or fms-server (visible case) kept failing to resolve InfluxDB's host name; reported from container logs, log excerpts not committed\",\n    \"[hypothesis] the isahc/libcurl HTTP client caches failed DNS lookups, delaying recovery after InfluxDB restarts\"\n   ]\n  },\n  {\n   \"id\": \"F2\",\n   \"rule\": \"silent_after_rollback\",\n   \"level\": \"high\",\n   \"experiment\": \"dependency_failure\",\n   \"runs\": [\n    {\n     \"run\": \"20261010T192839Z-179795\",\n     \"detail\": \"47 recovery polls HTTP 200 but stale (~23.5 s at 0.5 s polling)\"\n    },\n    {\n     \"run\": \"20261010T203817Z-01d396\",\n     \"detail\": \"42 recovery polls HTTP 200 but stale (~21 s at 0.5 s polling)\"\n    }\n   ],\n   \"facts\": [\n    \"[verified] after InfluxDB is back, recovery takes 20-27 s; in some runs the API stays HTTP 200 with frozen createdDateTime (silent), in others it answers HTTP 500 (visible)\",\n    \"[hypothesis] during that time fms-consumer (silent case) or fms-server (visible case) kept failing to resolve InfluxDB's host name; reported from container logs, log excerpts not committed\",\n    \"[hypothesis] the isahc/libcurl HTTP client caches failed DNS lookups, delaying recovery after InfluxDB restarts\"\n   ]\n  },\n  {\n   \"id\": \"F3\",\n   \"rule\": \"silent_during_fault\",\n   \"level\": \"high\",\n   \"experiment\": \"service_crash\",\n   \"runs\": [\n    {\n     \"run\": \"20261010T181441Z-920732\",\n     \"detail\": \"9 fault polls HTTP 200 but stale\"\n    },\n    {\n     \"run\": \"20261010T181503Z-31eafe\",\n     \"detail\": \"9 fault polls HTTP 200 but stale\"\n    },\n    {\n     \"run\": \"20261010T181525Z-8fa234\",\n     \"detail\": \"9 fault polls HTTP 200 but stale\"\n    },\n    {\n     \"run\": \"20261010T182331Z-b89ae0\",\n     \"detail\": \"9 fault polls HTTP 200 but stale\"\n    },\n    {\n     \"run\": \"20261010T183644Z-8941cc\",\n     \"detail\": \"9 fault polls HTTP 200 but stale\"\n    }\n   ],\n   \"facts\": [\n    \"[verified] fms-server answers HTTP 200 with the last stored status while the forwarder is paused or stopped; receivedDateTime is the request time, so only createdDateTime shows the data is stale\",\n    \"[verified] fms-forwarder ignores SIGTERM: docker stop always waits the 2 s grace and kills it (exit 137)\",\n    \"[verified] createdDateTime advances every 1.0 s at the API although the forwarder publishes every 0.5 s\"\n   ]\n  },\n  {\n   \"id\": \"F4\",\n   \"rule\": \"silent_during_fault\",\n   \"level\": \"high\",\n   \"experiment\": \"telemetry_stall\",\n   \"runs\": [\n    {\n     \"run\": \"20261010T181417Z-c1ab0d\",\n     \"detail\": \"9 fault polls HTTP 200 but stale\"\n    },\n    {\n     \"run\": \"20261010T183702Z-21c920\",\n     \"detail\": \"12 fault polls HTTP 200 but stale\"\n    }\n   ],\n   \"facts\": [\n    \"[verified] fms-server answers HTTP 200 with the last stored status while the forwarder is paused or stopped; receivedDateTime is the request time, so only createdDateTime shows the data is stale\",\n    \"[verified] fms-forwarder ignores SIGTERM: docker stop always waits the 2 s grace and kills it (exit 137)\",\n    \"[verified] createdDateTime advances every 1.0 s at the API although the forwarder publishes every 0.5 s\"\n   ]\n  },\n  {\n   \"id\": \"F5\",\n   \"rule\": \"slow_recovery\",\n   \"level\": \"medium\",\n   \"experiment\": \"dependency_failure\",\n   \"runs\": [\n    {\n     \"run\": \"20261010T193003Z-e2eacd\",\n     \"detail\": \"recovery verified after 24.247 s\"\n    },\n    {\n     \"run\": \"20261010T203712Z-08b9dd\",\n     \"detail\": \"recovery verified after 20.488 s\"\n    },\n    {\n     \"run\": \"20261010T203817Z-01d396\",\n     \"detail\": \"recovery verified after 27.143 s\"\n    },\n    {\n     \"run\": \"20261010T211735Z-748875\",\n     \"detail\": \"recovery verified after 21.265 s\"\n    }\n   ],\n   \"facts\": [\n    \"[verified] with InfluxDB down, fms-server requests first block ~4 s, then fail fast with HTTP 500\",\n    \"[verified] after InfluxDB is back, recovery takes 20-27 s; in some runs the API stays HTTP 200 with frozen createdDateTime (silent), in others it answers HTTP 500 (visible)\",\n    \"[hypothesis] during that time fms-consumer (silent case) or fms-server (visible case) kept failing to resolve InfluxDB's host name; reported from container logs, log excerpts not committed\",\n    \"[hypothesis] the isahc/libcurl HTTP client caches failed DNS lookups, delaying recovery after InfluxDB restarts\"\n   ]\n  },\n  {\n   \"id\": \"F6\",\n   \"rule\": \"data_loss\",\n   \"level\": \"medium\",\n   \"experiment\": \"dependency_failure\",\n   \"runs\": [\n    {\n     \"run\": \"20261010T185355Z-540224\",\n     \"detail\": \"4.011 s of stored telemetry missing\"\n    },\n    {\n     \"run\": \"20261010T185440Z-2f33aa\",\n     \"detail\": \"1.504 s of stored telemetry missing\"\n    },\n    {\n     \"run\": \"20261010T185448Z-595a16\",\n     \"detail\": \"3.508 s of stored telemetry missing\"\n    },\n    {\n     \"run\": \"20261010T191733Z-7123d9\",\n     \"detail\": \"2.503 s of stored telemetry missing\"\n    },\n    {\n     \"run\": \"20261010T193003Z-e2eacd\",\n     \"detail\": \"3.511 s of stored telemetry missing\"\n    },\n    {\n     \"run\": \"20261010T203616Z-596e45\",\n     \"detail\": \"7.033 s of stored telemetry missing\"\n    },\n    {\n     \"run\": \"20261010T203712Z-08b9dd\",\n     \"detail\": \"9.562 s of stored telemetry missing\"\n    },\n    {\n     \"run\": \"20261010T203817Z-01d396\",\n     \"detail\": \"30.182 s of stored telemetry missing\"\n    },\n    {\n     \"run\": \"20261010T211735Z-748875\",\n     \"detail\": \"30.197 s of stored telemetry missing\"\n    }\n   ],\n   \"facts\": [\n    \"[verified] fms-consumer drops statuses it cannot write ('failed to write data to influx'); no buffering or backfill\",\n    \"[verified] with InfluxDB down, fms-server requests first block ~4 s, then fail fast with HTTP 500\"\n   ]\n  },\n  {\n   \"id\": \"F7\",\n   \"rule\": \"blast_radius\",\n   \"level\": \"medium\",\n   \"experiment\": \"service_crash\",\n   \"runs\": [\n    {\n     \"run\": \"20261010T182500Z-4aa9f7\",\n     \"detail\": \"changed: grafana\",\n     \"operator_note\": \"deliberate guard test: operator ran `docker restart grafana` during the fault\"\n    }\n   ],\n   \"facts\": []\n  }\n ]\n}",
+      "schema": {
+        "type": "object",
+        "required": [
+          "analyses"
+        ],
+        "properties": {
+          "analyses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "finding",
+                "root_cause",
+                "confidence",
+                "evidence_runs",
+                "playbook"
+              ],
+              "properties": {
+                "finding": {
+                  "type": "string"
+                },
+                "root_cause": {
+                  "type": "string"
+                },
+                "confidence": {
+                  "type": "string",
+                  "enum": [
+                    "low",
+                    "medium",
+                    "high"
+                  ]
+                },
+                "evidence_runs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "playbook": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "kind",
+                      "step"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "verify",
+                          "mitigate",
+                          "fix"
+                        ]
+                      },
+                      "step": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "http_status": 200,
+      "raw_response": "{\"model\":\"qwen2.5:7b\",\"created_at\":\"2026-10-10T23:37:26.864946Z\",\"message\":{\"role\":\"assistant\",\"content\":\"{\\n  \\\"analyses\\\": [\\n    {\\n      \\\"finding\\\": \\\"F1\\\",\\n      \\\"root_cause\\\": \\\"The HTTP client (isahc/libcurl) caches failed DNS lookups, delaying recovery after InfluxDB restarts.\\\",\\n      \\\"confidence\\\": \\\"high\\\",\\n      \\\"evidence_runs\\\": [\\\"20261010T192839Z-179795\\\"],\\n      \\\"playbook\\\": [\\n        {\\n          \\\"kind\\\": \\\"verify\\\",\\n          \\\"step\\\": \\\"Check DNS resolution and caching behavior of the HTTP client.\\\"\\n        },\\n        {\\n          \\\"kind\\\": \\\"mitigate\\\",\\n          \\\"step\\\": \\\"Configure the HTTP client to disable DNS caching or implement a DNS cache flush mechanism.\\\"\\n        },\\n        {\\n          \\\"kind\\\": \\\"fix\\\",\\n          \\\"step\\\": \\\"Update the HTTP client configuration to ensure it does not cache failed DNS lookups.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"finding\\\": \\\"F2\\\",\\n      \\\"root_cause\\\": \\\"The HTTP client (isahc/libcurl) caches failed DNS lookups, delaying recovery after InfluxDB restarts.\\\",\\n      \\\"confidence\\\": \\\"high\\\",\\n      \\\"evidence_runs\\\": [\\\"20261010T192839Z-179795\\\", \\\"20261010T203817Z-01d396\\\"],\\n      \\\"playbook\\\": [\\n        {\\n          \\\"kind\\\": \\\"verify\\\",\\n          \\\"step\\\": \\\"Check DNS resolution and caching behavior of the HTTP client.\\\"\\n        },\\n        {\\n          \\\"kind\\\": \\\"mitigate\\\",\\n          \\\"step\\\": \\\"Configure the HTTP client to disable DNS caching or implement a DNS cache flush mechanism.\\\"\\n        },\\n        {\\n          \\\"kind\\\": \\\"fix\\\",\\n          \\\"step\\\": \\\"Update the HTTP client configuration to ensure it does not cache failed DNS lookups.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"finding\\\": \\\"F3\\\",\\n      \\\"root_cause\\\": \\\"The fms-forwarder ignores SIGTERM and continues running, causing stale data to be served.\\\",\\n      \\\"confidence\\\": \\\"high\\\",\\n      \\\"evidence_runs\\\": [\\\"20261010T181441Z-920732\\\", \\\"20261010T181503Z-31eafe\\\", \\\"20261010T181525Z-8fa234\\\", \\\"20261010T182331Z-b89ae0\\\", \\\"20261010T183644Z-8941cc\\\"],\\n      \\\"playbook\\\": [\\n        {\\n          \\\"kind\\\": \\\"verify\\\",\\n          \\\"step\\\": \\\"Check the signal handling and shutdown behavior of the fms-forwarder.\\\"\\n        },\\n        {\\n          \\\"kind\\\": \\\"mitigate\\\",\\n          \\\"step\\\": \\\"Ensure the fms-forwarder properly handles SIGTERM and gracefully exits.\\\"\\n        },\\n        {\\n          \\\"kind\\\": \\\"fix\\\",\\n          \\\"step\\\": \\\"Update the fms-forwarder to properly handle shutdown signals and ensure it stops processing new data.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"finding\\\": \\\"F4\\\",\\n      \\\"root_cause\\\": \\\"The fms-forwarder ignores SIGTERM and continues running, causing stale data to be served.\\\",\\n      \\\"confidence\\\": \\\"high\\\",\\n      \\\"evidence_runs\\\": [\\\"20261010T181417Z-c1ab0d\\\", \\\"20261010T183702Z-21c920\\\"],\\n      \\\"playbook\\\": [\\n        {\\n          \\\"kind\\\": \\\"verify\\\",\\n          \\\"step\\\": \\\"Check the signal handling and shutdown behavior of the fms-forwarder.\\\"\\n        },\\n        {\\n          \\\"kind\\\": \\\"mitigate\\\",\\n          \\\"step\\\": \\\"Ensure the fms-forwarder properly handles SIGTERM and gracefully exits.\\\"\\n        },\\n        {\\n          \\\"kind\\\": \\\"fix\\\",\\n          \\\"step\\\": \\\"Update the fms-forwarder to properly handle shutdown signals and ensure it stops processing new data.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"finding\\\": \\\"F5\\\",\\n      \\\"root_cause\\\": \\\"The HTTP client (isahc/libcurl) caches failed DNS lookups, delaying recovery after InfluxDB restarts.\\\",\\n      \\\"confidence\\\": \\\"high\\\",\\n      \\\"evidence_runs\\\": [\\\"20261010T193003Z-e2eacd\\\", \\\"20261010T203712Z-08b9dd\\\", \\\"20261010T203817Z-01d396\\\", \\\"20261010T211735Z-748875\\\"],\\n      \\\"playbook\\\": [\\n        {\\n          \\\"kind\\\": \\\"verify\\\",\\n          \\\"step\\\": \\\"Check DNS resolution and caching behavior of the HTTP client.\\\"\\n        },\\n        {\\n          \\\"kind\\\": \\\"mitigate\\\",\\n          \\\"step\\\": \\\"Configure the HTTP client to disable DNS caching or implement a DNS cache flush mechanism.\\\"\\n        },\\n        {\\n          \\\"kind\\\": \\\"fix\\\",\\n          \\\"step\\\": \\\"Update the HTTP client configuration to ensure it does not cache failed DNS lookups.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"finding\\\": \\\"F6\\\",\\n      \\\"root_cause\\\": \\\"The fms-consumer drops statuses it cannot write ('failed to write data to influx'); no buffering or backfill.\\\",\\n      \\\"confidence\\\": \\\"high\\\",\\n      \\\"evidence_runs\\\": [\\\"20261010T185355Z-540224\\\", \\\"20261010T185440Z-2f33aa\\\", \\\"20261010T185448Z-595a16\\\", \\\"20261010T191733Z-7123d9\\\", \\\"20261010T193003Z-e2eacd\\\", \\\"20261010T203616Z-596e45\\\", \\\"20261010T203712Z-08b9dd\\\", \\\"20261010T203817Z-01d396\\\", \\\"20261010T211735Z-748875\\\"],\\n      \\\"playbook\\\": [\\n        {\\n          \\\"kind\\\": \\\"verify\\\",\\n          \\\"step\\\": \\\"Check the data handling and buffering mechanisms of the fms-consumer.\\\"\\n        },\\n        {\\n          \\\"kind\\\": \\\"mitigate\\\",\\n          \\\"step\\\": \\\"Implement a backfill mechanism to recover lost data.\\\"\\n        },\\n        {\\n          \\\"kind\\\": \\\"fix\\\",\\n          \\\"step\\\": \\\"Update the fms-consumer to buffer data and retry writes, or implement a backfill strategy.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"finding\\\": \\\"F7\\\",\\n      \\\"root_cause\\\": \\\"The fms-forwarder ignores SIGTERM and continues running, causing stale data to be served.\\\",\\n      \\\"confidence\\\": \\\"medium\\\",\\n      \\\"evidence_runs\\\": [\\\"20261010T182500Z-4aa9f7\\\"],\\n      \\\"playbook\\\": [\\n        {\\n          \\\"kind\\\": \\\"verify\\\",\\n          \\\"step\\\": \\\"Check the signal handling and shutdown behavior of the fms-forwarder.\\\"\\n        },\\n        {\\n          \\\"kind\\\": \\\"mitigate\\\",\\n          \\\"step\\\": \\\"Ensure the fms-forwarder properly handles SIGTERM and gracefully exits.\\\"\\n        },\\n        {\\n          \\\"kind\\\": \\\"fix\\\",\\n          \\\"step\\\": \\\"Update the fms-forwarder to properly handle shutdown signals and ensure it stops processing new data.\\\"\\n        }\\n      ]\\n    }\\n  ]\\n}\"},\"done\":true,\"done_reason\":\"stop\",\"total_duration\":98357052208,\"load_duration\":5124333,\"prompt_eval_count\":2387,\"prompt_eval_cached_count\":9,\"prompt_eval_duration\":13738149000,\"eval_count\":1707,\"eval_duration\":84573913000}",
+      "error": null,
+      "validation": {
+        "accepted": [
+          "F6"
+        ],
+        "rejected": [
+          {
+            "finding": "F1",
+            "reason": "states DNS caching as fact; it is an unverified hypothesis"
+          },
+          {
+            "finding": "F2",
+            "reason": "does not name the component the evidence points to (one of ['consumer'])"
+          },
+          {
+            "finding": "F3",
+            "reason": "does not name the component the evidence points to (one of ['fms-server', 'stored status', 'last status', 'createdDateTime'])"
+          },
+          {
+            "finding": "F4",
+            "reason": "does not name the component the evidence points to (one of ['fms-server', 'stored status', 'last status', 'createdDateTime'])"
+          },
+          {
+            "finding": "F5",
+            "reason": "states DNS caching as fact; it is an unverified hypothesis"
+          },
+          {
+            "finding": "F7",
+            "reason": "ignores the run annotation (deliberate guard test: operator ran `docker restart grafana` during the fault)"
+          }
+        ],
+        "missing": []
+      }
+    }
+  ]
+}
