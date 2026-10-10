@@ -89,7 +89,7 @@ function svgEl(t,a,txt){var e=document.createElementNS("http://www.w3.org/2000/s
 var S=null, busyReq=false;
 
 function gauge(age,thr){
-  var max=thr*2.5, W=260,H=150,cx=130,cy=130,r=100;
+  var max=thr*2.5, W=260,H=185,cx=130,cy=130,r=100;
   function pt(v){var a=Math.PI*(1-Math.min(Math.max(v,0),max)/max);return [cx+r*Math.cos(a),cy-r*Math.sin(a)];}
   function arc(v0,v1,col,w){var p0=pt(v0),p1=pt(v1);return svgEl("path",{d:"M"+p0[0]+","+p0[1]+" A"+r+","+r+" 0 0 1 "+p1[0]+","+p1[1],fill:"none",stroke:col,"stroke-width":w,"stroke-linecap":"butt"});}
   var s=svgEl("svg",{viewBox:"0 0 "+W+" "+H,width:"100%",style:"max-width:320px;display:block;margin:auto"});
@@ -98,7 +98,7 @@ function gauge(age,thr){
   if(age!==null&&age!==undefined){var p=pt(age);
     s.appendChild(svgEl("line",{x1:cx,y1:cy,x2:p[0],y2:p[1],stroke:css("--fg"),"stroke-width":3}));
     s.appendChild(svgEl("circle",{cx:cx,cy:cy,r:5,fill:css("--fg")}));}
-  s.appendChild(svgEl("text",{x:cx,y:cy-28,"text-anchor":"middle","font-size":"30","font-weight":"700",fill:(age>thr)?css("--bad"):css("--fg")},
+  s.appendChild(svgEl("text",{x:cx,y:cy+46,"text-anchor":"middle","font-size":"30","font-weight":"700",fill:(age>thr)?css("--bad"):css("--fg")},
     (age===null||age===undefined)?"not recorded":age.toFixed(2)+" s"));
   s.appendChild(svgEl("text",{x:cx-r,y:cy+16,"text-anchor":"middle","font-size":"10",fill:css("--muted")},"0"));
   s.appendChild(svgEl("text",{x:cx+r,y:cy+16,"text-anchor":"middle","font-size":"10",fill:css("--muted")},max+"s+"));

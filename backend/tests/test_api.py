@@ -136,3 +136,14 @@ def test_api_module_has_no_safety_logic_of_its_own():
     src = open(api_mod.__file__, encoding="utf-8").read()
     for forbidden in ("docker.pause", "docker.unpause", ".pause(", ".unpause(", "mark_fault_active", "clear_fault_marker"):
         assert forbidden not in src
+
+
+def test_last_run_never_shows_an_in_progress_record(env):
+    first = env["a"].post("/api/run").json()["run_id"]
+    wait_idle(env)
+    env["a"].post("/api/run")
+    wait_paused(env)                                   # second run is active now
+    s = env["a"].get("/api/status").json()
+    assert s["state"] == "BUSY"
+    assert s["last_run"]["run_id"] == first and s["last_run"]["state"] == "COMPLETED"
+    wait_idle(env)

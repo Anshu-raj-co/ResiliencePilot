@@ -144,8 +144,30 @@ def create_app(cfg: SafetyConfig, catalog: dict[str, ExperimentSpec], ctl: Safet
         ids = store.list_runs()
         return store.load_run(ids[-1]) if ids else None
 
+    def _latest_finished_record() -> dict | None:
+        """Newest run that has reached a final state; an in-progress record is not a 'last run'."""
+        for rid in reversed(store.list_runs()):
+            rec = store.load_run(rid)
+            if rec is not None and rec.get("state") in ("COMPLETED", "ABORTED", "LATCHED_UNSAFE"):
+                return rec
+        return None
+
+    def _ctl_status() -> dict:
+        # Read controller state under the controller's own (re-entrant) lock, which begin()/end() hold while they
+        # create/delete run.lock. On Windows a concurrent reader makes that delete fail with PermissionError and
+        # leaves a stale lock (fail-safe, but stuck BUSY). Serialising our reads avoids that in-process race.
+        # emergency_stop() does not take this lock, so Kill is never delayed by it.
+        # While a run is active in this process, the orchestrator deletes/replaces controller files (marker, latch
+        # state); answer from memory and open none of them, so our polling can never make those operations fail.
+        with ctl._lock:
+            active = ctl._active_run
+            if active is not None:
+                return {"state": "BUSY", "latched_reason": None, "latched_since": None, "active_run": active,
+                        "run_lock": None, "emergency_stop_engaged": ctl.stop_file.exists(), "fault_marker": None}
+            return ctl.status()
+
     def _blocked() -> bool:
-        st = ctl.status()
+        st = _ctl_status()
         return st["state"] == "LATCHED_UNSAFE" or st["emergency_stop_engaged"]
 
     @app.get("/", response_class=HTMLResponse)
@@ -154,7 +176,7 @@ def create_app(cfg: SafetyConfig, catalog: dict[str, ExperimentSpec], ctl: Safet
 
     @app.get("/api/status")
     def status() -> dict:
-        st = ctl.status()
+        st = _ctl_status()
         with live.lock:
             latest, recent = live.latest, list(live.recent)
             run = None if live.run is None else {**live.run, "events": list(live.run["events"])}
@@ -164,7 +186,7 @@ def create_app(cfg: SafetyConfig, catalog: dict[str, ExperimentSpec], ctl: Safet
             "latched_reason": st["latched_reason"], "emergency_stop_engaged": st["emergency_stop_engaged"],
             "active_run": st["active_run"], "stale_threshold_s": cfg.stale_threshold_s,
             "poll_interval_s": cfg.poll_interval_s, "latest": latest, "recent": recent, "current_run": run,
-            "last_run": _run_summary(_latest_record()), "template": template,
+            "last_run": _run_summary(_latest_finished_record()), "template": template,
             "startup_recovery": getattr(app.state, "recovered", None),
         }
 

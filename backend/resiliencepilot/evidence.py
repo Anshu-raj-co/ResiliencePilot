@@ -35,7 +35,14 @@ class EvidenceStore:
         if not run_id.replace("-", "").isalnum():
             return None
         p = self.data_dir / "runs" / f"{run_id}.json"
-        return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+        for attempt in range(40):  # Windows: opening while a writer replaces the file -> PermissionError
+            try:
+                return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+            except PermissionError:
+                if attempt == 39:
+                    raise
+                time.sleep(0.025)
+        return None
 
     def list_runs(self) -> list[str]:
         return sorted(p.stem for p in (self.data_dir / "runs").glob("*.json"))

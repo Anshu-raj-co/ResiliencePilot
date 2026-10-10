@@ -1,6 +1,6 @@
 # Handoff
 
-_Updated: 2026-10-10 ~15:55 IST, live dashboard in progress (branch feat/day1-dashboard)_
+_Updated: 2026-10-10 ~16:30 IST, live dashboard (branch feat/day1-dashboard)_
 
 ## Where things are
 - Branch `wip/day1-recon` (pushed). Last known-good on main: `401a23d`.
@@ -25,7 +25,15 @@ _Updated: 2026-10-10 ~15:55 IST, live dashboard in progress (branch feat/day1-da
 - Page: `backend/resiliencepilot/static/dashboard.html`. Tests: `backend/tests/test_api.py`.
 - Evidence-store fix (`evidence.py`): retry `os.replace` on Windows PermissionError. A concurrent reader (the
   dashboard) made the final run save fail with "Access is denied". Safety/orchestrator/fault code is unchanged.
-- Status: unit tests pass (66). The live end-to-end run from the page is still to do.
+- Evidence store also retries reads (`load_run`) on Windows PermissionError.
+- **Open defect in `safety.py` (not fixed: the safety code is off-limits without the lead's approval).** On Windows,
+  `run.lock` / `active_fault.json` deletes and `safety_state.json` replaces fail with PermissionError when another
+  thread or process has the file open. Seen as: a stale run.lock (stuck BUSY) and a spurious LATCHED_UNSAFE after a
+  verified rollback. Both fail safe. The dashboard avoids it in-process: it reads status under `ctl._lock` and opens
+  no controller files while its own run is active (40/40 clean API-suite runs). A CLI `rp status` in another
+  terminal at the exact moment can still trigger it. Proposed fix: retry-on-PermissionError in `_atomic_write` and
+  the unlink calls.
+- Live end-to-end run from the page passed (run `20261010T102525Z-e0bb59`); see the PR description.
 
 ## Where the evidence lives
 | What | Where |
