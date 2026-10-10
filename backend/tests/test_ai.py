@@ -242,3 +242,16 @@ def test_prompt_gives_each_finding_only_its_own_facts_and_notes():
     assert first["runs"][0]["operator_note"] == "deliberate test"
     assert any("drops statuses" in x for x in loss["facts"]) and not any("SIGTERM" in x for x in loss["facts"])
     assert "facts" not in body                       # no global fact dump
+
+
+def test_unhedged_name_resolution_claim_is_rejected():
+    assert "hypothesis" in grounding_problem(
+        "not_recovered", "dependency_failure", "fms-consumer failed to resolve the InfluxDB host name.", [])
+    assert grounding_problem(
+        "not_recovered", "dependency_failure", "fms-consumer possibly failed to resolve the host name (hypothesis).", []) is None
+
+
+def test_name_resolution_is_labelled_hypothesis_in_facts():
+    for label, text in ai.FACTS:
+        if "resolve" in text or "dns" in text.lower():
+            assert label == "hypothesis", text
