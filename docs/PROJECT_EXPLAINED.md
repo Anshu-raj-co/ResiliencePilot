@@ -218,7 +218,7 @@ All code is in `backend/resiliencepilot/`.
 | **Evidence store** | Saves every run (request, timeline, every observation, rollback, recovery, impact) and every baseline as JSON. | Claims must be checkable later. | `evidence.py` → `backend/data/` (local); curated real runs in `reports/day1/` |
 | **Docker wrapper** | The single place that calls the `docker` command line. | Tests replace it with a fake, so safety logic is tested without Docker. | `docker_cli.py` |
 | **CLI** | Commands: `status`, `observe`, `baseline`, `run`, `stop`, `reset`, `runs`, `show`, `deps`, `show-baseline`, `report`, `serve`. Also installed as the `rp` command. | The operator's control panel. | `__main__.py`, `views.py` |
-| **Local API + live dashboard** | `rp serve` starts a FastAPI server bound to 127.0.0.1 only. It serves one static page that polls `GET /api/status` every 500 ms and shows a data-age gauge, an HTTP status chip, a phase timeline, a live chart and Start / Kill / Reset buttons. `POST /api/run` takes **no parameters** and runs one approved template (pause `fms-forwarder` for 12 s, approver `dashboard-operator`). Kill and Reset call the same safety-controller functions as the CLI. Busy → 409, latched → 423. | Lets a person run and watch the experiment live without the terminal, without adding a second path around the safety rules. | `api.py`, `static/dashboard.html` |
+| **Local API + live dashboard** | `rp serve` starts a FastAPI server bound to 127.0.0.1 only. It serves one static page that polls `GET /api/status` every 500 ms and shows a data-age gauge, an HTTP status chip, a phase timeline, a live chart and Start / Kill / Reset buttons. `GET /api/proposals` lists the rule-based planner's ranking with reasons, predicted symptoms and risks; `POST /api/run` accepts exactly `{experiment_id, approved_by}` (a catalogue id and the approver's typed name); target and duration come from the catalogue (PR #25). The dashboard refuses to start with a GUARDRAIL-DEMO profile set. Kill and Reset call the same safety-controller functions as the CLI. Busy → 409, latched → 423. | Lets a person run and watch the experiment live without the terminal, without adding a second path around the safety rules. | `api.py`, `static/dashboard.html` |
 | **Explainer page** | `rp report` builds one standalone, offline HTML file from recorded runs: dependency map, baseline, and a chart of data age against the 5 s threshold while every poll was HTTP 200. It is read-only and has no buttons that start or stop anything. | Makes the impact easy to see for non-engineers. | `explainer.py` → `reports/day1/explainer.html` |
 
 ### The safety controller in detail
@@ -259,7 +259,7 @@ All code is in `backend/resiliencepilot/`.
 | **Python 3.13** | It was installed, it supports typing, and it is fast to test (D-007). |
 | **pydantic** | Validates the experiment request strictly (`extra="forbid"`: any unknown field is an error). |
 | **httpx** | Makes the HTTP calls to the rFMS API. |
-| **pytest** | The tests on `main`: 80 unit tests, plus 3 live tests that need the running stack (83 with `RP_LIVE=1`, verified 2026-10-10 after merging PRs #9–#13). |
+| **pytest** | The tests on `main`: 315 unit tests, plus 3 live tests that need the running stack (318 with `RP_LIVE=1`; verified 2026-10-11 on `main` after PR #27). |
 | **`docker` command line via one wrapper** | One small file that tests can fake; no Docker socket is ever handed to any other component. |
 | **FastAPI + uvicorn** | Run the local API and dashboard (`rp serve`), bound to 127.0.0.1 only. |
 | **Frontend** | No framework, npm or build step. The dashboard is one static HTML file (inline CSS/JS) served by the API. The explainer is a generated HTML file that needs no server. |
@@ -442,18 +442,15 @@ run with a precise timestamp: 0.6 s from switch to verified rollback.
 
 ## 12. Run it yourself
 
-> **Test counts below are for current `main` (`50f1f42`, after PRs #9–#13):** 80 unit tests, 83 with live tests
-> (verified 2026-10-10). The clean-clone re-test described next was done earlier, at `519fff8`, before the dashboard
-> was merged, when the counts were 52 and 55. The clean-clone run has not been repeated on `50f1f42`.
+> **Test counts below are for `main` after PR #27 (2026-10-11):** 315 unit tests, 318 with the live tests.
 >
-> **Re-tested from a clean clone on 2026-10-10** (fresh `git clone` of `main` at `519fff8` into a new folder):
-> steps 1–3 and 5–8 all passed: 52 unit tests, 55 with live tests, `deps`, `observe`, a 20-sample baseline, the full
-> demo (exit 0: COMPLETED stall, ABORTED kill-switch run, refused run, reset), the kill switch, `reset` and `rp report`.
-> **Not re-tested from the clean clone:** step 4 (`stack-up.sh`) and step 9 (`stack-down.sh`), because a stack was
-> already running on the test machine. Both were run from the main checkout earlier the same day.
-> The clean clone hit **two real problems**, now in the troubleshooting table: the submodule clone failed on a long
-> folder path ("Filename too long"), and CLI output crashed with `UnicodeEncodeError` when piped, until
-> `PYTHONIOENCODING=utf-8` was set.
+> **Latest clean-clone test (2026-10-11, macOS 27.0.1 on Apple Silicon):** a fresh `git clone` into a new folder,
+> with the cached `fms-server`/`fms-consumer` images deleted first. Every step passed: `stack-up.sh` (both images
+> pulled as linux/amd64, D-023), `stack-status.sh` (8/8, exit 0; exit 1 after `stack-down`), tests, `rp status`, the
+> full demo (exit 0, 42 s) and `rp serve`. The steps below use Windows paths (`.venv/Scripts/`); on macOS use
+> `.venv/bin/`. Earlier clean-clone tests on Windows hit two problems, both in the troubleshooting table: the
+> submodule clone failed on a long folder path ("Filename too long"), and CLI output crashed with
+> `UnicodeEncodeError` when piped (fixed by PR #9). Windows was not re-tested after the 2026-10-11 changes.
 
 ### Prerequisites
 
@@ -490,7 +487,7 @@ python -m venv .venv
 .venv/Scripts/python -m pytest -q
 cd ..
 ```
-Success: `80 passed, 3 skipped` (the 3 skipped are the live tests).
+Success: `315 passed, 11 skipped` (3 are the live tests; 8 are platform-specific).
 
 **4. Start the stack**
 ```bash
@@ -505,7 +502,7 @@ cd backend
 .venv/Scripts/python -m resiliencepilot status       # "state": "READY"
 .venv/Scripts/python -m resiliencepilot deps         # dependency map with live network checks
 .venv/Scripts/python -m resiliencepilot observe -n 6 # FRESH lines, createdDateTime advancing
-RP_LIVE=1 .venv/Scripts/python -m pytest -q          # 83 passed
+RP_LIVE=1 .venv/Scripts/python -m pytest -q          # 318 passed, 8 skipped
 ```
 
 **6. Baseline**
@@ -545,8 +542,9 @@ print `REFUSED: emergency stop engaged…`. If `status` says `LATCHED_UNSAFE`, r
 ```bash
 cd backend && .venv/Scripts/rp serve      # open http://127.0.0.1:8765/ ; Ctrl+C to stop
 ```
-Success: the page shows READY, HTTP 200 and a fresh data age. Start asks you to confirm, then pauses `fms-forwarder` for
-12 s: HTTP stays 200 while the gauge passes 5 s and "STALE while HTTP 200" appears. Kill stops it; Reset (with
+Success: the page shows READY, HTTP 200 and a fresh data age. Pick one ranked experiment (e.g. `telemetry_stall`),
+type your name, and click *Approve & start*; a confirm dialog shows the pick, predicted symptoms and risks. For
+`telemetry_stall` (12 s): HTTP stays 200 while the gauge passes 5 s and "STALE while HTTP 200" appears. Kill stops it; Reset (with
 confirmation) clears the stop. Don't run CLI experiments in another terminal at the same time.
 
 **10. Stop the stack**

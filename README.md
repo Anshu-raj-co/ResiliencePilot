@@ -73,7 +73,7 @@ git -c core.longpaths=true submodule update --init   # long-paths flag avoids "F
 ./scripts/stack-up.sh && ./scripts/stack-status.sh    # 8 containers; HTTP 200 with vehicle data; exits 1 if any is down
 cd backend && python3.13 -m venv .venv
 .venv/bin/pip install -e ".[test]"                    # Windows: .venv/Scripts/...
-.venv/bin/python -m pytest -q                         # 270 unit tests (RP_LIVE=1 adds live read-only tests)
+.venv/bin/python -m pytest -q                         # 315 unit tests (RP_LIVE=1: 318, adds live read-only tests)
 .venv/bin/rp serve                                    # dashboard at http://127.0.0.1:8765/
 ```
 
@@ -91,7 +91,7 @@ If a port is taken, stop the other program; the databroker port can be moved, e.
 | `rp score` · `rp plan` · `rp findings` | Resilience Score, rule-based experiment ranking, findings report | no |
 | `rp discover` | Dependency graph from `docker inspect`, diffed against the map | no |
 | `rp advise [--offline]` | Advisory AI planner + analyst on local Ollama, rule-based fallback | no |
-| `rp serve` | Dashboard + local API on 127.0.0.1:8765 | Start runs one fixed template |
+| `rp serve` | Dashboard + local API on 127.0.0.1:8765 | **yes**: pick one ranked experiment, approve with your typed name |
 
 Demo: `docs/demo/DAY2_DEMO_SCRIPT.md` (3 minutes). Day-1 scripted demo: `RP_APPROVER="<name>" ./scripts/demo-day1.sh`.
 
@@ -107,7 +107,7 @@ Demo: `docs/demo/DAY2_DEMO_SCRIPT.md` (3 minutes). Day-1 scripted demo: `RP_APPR
 - The AI is advisory: no shell, Docker, credentials or safety state; it can only reorder allowlisted proposals,
   and every analyst answer is checked against the recorded evidence (`docs/AI_LAYER.md`).
 
-Full rules: `CLAUDE.md`. Decisions: `docs/DECISIONS.md` (D-001 … D-022).
+Full rules: `CLAUDE.md`. Decisions: `docs/DECISIONS.md` (D-001 … D-023).
 
 ## What the AI does and does not do
 

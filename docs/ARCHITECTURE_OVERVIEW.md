@@ -81,4 +81,4 @@ VERIFYING_RECOVERY → COMPLETED | ABORTED | LATCHED_UNSAFE`
 ## Tech
 
 Python 3.13 (FastAPI, httpx, pydantic), Docker CLI, vanilla HTML/SVG dashboard, Ollama (`qwen2.5:7b`) for the
-optional AI layer. 270 unit tests; live tests behind `RP_LIVE=1`.
+optional AI layer. 315 unit tests (318 with the live tests behind `RP_LIVE=1`).
