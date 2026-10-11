@@ -11,120 +11,161 @@
 -->
 <style>
 :root {
-  --bg: #0d141c; --card: rgba(16, 24, 34, 0.92); --line: #2a3a4c; --text: #e3ebf3; --muted: #93a4b6;
+  --bg: #0d141c; --card: #111a24; --line: #2a3a4c; --text: #e3ebf3; --muted: #93a4b6;
   --fresh: #2fc6a6; --stale: #f2a33a; --bad: #ef5a5a; --nodata: #8c97a3; --accent: #6fa8ff; --illus: #c9a6ff;
+  --gap: 10px;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
-  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
-#gl { position: fixed; inset: 0; display: block; }
+  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+/* Layout: the 3D stage gets its own grid cell, so no card ever covers the scene or another card. */
+body { display: grid; height: 100vh; height: 100dvh; overflow: hidden; padding: var(--gap); gap: var(--gap);
+  grid-template-columns: minmax(260px, 330px) minmax(0, 1fr) minmax(260px, 320px);
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas: "left stage right" "tl tl tl"; }
+#side { display: contents; } /* wide: #left and #right are grid items of their own */
+#left, #right { min-height: 0; display: flex; flex-direction: column; gap: var(--gap); overflow: auto; }
+#left { grid-area: left; } #right { grid-area: right; }
+#stage { grid-area: stage; position: relative; min-width: 0; min-height: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+#gl { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+#gl:active { cursor: grabbing; }
+#viewbar { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 11px; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
-.src { color: var(--muted); font: 11px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; margin-top: 2px; word-break: break-all; }
+.src { color: var(--muted); font: 11px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; margin-top: 2px; overflow-wrap: anywhere; }
 .illus { color: var(--illus); font-weight: 600; }
 .nr { color: var(--muted); font-style: italic; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-#top { position: fixed; left: 12px; top: 12px; width: min(500px, calc(100vw - 24px)); font-size: 12px; }
-#top h1 { margin: 0; font-size: 17px; letter-spacing: .2px; }
+button { font: inherit; }
+.btn { background: #1b2735; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 4px 9px; cursor: pointer; }
+.btn.on { background: var(--accent); color: #06111f; border-color: var(--accent); }
+.linkbtn { background: #1b2735; color: var(--text); border: 1px solid var(--illus); border-radius: 6px; padding: 3px 9px; cursor: pointer; }
+#top { font-size: 12px; }
+#top h1 { margin: 0; font-size: 16px; letter-spacing: .2px; }
 #top .sub { color: var(--muted); margin: 2px 0 8px; }
-#top select { width: 100%; max-width: 100%; background: #0b1118; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 5px; font: inherit; }
+#top select { width: 100%; background: #0b1118; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 5px; font: inherit; }
 #runmeta { margin-top: 6px; }
 #runmeta b { font-weight: 600; }
-#api { position: fixed; right: 12px; top: 12px; width: 280px; font-size: 12px; }
-#api h2, #legend h2, #events h2 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+h2.cap, #legend summary { margin: 0 0 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+#api { font-size: 12px; flex: 0 0 auto; }
 #api .row { display: flex; justify-content: space-between; gap: 8px; }
 #api .big { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+#api .kv { grid-template-columns: max-content minmax(0, 1fr); }
 .badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-weight: 700; font-size: 12px; }
 .b-fresh { background: var(--fresh); color: #062018; } .b-stale { background: var(--stale); color: #2a1700; }
 .b-bad { background: var(--bad); color: #2a0000; } .b-nodata { background: var(--nodata); color: #111; }
-#legend { position: fixed; left: 12px; bottom: 104px; width: 310px; font-size: 12px; padding: 8px 10px; }
-#legend summary { cursor: pointer; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .6px; }
+#legend { font-size: 12px; }
+#legend summary { cursor: pointer; margin: 0; }
+#legend[open] summary { margin-bottom: 6px; }
 #legend .li { display: flex; gap: 8px; align-items: flex-start; margin: 3px 0; }
 #legend .sw { flex: 0 0 14px; height: 14px; border-radius: 3px; margin-top: 2px; }
-#events { position: fixed; right: 12px; bottom: 104px; width: 280px; max-height: 28vh; overflow: auto; font-size: 12px; padding: 8px 10px; }
+#events { flex: 1 1 auto; min-height: 120px; overflow: auto; font-size: 12px; }
 #events ol { margin: 0; padding: 0; list-style: none; }
-#events li { display: grid; grid-template-columns: 56px 1fr; gap: 6px; padding: 2px 0; color: var(--muted); cursor: pointer; }
+#events li { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 6px; padding: 2px 0; color: var(--muted); cursor: pointer; }
 #events li.past { color: var(--text); }
 #events li.now { color: #fff; font-weight: 600; }
-#tl { position: fixed; left: 12px; right: 12px; bottom: 12px; display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; }
-.linkbtn { background: #1b2735; color: var(--text); border: 1px solid #c9a6ff; border-radius: 6px; padding: 3px 9px; font: inherit; cursor: pointer; }
-#tl button { background: #1b2735; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 4px 9px; font: inherit; cursor: pointer; }
-#tl button.on { background: var(--accent); color: #06111f; border-color: var(--accent); }
+#tl { grid-area: tl; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+#tl .ctl { display: flex; gap: 6px; flex-wrap: wrap; }
 #scrubwrap { position: relative; height: 54px; }
 #scrub { position: absolute; left: 0; right: 0; top: 2px; width: 100%; margin: 0; }
 #marks { position: absolute; left: 0; right: 0; top: 20px; height: 34px; pointer-events: none; }
 #marks i { position: absolute; top: 0; width: 2px; height: 34px; margin-left: -1px; opacity: .9; }
 #marks i b { position: absolute; top: -1px; left: 4px; font: 600 10px/1 system-ui; white-space: nowrap; font-style: normal; }
 #clock { font-variant-numeric: tabular-nums; white-space: nowrap; }
-#toast { position: fixed; left: 50%; top: 14px; transform: translateX(-50%); max-width: min(520px, 60vw); display: none; }
-#panel { background: #101822; position: fixed; right: 12px; top: 12px; bottom: 104px; width: min(420px, calc(100vw - 24px)); overflow: auto; display: none; z-index: 5; }
-#panel h3 { margin: 0 0 2px; font-size: 16px; }
+#toast { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); width: max-content; max-width: min(520px, calc(100% - 20px)); display: none; z-index: 2; }
+/* Inspector: covers the right column (same grid cell), never the scene. */
+#panel { grid-area: right; z-index: 5; overflow: auto; display: none; min-height: 0; }
+#panel h3 { margin: 0 0 2px; font-size: 16px; padding-right: 64px; }
 #panel h4 { margin: 12px 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
 #panel .close { float: right; background: none; border: 1px solid var(--line); color: var(--text); border-radius: 6px; cursor: pointer; }
-.kv { display: grid; grid-template-columns: minmax(110px, 42%) 1fr; gap: 2px 8px; }
+.kv { display: grid; grid-template-columns: minmax(96px, 42%) minmax(0, 1fr); gap: 2px 8px; }
 .kv > div { overflow-wrap: anywhere; min-width: 0; }
 .kv > div:nth-child(odd) { color: var(--muted); }
 .fact { margin: 4px 0 6px; }
 .role { display: inline-block; border: 1px solid var(--line); border-radius: 10px; padding: 0 8px; margin: 2px 4px 2px 0; font-size: 12px; }
-#tip { background: #101822; position: fixed; pointer-events: none; max-width: 340px; display: none; z-index: 6; }
+#tip { position: fixed; pointer-events: none; max-width: 340px; display: none; z-index: 6; box-shadow: 0 6px 20px rgba(0,0,0,.45); }
 #nogl { position: fixed; inset: 0; display: none; place-items: center; z-index: 10; background: var(--bg); padding: 16px; }
 #nogl .card { max-width: 520px; }
 #nogl a { color: var(--accent); }
-@media (max-width: 900px) {
-  #legend, #events { display: none; }
-  #api { top: auto; bottom: 172px; left: 12px; right: 12px; width: auto; }
-  #api .kv, #api .src { display: none; }
-  #api .big { font-size: 20px; }
-  #top .sub, #runmeta .src { display: none; }
-  #tl { grid-template-columns: 1fr; gap: 4px; }
-  #panel { bottom: 172px; }
+/* Mid-size windows: slimmer side columns so the stage keeps most of the width. */
+@media (max-width: 1400px) {
+  body { grid-template-columns: minmax(240px, 280px) minmax(0, 1fr) minmax(240px, 280px); }
+  #api .big { font-size: 24px; }
+}
+/* Wide panel when the window allows it. */
+@media (min-width: 1500px) {
+  body { grid-template-columns: 340px minmax(0, 1fr) 360px; }
+}
+/* Mid-size or short landscape windows: one scrolling sidebar (run info, API, events) beside the stage. */
+@media (max-width: 1100px) and (min-width: 761px) {
+  body { grid-template-columns: minmax(250px, 290px) minmax(0, 1fr); grid-template-areas: "side stage" "tl tl"; }
+  #side { grid-area: side; display: flex; flex-direction: column; gap: var(--gap); overflow: auto; min-height: 0; }
+  #left, #right { display: contents; }
+  #top { order: 1; } #api { order: 2; } #events { order: 3; flex: 0 0 auto; overflow: visible; } #legend { order: 4; }
+  #panel { grid-area: side; }
+  #api .big { font-size: 22px; }
+}
+/* Phone width: one column, the page scrolls; the stage keeps a fixed share of the screen. */
+@media (max-width: 760px) {
+  body { display: flex; flex-direction: column; height: auto; min-height: 100%; overflow: auto; }
+  #left { order: 1; overflow: visible; } #stage { order: 2; height: clamp(260px, 82vw, 62vh); flex: 0 0 auto; }
+  #viewbar span { display: none; }
+  #tl { order: 3; grid-template-columns: 1fr; gap: 4px; } #right { order: 4; overflow: visible; }
+  #events { max-height: 40vh; }
+  #panel { position: fixed; left: 0; right: 0; bottom: 0; max-height: 72vh; border-radius: 12px 12px 0 0; }
 }
 </style>
 </head>
 <body>
-<canvas id="gl"></canvas>
-
 <div id="nogl"><div class="card">
   <h1 style="margin-top:0;font-size:18px">Visualization of recorded runs</h1>
   <p>This page needs WebGL, which is not available in this browser (or the bundled <span class="mono">three.r160.min.js</span> did not load).</p>
   <p>The same recorded evidence is in the static explainer page: <a id="nogl-link" href="../../reports/day1/explainer.html">reports/day1/explainer.html</a>.</p>
 </div></div>
 
-<div id="top" class="card">
-  <h1>Visualization of recorded runs</h1>
-  <div class="sub">ResiliencePilot SDV · read-only replay of committed run records (nothing here starts, stops or resets anything).
-    Anything not taken from data is labelled <span class="illus">illustrative</span>.</div>
-  <label for="runsel" class="sub" style="display:block;margin:0 0 3px">Run</label>
-  <select id="runsel"></select>
-  <div id="runmeta"></div>
-  <div style="margin-top:6px"><button id="tolbtn" class="linkbtn">Tolerances &amp; AI</button> <span class="sub">Hover anything for facts; click for the full inspector.</span></div>
+<div id="side">
+<aside id="left">
+  <div id="top" class="card">
+    <h1>Visualization of recorded runs</h1>
+    <div class="sub">ResiliencePilot SDV · read-only replay of committed run records (nothing here starts, stops or resets anything).
+      Anything not taken from data is labelled <span class="illus">illustrative</span>.</div>
+    <label for="runsel" class="sub" style="display:block;margin:0 0 3px">Run</label>
+    <select id="runsel"></select>
+    <div id="runmeta"></div>
+    <div style="margin-top:8px"><button id="tolbtn" class="linkbtn">Tolerances &amp; AI</button></div>
+  </div>
+  <details id="legend" class="card" open><summary>Legend</summary>
+    <div class="li"><span class="sw" style="background:#e9eef3"></span><div><b>Main truck: what the API reports.</b> Moves only when the recorded <span class="mono">createdDateTime</span> advances.</div></div>
+    <div class="li"><span class="sw" style="background:#9fc3ff;opacity:.45;border:1px dashed #9fc3ff"></span><div><span class="illus">Ghost truck: illustrative: what the vehicle may be doing, not measured.</span></div></div>
+    <div class="li"><span class="sw" style="background:#3a4552"></span><div>Loop road: <span class="illus">illustrative path</span> (run records store no <span class="mono">gnssPosition</span>).</div></div>
+    <div class="li"><span class="sw" style="background:var(--fresh)"></span><div>Packet, latest recorded observation <b>FRESH</b></div></div>
+    <div class="li"><span class="sw" style="background:var(--stale)"></span><div>Packet, latest recorded observation <b>STALE</b></div></div>
+    <div class="li"><span class="sw" style="background:var(--nodata)"></span><div>No API answer recorded / edge not measured</div></div>
+    <div class="li"><span class="sw" style="background:#f2a33a;border-radius:0"></span><div>Building: fault target inside its recorded fault window</div></div>
+    <div style="color:var(--muted);margin-top:4px">Packet motion and spacing are <span class="illus">illustrative</span>; their colour comes from the recorded observation.</div>
+  </details>
+</aside>
+<aside id="right">
+  <div id="api" class="card"></div>
+  <div id="events" class="card"><h2 class="cap">Recorded events</h2><ol id="evlist"></ol><div class="src" id="evsrc"></div></div>
+</aside>
 </div>
 
-<div id="api" class="card"></div>
+<main id="stage">
+  <canvas id="gl" aria-label="3D scene of the recorded run"></canvas>
+  <div id="toast" class="card"></div>
+  <div id="viewbar"><span>drag: rotate · wheel: zoom · hover/click: facts</span><button id="resetview" class="btn" title="Fit the whole scene in view">Reset view</button></div>
+</main>
 
-<details id="legend" class="card" open><summary>Legend</summary>
-  <div class="li"><span class="sw" style="background:#e9eef3"></span><div><b>Main truck: what the API reports.</b> Moves only when the recorded <span class="mono">createdDateTime</span> advances.</div></div>
-  <div class="li"><span class="sw" style="background:#9fc3ff;opacity:.45;border:1px dashed #9fc3ff"></span><div><span class="illus">Ghost truck: illustrative: what the vehicle may be doing, not measured.</span></div></div>
-  <div class="li"><span class="sw" style="background:#3a4552"></span><div>Loop road: <span class="illus">illustrative path</span> (run records store no <span class="mono">gnssPosition</span>).</div></div>
-  <div class="li"><span class="sw" style="background:var(--fresh)"></span><div>Packet, latest recorded observation <b>FRESH</b></div></div>
-  <div class="li"><span class="sw" style="background:var(--stale)"></span><div>Packet, latest recorded observation <b>STALE</b></div></div>
-  <div class="li"><span class="sw" style="background:var(--nodata)"></span><div>No API answer recorded / edge not measured</div></div>
-  <div class="li"><span class="sw" style="background:#f2a33a;border-radius:0"></span><div>Building: fault target inside its recorded fault window</div></div>
-  <div style="color:var(--muted);margin-top:4px">Packet motion and spacing are <span class="illus">illustrative</span>; their colour comes from the recorded observation.</div>
-</details>
-
-<div id="events" class="card"><h2>Recorded events</h2><ol id="evlist"></ol><div class="src" id="evsrc"></div></div>
-
-<div id="toast" class="card"></div>
 <div id="panel" class="card"></div>
 <div id="tip" class="card"></div>
 
 <div id="tl" class="card">
-  <div style="display:flex;gap:6px;flex-wrap:wrap">
-    <button id="play" title="Play / pause the replay (view only)">Play</button>
-    <button id="restart" title="Restart the replay from t = 0 (view only)">Restart replay</button>
-    <button class="spd on" data-s="1">1x</button><button class="spd" data-s="2">2x</button><button class="spd" data-s="4">4x</button>
+  <div class="ctl">
+    <button id="play" class="btn" title="Play / pause the replay (view only)">Play</button>
+    <button id="restart" class="btn" title="Restart the replay from t = 0 (view only)">Restart replay</button>
+    <button class="btn spd on" data-s="1">1x</button><button class="btn spd" data-s="2">2x</button><button class="btn spd" data-s="4">4x</button>
   </div>
-  <div id="scrubwrap"><input id="scrub" type="range" min="0" max="1" step="0.01" value="0"><div id="marks"></div></div>
+  <div id="scrubwrap"><input id="scrub" type="range" min="0" max="1" step="0.01" value="0" aria-label="Replay time"><div id="marks"></div></div>
   <div id="clock"></div>
 </div>
 
@@ -217,6 +258,9 @@ function tile(x0, x1, z0, z1, color) {
 tile(-50, -5, -30, 32, 0x1b2836); // vehicle side
 tile(5, 46, -30, 31, 0x1f2236);   // backend side
 
+// Labels grow when the camera has to sit further back (small stage), so they stay readable.
+let LABEL_K = 1; const LABELS = [];
+function setLabelScale(k) { LABEL_K = k; for (const sp of LABELS) sp.scale.set(sp.userData.base[0] * k, sp.userData.base[1] * k, 1); }
 function makeLabel(text, o = {}) {
   const c = document.createElement("canvas"); const ctx = c.getContext("2d");
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
@@ -234,10 +278,11 @@ function makeLabel(text, o = {}) {
     ctx.fillStyle = q.fg; ctx.textBaseline = "top";
     lines.forEach((l, i) => ctx.fillText(l, 12, 7 + i * lh));
     tex.needsUpdate = true;
-    sp.scale.set((w / h) * q.h * lines.length * 0.9 + 0.0, q.h * lines.length * 0.9 + 0.0, 1);
+    sp.userData.base = [(w / h) * q.h * lines.length * 0.9, q.h * lines.length * 0.9];
+    sp.scale.set(sp.userData.base[0] * LABEL_K, sp.userData.base[1] * LABEL_K, 1);
     sp.userData.text = t;
   };
-  sp.userData.draw(text);
+  sp.userData.draw(text); LABELS.push(sp);
   return sp;
 }
 function setLabel(sp, t, o) { const k = t + JSON.stringify(o || {}); if (sp.userData.key !== k) { sp.userData.key = k; sp.userData.draw(t, o); } }
@@ -282,7 +327,8 @@ for (const [id, L] of Object.entries(LAYOUT)) {
       ring.position.y = y; g.add(ring);
     }
   }
-  const lbl = makeLabel(id, { h: 2.3 }); lbl.position.set(0, L.h + 2.6, 0); g.add(lbl);
+  // labels of fms-zenoh-router are raised (staggered) so neighbouring labels never touch
+  const lbl = makeLabel(id, { h: 2.3 }); lbl.position.set(0, L.h + (id === "fms-zenoh-router" ? 5.4 : 2.6), 0); g.add(lbl);
   const ringMat = new THREE.MeshBasicMaterial({ color: COL.amber, transparent: true, opacity: 0.0 });
   const pulse = new THREE.Mesh(new THREE.RingGeometry(Math.max(L.w, L.d) * 0.85, Math.max(L.w, L.d) * 0.85 + 0.6, 32), ringMat);
   pulse.rotation.x = -Math.PI / 2; pulse.position.y = 0.05; g.add(pulse);
@@ -291,8 +337,9 @@ for (const [id, L] of Object.entries(LAYOUT)) {
   pickable(g, { kind: "building", id });
 }
 // side labels (node.side from the dependency map)
-const sideV = makeLabel("vehicle side (dependency_map: side = vehicle)", { h: 1.8, bg: "rgba(10,16,24,0.5)" }); sideV.position.set(-27, 0.8, -27); scene.add(sideV);
-const sideB = makeLabel("backend (dependency_map: side = backend)", { h: 1.8, bg: "rgba(10,16,24,0.5)" }); sideB.position.set(38, 0.8, 14); scene.add(sideB);
+const sideV = makeLabel("vehicle side", { h: 1.8, bg: "rgba(10,16,24,0.5)" }); sideV.position.set(-41, 0.8, 29); scene.add(sideV);
+const sideB = makeLabel("backend side", { h: 1.8, bg: "rgba(10,16,24,0.5)" }); sideB.position.set(37, 0.8, 29); scene.add(sideB);
+pickable(sideV, { kind: "side", id: "vehicle" }); pickable(sideB, { kind: "side", id: "backend" });
 
 // fms-server sign + data-age sign
 const srvL = LAYOUT["fms-server"];
@@ -398,14 +445,54 @@ function placeOnLoop(obj, s) {
   obj.position.set(p.x, 0, p.z); obj.rotation.y = -Math.atan2(tg.z, tg.x);
 }
 
-// ---------------------------------------------------------------- camera control (drag = orbit, wheel = zoom)
-const cam = { theta: -0.02, phi: 0.82, r: 108, target: new THREE.Vector3(6, 0, -3) };
+// ---------------------------------------------------------------- camera control (drag = orbit, wheel = zoom, double-click / Reset view = fit)
+const cam = { theta: -0.02, phi: 0.86, r: 108, target: new THREE.Vector3(0, 0, 2) };
+const SCENE_BOX = new THREE.Box3(new THREE.Vector3(-46, 0, -25), new THREE.Vector3(42, 13, 30)); // buildings, loop road, labels
+let userMoved = false;
 function applyCam() {
-  cam.phi = Math.min(1.45, Math.max(0.25, cam.phi)); cam.r = Math.min(220, Math.max(30, cam.r));
-  camera.position.set(cam.target.x + cam.r * Math.sin(cam.phi) * Math.sin(cam.theta), cam.r * Math.cos(cam.phi),
+  cam.phi = Math.min(1.45, Math.max(0.25, cam.phi)); cam.r = Math.min(600, Math.max(25, cam.r));
+  camera.position.set(cam.target.x + cam.r * Math.sin(cam.phi) * Math.sin(cam.theta), cam.target.y + cam.r * Math.cos(cam.phi),
     cam.target.z + cam.r * Math.sin(cam.phi) * Math.cos(cam.theta));
-  camera.lookAt(cam.target);
-  scene.fog.near = cam.r + 20; scene.fog.far = cam.r + 130;
+  camera.lookAt(cam.target); camera.updateMatrixWorld();
+  scene.fog.near = cam.r + 20; scene.fog.far = cam.r + 160;
+}
+// Projected extent of the scene box in normalised device coordinates for the current camera.
+const boxCorners = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => new THREE.Vector3(i & 1 ? SCENE_BOX.max.x : SCENE_BOX.min.x, i & 2 ? SCENE_BOX.max.y : SCENE_BOX.min.y, i & 4 ? SCENE_BOX.max.z : SCENE_BOX.min.z));
+function ndcExtent() {
+  const e = { x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity }, v = new THREE.Vector3();
+  for (const c of boxCorners) { v.copy(c).project(camera); e.x0 = Math.min(e.x0, v.x); e.x1 = Math.max(e.x1, v.x); e.y0 = Math.min(e.y0, v.y); e.y1 = Math.max(e.y1, v.y); }
+  return e;
+}
+// Fit the whole scene into the stage for any aspect ratio: binary-search the distance, then re-centre (a few passes).
+function fitAt(phi) {
+  cam.theta = -0.02; cam.phi = phi; SCENE_BOX.getCenter(cam.target); cam.target.y = 0;
+  const MX = 0.95, MY = 0.92, right = new THREE.Vector3(), fwd = new THREE.Vector3();
+  for (let pass = 0; pass < 4; pass++) {
+    let lo = 25, hi = 600;
+    for (let k = 0; k < 22; k++) {
+      cam.r = (lo + hi) / 2; applyCam(); const e = ndcExtent();
+      if (e.x0 < -MX || e.x1 > MX || e.y0 < -MY || e.y1 > MY) lo = cam.r; else hi = cam.r;
+    }
+    cam.r = hi; applyCam();
+    const e = ndcExtent(), cx = (e.x0 + e.x1) / 2, cy = (e.y0 + e.y1) / 2;
+    const halfH = cam.r * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    right.setFromMatrixColumn(camera.matrixWorld, 0).setY(0).normalize();
+    fwd.copy(cam.target).sub(camera.position).setY(0).normalize();
+    cam.target.addScaledVector(right, cx * halfH * camera.aspect).addScaledVector(fwd, (cy * halfH) / Math.cos(cam.phi));
+  }
+  applyCam();
+  return { phi, r: cam.r, target: cam.target.clone() };
+}
+// Pick the tilt that shows the scene largest (tall stages get a more top-down view), within a range that still reads as 3D.
+function fitView() {
+  let best = null;
+  for (let phi = 0.5; phi <= 1.0001; phi += 0.05) {
+    const f = fitAt(phi), score = f.r * (1 + 0.15 * Math.abs(phi - 0.86)); // mild preference for the default tilt
+    if (!best || score < best.score) best = Object.assign(f, { score });
+  }
+  cam.phi = best.phi; cam.r = best.r; cam.target.copy(best.target); cam.theta = -0.02;
+  applyCam(); userMoved = false;
+  setLabelScale(Math.min(1.3, Math.max(1, cam.r / 115)));
 }
 let drag = null;
 canvas.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY, moved: false }; });
@@ -413,17 +500,22 @@ window.addEventListener("pointerup", () => { setTimeout(() => { drag = null; }, 
 window.addEventListener("pointermove", (e) => {
   if (drag && (e.buttons & 1)) {
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-    if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+    if (Math.abs(dx) + Math.abs(dy) > 3) { drag.moved = true; userMoved = true; }
     cam.theta -= dx * 0.005; cam.phi -= dy * 0.005; drag.x = e.clientX; drag.y = e.clientY; applyCam();
   }
 });
-canvas.addEventListener("wheel", (e) => { e.preventDefault(); cam.r *= e.deltaY > 0 ? 1.08 : 0.93; applyCam(); }, { passive: false });
+canvas.addEventListener("wheel", (e) => { e.preventDefault(); cam.r *= e.deltaY > 0 ? 1.08 : 0.93; userMoved = true; applyCam(); }, { passive: false });
+canvas.addEventListener("dblclick", fitView);
+$("resetview").addEventListener("click", fitView);
+// The canvas is sized by CSS (its grid cell); the drawing buffer follows it at the device pixel ratio.
+const stage = $("stage");
 function resize() {
-  const w = window.innerWidth, h = window.innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h;
-  if (w / h < 1.4) cam.r = Math.max(cam.r, Math.min(220, 108 * 1.5 / (w / h)));
-  camera.updateProjectionMatrix(); applyCam();
+  const w = Math.max(1, stage.clientWidth), h = Math.max(1, stage.clientHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+  if (!userMoved) fitView(); else applyCam();
 }
-window.addEventListener("resize", resize);
+if (window.ResizeObserver) new ResizeObserver(resize).observe(stage); else window.addEventListener("resize", resize);
 
 // ---------------------------------------------------------------- run selector
 const GROUPS = ["telemetry_stall", "service_crash", "dependency_failure", "kill-switch run", "guardrail-demo runs"];
@@ -458,13 +550,21 @@ function loadRun(id) {
   $("evlist").innerHTML = R.events.map((e, k) => `<li data-t="${e.t}" data-k="${k}"><span class="mono">${e.t.toFixed(2)}s${e.t_computed ? "*" : ""}</span><span>${esc(e.event)}${e.detail && e.detail.stop_reason ? " · " + esc(e.detail.stop_reason) : ""}${e.event === "rollback_result" && e.detail ? " · verified " + esc(e.detail.verified) : ""}</span></li>`).join("");
   $("evsrc").innerHTML = `source: ${esc(r.src)} → timeline[].t_s, at${R.events.some((e) => e.t_computed) ? "; * = t computed from <span class=mono>at</span> (no t_s stored)" : ""}`;
   $("evlist").querySelectorAll("li").forEach((li) => li.addEventListener("click", () => { simT = +li.dataset.t; }));
-  const rowEnd = [-99, -99, -99];
-  $("marks").innerHTML = R.events.filter((e) => KEY.has(e.event)).map((e) => {
-    const pct = (e.t / R.tEnd) * 100; let row = rowEnd.findIndex((x) => pct - x > 9); if (row < 0) row = 2; rowEnd[row] = pct;
-    return `<i style="left:${pct}%;background:${EV_COL[e.event] || "#ccc"}" title="${esc(e.event)} @ ${e.t.toFixed(3)} s (${esc(hms(e.at) || "")} UTC)"><b style="color:${EV_COL[e.event] || "#ccc"};top:${row * 11 - 1}px;${pct > 85 ? "left:auto;right:4px" : ""}">${esc(EV_LABEL[e.event])}</b></i>`;
-  }).join("");
+  renderMarks();
   closePanel();
 }
+// Timeline markers at the recorded event times; labels go to the first row with ~80 px of free space.
+function renderMarks() {
+  if (!R) return;
+  const KEY = new Set(Object.keys(EV_LABEL));
+  const minGap = (80 / Math.max(120, $("scrubwrap").clientWidth)) * 100;
+  const rowEnd = [-999, -999, -999];
+  $("marks").innerHTML = R.events.filter((e) => KEY.has(e.event)).map((e) => {
+    const pct = (e.t / R.tEnd) * 100; let row = rowEnd.findIndex((x) => pct - x > minGap); if (row < 0) row = 2; rowEnd[row] = pct;
+    return `<i style="left:${pct}%;background:${EV_COL[e.event] || "#ccc"}" title="${esc(e.event)} @ ${e.t.toFixed(3)} s (${esc(hms(e.at) || "")} UTC)"><b style="color:${EV_COL[e.event] || "#ccc"};top:${row * 11 - 1}px;${pct > 85 ? "left:auto;right:4px" : ""}">${esc(EV_LABEL[e.event])}</b></i>`;
+  }).join("");
+}
+if (window.ResizeObserver) new ResizeObserver(renderMarks).observe($("scrubwrap"));
 sel.addEventListener("change", () => { loadRun(sel.value); playing = true; syncButtons(); });
 $("play").addEventListener("click", () => { if (simT >= R.tEnd - 0.01) simT = 0; playing = !playing; syncButtons(); });
 $("restart").addEventListener("click", () => { simT = 0; lastEvKey = null; playing = true; syncButtons(); });
@@ -483,7 +583,7 @@ function apiCard(s) {
   const o = s.obs, r = R.r;
   const thr = D.safety.top.stale_threshold_s;
   if (!o) {
-    $("api").innerHTML = `<h2>What the API reports</h2><div>No poll recorded yet at t = ${s.t.toFixed(2)} s.</div>${srcl(r.src + " → observations[]")}`;
+    $("api").innerHTML = `<h2 class="cap">What the API reports</h2><div>No poll recorded yet at t = ${s.t.toFixed(2)} s.</div>${srcl(r.src + " → observations[]")}`;
     return;
   }
   const st = has(o.http_status) ? `HTTP ${o.http_status}` : "no answer";
@@ -491,7 +591,7 @@ function apiCard(s) {
   const fk = freshKey(o);
   const lastObs = R.obs[R.obs.length - 1];
   const gap = s.t - o.t_s > 2 ? `<div class="fact" style="color:var(--stale)">No poll recorded since t = ${o.t_s.toFixed(2)} s${o === lastObs ? " (last observation in this record)" : ""}; values below are from that poll.</div>` : "";
-  $("api").innerHTML = `<h2>What the API reports</h2>${gap}
+  $("api").innerHTML = `<h2 class="cap">What the API reports</h2>${gap}
     <div class="row"><span class="badge ${stc}">${esc(st)}</span><span class="badge b-${fk}">${esc(o.freshness || "not recorded")}</span></div>
     <div style="margin-top:6px;color:var(--muted)">data age at last poll (createdDateTime → server time)</div>
     <div class="big">${has(o.data_age_s) ? o.data_age_s.toFixed(2) + " s" : NR}</div>
@@ -830,6 +930,7 @@ function tipHTML(p) {
   if (k === "truck") { const o = S.co; return `<b>Main truck: what the API reports</b><br>createdDateTime ${o ? val(o.created_at) : NR}${S.obs ? `<br>freshness ${val(S.obs.freshness)} · stalled ${val(S.obs.stalled_for_s, "s")}` : ""}<div class="src">source: ${esc(RUNSRC())}${o ? " → observations[" + obsIdx(o) + "]" : ""}</div>`; }
   if (k === "ghost") return `<b class="illus">Ghost truck</b><br><span class="illus">illustrative: what the vehicle may be doing, not measured</span><div class="src">source: none (replay clock only)</div>`;
   if (k === "loop") return `<b>Loop road</b><br><span class="illus">illustrative path</span>: gnssPosition not recorded<div class="src">source: ${esc(RUNSRC())} (no gnssPosition field)</div>`;
+  if (k === "side") return `<b>${esc(p.id)} side</b><br>${Object.entries(DM.nodes).filter(([, n]) => n.side === p.id || n.side === "both").map(([id, n]) => esc(id) + (n.side === "both" ? " (both)" : "")).join(", ")}<div class="src">source: ${esc(DM.path)} → nodes[].side</div>`;
   if (k === "booth") return `<b>Safety controller (deterministic)</b><br>Executor (deterministic, no AI)<br>approver: ${val(R.r.request.approved_by)} · state ${val(S.runState)}<div class="src">source: ${esc(RUNSRC())} → request.approved_by; config/safety.json</div>`;
   if (k === "ai") {
     const log = D.ai_calls[0]; const a = log && log.calls.find((c) => c.accepted);
@@ -839,7 +940,8 @@ function tipHTML(p) {
 }
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 function pickAt(x, y) {
-  ndc.set((x / window.innerWidth) * 2 - 1, -(y / window.innerHeight) * 2 + 1); ray.setFromCamera(ndc, camera);
+  const rc = canvas.getBoundingClientRect();
+  ndc.set(((x - rc.left) / rc.width) * 2 - 1, -((y - rc.top) / rc.height) * 2 + 1); ray.setFromCamera(ndc, camera);
   const hit = ray.intersectObjects(pickables, false)[0];
   return hit ? Object.assign({}, hit.object.userData.pick, hit.instanceId !== undefined ? { instance: hit.instanceId } : {}) : null;
 }
@@ -882,6 +984,7 @@ loadRun(H.run || DEFAULT_RUN);
 if (H.t) simT = Math.min(+H.t, R.tEnd);
 if (H.speed) speed = +H.speed;
 playing = H.play === undefined ? true : H.play === "1";
+if (window.matchMedia && window.matchMedia("(max-width: 1100px)").matches) $("legend").open = false;
 syncButtons(); resize();
 update(0);
 const hashInfo = (v) => { const [kind, id] = v.split(":"); return { kind, id, i: id, instance: id }; };
@@ -897,7 +1000,8 @@ function frame(now) {
     if (obj) {
       const v = new THREE.Vector3();
       if (obj.isInstancedMesh) { obj.getMatrixAt(+hashTip.instance, tmpM); v.setFromMatrixPosition(tmpM); } else obj.getWorldPosition(v);
-      v.project(camera); showTip(hashTip, (v.x + 1) / 2 * window.innerWidth, (1 - v.y) / 2 * window.innerHeight);
+      v.project(camera); const rc = canvas.getBoundingClientRect();
+      showTip(hashTip, rc.left + (v.x + 1) / 2 * rc.width, rc.top + (1 - v.y) / 2 * rc.height);
     }
   } else if (now - (frame.lastHover || 0) > 60) { frame.lastHover = now; hoverTick(); }
   if (selected && (panelTick++ % 15 === 0)) { const sc = $("panel").scrollTop; renderPanel(); $("panel").scrollTop = sc; }
