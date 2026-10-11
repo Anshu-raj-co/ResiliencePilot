@@ -26,7 +26,7 @@ Have `reports/day2/findings.md` open in a second tab. Take 1 s pauses between sc
 | **1:35–1:55** · Score | Scroll to *Resilience Score* card (now this run): component bars, silent polls, penalty | "Each run gets a Resilience Score from what was measured: detection time, recovery time, data loss, and blast radius, then cut by up to half for the polls where the API answered 200 with stale data." |
 | **1:55–2:20** · The worst case (recorded) | Toggle **Committed Day-2 evidence**; *Findings* card: F1/F2 *Stale data served as HTTP 200 after the fault was removed*; on-screen label "recorded run" | "Our strongest finding came from stopping the database. The API showed errors, which is good, but after the database came back, the consumer kept failing to resolve its host name for over 20 seconds, while the API answered 200 with frozen data. Container checks: healthy. Our recovery rule: not recovered. That run latched." |
 | **2:20–2:40** · Planner + AI | *Next experiments* card; then terminal: `head -30 ../reports/day2/ai_advice_qwen2.5-7b.md` showing an "AI answer rejected" line | "A rule-based planner ranks the next experiment, most informative and riskiest first; it can propose, never run. A local LLM can reorder and explain, but every root cause is checked against the evidence. With a 7B model, six of seven answers were rejected and replaced by the rule-based ones. We show that, because it's what happened." |
-| **2:40–2:55** · Safety | Terminal: `.venv/bin/rp status` (READY); show `scripts/kill-switch.sh` name; README *Safety model* | "Faults only hit allowlisted containers in this local sandbox, at most 30 seconds, one at a time, with a watchdog, a kill switch that works even if our backend is dead, and 315 tests." |
+| **2:40–2:55** · Safety | Terminal: `.venv/bin/rp status` (READY); show `scripts/kill-switch.sh` name; README *Safety model* | "Faults only hit allowlisted containers in this local sandbox, at most 30 seconds, one at a time, with a watchdog, a kill switch that works even if our backend is dead, and 317 tests." |
 | **2:55–3:00** · Close | README results table | "ResiliencePilot: HTTP 200 is not recovery. Fresh data is." |
 
 ## Numbers quoted (all from recorded runs)
@@ -36,7 +36,7 @@ Have `reports/day2/findings.md` open in a second tab. Take 1 s pauses between sc
 | Stale flagged ~5 s after injection; recovery verified ~3 s after rollback | `reports/day1/`, `reports/day2/` telemetry_stall runs (4.8–5.3 s; 2.6–3.7 s) |
 | Stale HTTP 200 for over 20 s after the database returned; one run latched | `20261010T192839Z-179795` (~23.5 s, not recovered in 30 s), `20261010T203817Z-01d396` (~21 s) |
 | AI: 6 of 7 answers rejected | `reports/day2/ai_advice_qwen2.5-7b.md`, `docs/AI_LAYER.md` |
-| 315 tests | `pytest -q` on main after PR #27 (318 with `RP_LIVE=1`) |
+| 317 tests | `pytest -q` on main after PR #29 (320 with `RP_LIVE=1`) |
 
 The live run's own numbers (detection time, recovery time, score) will differ slightly from these ranges; read them
 from the screen, don't quote the table.

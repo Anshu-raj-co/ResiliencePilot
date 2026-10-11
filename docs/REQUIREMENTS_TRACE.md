@@ -1,9 +1,8 @@
 # Requirements trace
 
 Verification of each Bosch requirement against evidence in the repository. Final regeneration on 2026-10-11 (code
-frozen). State checked: `main` after PRs #7 and #22–#28, plus **PR #29 (open, awaiting the lead's approval)** where
-noted. Host: macOS 27.0.1, Apple Silicon (arm64), Docker 29.7.2, Python 3.13. On `main`: `pytest -q` **315 passed,
-11 skipped**; `RP_LIVE=1` **318 passed, 8 skipped**; `scripts/demo-day1.sh` exit 0 (42 s). PR #29 branch: 317 passed.
+frozen). State checked: `main` after PRs #7 and #22–#30 (PR #29 approved and merged by the lead). Host: macOS 27.0.1, Apple Silicon (arm64), Docker 29.7.2, Python 3.13. On `main`: `pytest -q` **317 passed,
+11 skipped**; `RP_LIVE=1` **320 passed, 8 skipped**; `scripts/demo-day1.sh` exit 0 (42 s).
 
 Status meanings:
 - **DONE**: met, and the evidence is in the repo or was reproduced.
@@ -17,7 +16,7 @@ Status meanings:
 | 1 | AI planner ranks and selects experiments from the dependency map, with a reason each | PARTIAL | **PARTIAL** | The AI only reorders the rule-based ranking (same order as the rules in both logged calls); a human selects, by design |
 | 2 | 3+ failure types; errors, slowdowns, recovery time recorded | DONE | **DONE** | Slowdowns are measured, not injected |
 | 3 | AI explains, ranks by severity, recommends fixes, gives a resilience score; formula documented | PARTIAL | **PARTIAL** | Severity and score are deterministic (by design); 1 of 7 AI explanations passes validation |
-| 4 | Automatic stop on error rate, latency, blast radius, each tested live | PARTIAL | **PARTIAL → DONE when PR #29 merges** | Error rate and blast radius tripped live (on `main`); the latency live trip (`8ad2b8`) and the loader fix that allows it are in PR #29 |
+| 4 | Automatic stop on error rate, latency, blast radius, each tested live | PARTIAL | **DONE** | All three guards tripped live: blast radius `4aa9f7`, error rate `77b84c`, latency `8ad2b8` (the last two with deliberately tight GUARDRAIL-DEMO profiles) |
 | 5 | Semi-automatic dependency mapping | DONE | **DONE** | — |
 | 6 | Kill switch | DONE | **DONE** | — |
 | 7 | Human approval before execution | DONE | **DONE** | Now with the approver's typed name on the dashboard |
@@ -58,12 +57,12 @@ Note: no failure type **injects** latency (no network-degradation experiment; D-
 | Resilience score | DONE, deterministic (not AI) | `scoring.py`, `rp score`, `reports/day2/scores.json`; `test_scoring.py` |
 | Formula documented | DONE | `docs/SCORING.md` |
 
-### 4. Automatic stop on error rate, latency and blast radius, each tested live: PARTIAL
+### 4. Automatic stop on error rate, latency and blast radius, each tested live: DONE
 
 | Guard | Unit-tested | Live |
 |---|---|---|
 | Error rate | `test_error_rate_trips_and_rolls_back`, `test_error_rate_guard_zero_tolerance_trips_on_first_error` | **Tripped** (on `main`, PR #27). First attempt `20261010T234226Z-e3e15c`: *guard not exercised* (no answer within 8 s). Second attempt `20261010T234332Z-77b84c`: *guard tripped, then fail-closed latch on 30 s recovery* (HTTP 500 at 1.93 s → `guardrail_error_rate`, rollback verified; reset by Vaibhav after checking the stack) |
-| Latency | `test_latency_p95_trips_and_rolls_back`, `test_latency_guard_needs_min_samples_then_uses_rolling_p95` | First attempt `20261011T000246Z-46ea3d` (on `main`): *armed, not tripped* (threshold 76.84 ms; polls 44–72 ms). Second and final attempt `20261011T002904Z-8ad2b8`: ***guard tripped with a deliberately tight threshold*** (30 ms cap; first poll 30.89 ms → `guardrail_latency` at 1.88 s; rollback verified; recovery 2.33 s; no latch). **Evidence and the loader fix are in PR #29 (open)**; the margin was 0.89 ms, so it proves the abort path, not a real slowdown |
+| Latency | `test_latency_p95_trips_and_rolls_back`, `test_latency_guard_needs_min_samples_then_uses_rolling_p95` | First attempt `20261011T000246Z-46ea3d` (on `main`): *armed, not tripped* (threshold 76.84 ms; polls 44–72 ms). Second and final attempt `20261011T002904Z-8ad2b8`: ***guard tripped with a deliberately tight threshold*** (30 ms cap; first poll 30.89 ms → `guardrail_latency` at 1.88 s; rollback verified; recovery 2.33 s; no latch). Evidence and the tighten-only loader fix merged in PR #29; the margin was 0.89 ms, so it proves the abort path, not a real slowdown |
 | Blast radius | `test_blast_radius_breach_trips_rolls_back_and_latches` | **Tripped** in `20261010T182500Z-4aa9f7` (deliberate Grafana restart) |
 
 Demo profiles (merged in PR #27) are tighten-only (enforced in `config.py`; `test_profile_experiment_overrides_only_tighten`,
@@ -141,11 +140,10 @@ fields. **Still present:** two personal emails in old git commit metadata. Remov
 and force-push, which the repo rules forbid. Upstream demo credentials in the blueprint submodule are public sandbox
 defaults (`CLAUDE.md:61`).
 
-## Remaining PARTIAL items
+## Remaining PARTIAL items (1, 3) and caveats
 
 1. **Req 1:** the AI does not select, and its ranking adds nothing over the rules so far. Selection by a human is
    intentional (safety rule 8).
 2. **Req 3:** severity and score are deterministic, not AI (intentional), and the 7B model passes 1 of 7
    explanations.
-3. **Req 4:** becomes DONE when PR #29 is merged (latency live trip + the tighten-only loader fix that permits it).
-4. **Req 9:** Windows clean run not repeated after the fixes.
+3. **Req 9 (DONE on macOS arm64), caveat:** the Windows clean run was not repeated after the fixes.

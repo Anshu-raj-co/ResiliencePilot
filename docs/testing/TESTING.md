@@ -20,11 +20,11 @@ Setup: `python -m venv .venv && .venv/Scripts/python -m pip install -e ".[test]"
   refusal to inject when unobservable or the target is missing from the baseline, breach after the fault window
   still latches).
 
-## Final results (2026-10-11, `main` after PR #27, macOS Apple Silicon)
-- `pytest -q`: **315 passed, 11 skipped**. `RP_LIVE=1 pytest -q`: **318 passed, 8 skipped**.
+## Final results (2026-10-11, `main` after PR #29, macOS Apple Silicon)
+- `pytest -q`: **317 passed, 11 skipped**. `RP_LIVE=1 pytest -q`: **320 passed, 8 skipped**.
 - New since Day 2: picker/API (`test_api.py`), AI call logging and hypothesis labels (`test_ai.py`), config profiles
   tighten-only and CLI-only (`test_profiles.py`, `test_api.py`), platform and config profile in run records
-  (`test_safety.py`). PR #29 (open) adds 2 more profile tests.
+  (`test_safety.py`). PR #29 added 2 tighten-only tests (implicit defaults).
 
 ## What the unit tests cover
 Fakes in `tests/helpers.py` model the real blueprint: telemetry `createdDateTime` advances only while the fake

@@ -259,7 +259,7 @@ All code is in `backend/resiliencepilot/`.
 | **Python 3.13** | It was installed, it supports typing, and it is fast to test (D-007). |
 | **pydantic** | Validates the experiment request strictly (`extra="forbid"`: any unknown field is an error). |
 | **httpx** | Makes the HTTP calls to the rFMS API. |
-| **pytest** | The tests on `main`: 315 unit tests, plus 3 live tests that need the running stack (318 with `RP_LIVE=1`; verified 2026-10-11 on `main` after PR #27). |
+| **pytest** | The tests on `main`: 317 unit tests, plus 3 live tests that need the running stack (320 with `RP_LIVE=1`; verified 2026-10-11 on `main` after PR #29). |
 | **`docker` command line via one wrapper** | One small file that tests can fake; no Docker socket is ever handed to any other component. |
 | **FastAPI + uvicorn** | Run the local API and dashboard (`rp serve`), bound to 127.0.0.1 only. |
 | **Frontend** | No framework, npm or build step. The dashboard is one static HTML file (inline CSS/JS) served by the API. The explainer is a generated HTML file that needs no server. |
@@ -442,7 +442,7 @@ run with a precise timestamp: 0.6 s from switch to verified rollback.
 
 ## 12. Run it yourself
 
-> **Test counts below are for `main` after PR #27 (2026-10-11):** 315 unit tests, 318 with the live tests.
+> **Test counts below are for `main` after PR #29 (2026-10-11):** 317 unit tests, 320 with the live tests.
 >
 > **Latest clean-clone test (2026-10-11, macOS 27.0.1 on Apple Silicon):** a fresh `git clone` into a new folder,
 > with the cached `fms-server`/`fms-consumer` images deleted first. Every step passed: `stack-up.sh` (both images
@@ -487,7 +487,7 @@ python -m venv .venv
 .venv/Scripts/python -m pytest -q
 cd ..
 ```
-Success: `315 passed, 11 skipped` (3 are the live tests; 8 are platform-specific).
+Success: `317 passed, 11 skipped` (3 are the live tests; 8 are platform-specific).
 
 **4. Start the stack**
 ```bash
@@ -502,7 +502,7 @@ cd backend
 .venv/Scripts/python -m resiliencepilot status       # "state": "READY"
 .venv/Scripts/python -m resiliencepilot deps         # dependency map with live network checks
 .venv/Scripts/python -m resiliencepilot observe -n 6 # FRESH lines, createdDateTime advancing
-RP_LIVE=1 .venv/Scripts/python -m pytest -q          # 318 passed, 8 skipped
+RP_LIVE=1 .venv/Scripts/python -m pytest -q          # 320 passed, 8 skipped
 ```
 
 **6. Baseline**
