@@ -3,6 +3,19 @@
 _Updated: 2026-10-11. **Code frozen for the demo** (lead's instruction). `main`: PRs #7 and #22–#30 merged (PR #29
 approved by the lead) + the final count update. PR #8 still open (older)._
 
+## Optional visualization: branch `feat/scene-3d` (in progress, NOT merged; merge only with the lead's approval)
+- Scope: `docs/scene/` (page `index.html` + vendored `three.r160.min.js`, MIT licence at its top; `screenshots/`)
+  and `scripts/build_scene_data.py` (+ `docs/TEAM_FORM_INFO.md` third-party list). No backend/config/test changes.
+- Page: double-click `docs/scene/index.html` (file://, offline, no fetch/XHR, read-only replay of committed runs).
+  Regenerate embedded data: `python3 scripts/build_scene_data.py` (`--check` verifies it is current).
+- **M1 done (core scene)**: 8 buildings + roads from `config/dependency_map.json`, instanced packets coloured by
+  recorded freshness, main truck driven by recorded `createdDateTime` (loop path illustrative: no gnssPosition in
+  records), ghost truck (illustrative), timeline (play/pause/restart, 1x/2x/4x, scrubber, event markers), run selector
+  (37 runs: telemetry_stall / service_crash / dependency_failure / kill-switch run `6f6559` / guardrail-demo), safety
+  booth with inspector (config/safety.json checks, approver from the run record). Screenshots `docs/scene/screenshots/m1-*`.
+- Next: M2 hover tooltip + click inspector for every building, road, packet, truck, booth; tolerance & AI panel.
+  Stop after M2 and report (M3/M4 only with explicit approval).
+
 ## RESUME HERE
 - Status: `docs/coordination/CURRENT_STATUS.md`; requirements: `docs/REQUIREMENTS_TRACE.md` (final); guide:
   `docs/PROJECT_A_TO_Z.md` (refreshed).
