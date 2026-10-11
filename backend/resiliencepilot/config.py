@@ -22,7 +22,7 @@ SUPPORTED_MECHANISMS = ("docker_pause", "docker_stop")
 # passes the same bounds checks. Used to demonstrate guards live with deliberately tight thresholds.
 CONFIG_PROFILES = ("guardrail-demo-error-rate", "guardrail-demo-latency")
 PROFILE_SPEC_KEYS = frozenset({"description", "expected_symptoms", "risks", "expected_statuses", "max_error_rate",
-                               "fault_observer_timeout_s", "fault_latency_p95_max_ms"})
+                               "fault_observer_timeout_s", "fault_latency_p95_max_ms", "max_duration_s"})
 # Tighten-only: each overridable guardrail number may only go DOWN (stricter / judged sooner) versus the default config.
 PROFILE_GUARDRAIL_KEYS = frozenset({"max_error_rate", "error_min_samples", "latency_p95_multiplier", "latency_p95_floor_ms",
                                     "latency_min_samples", "blast_radius_interval_s", "blast_radius_max_snapshot_failures"})
@@ -181,6 +181,12 @@ def load_safety_config(root: Path = REPO_ROOT) -> SafetyConfig:
 def load_experiment_catalog(root: Path = REPO_ROOT) -> dict[str, ExperimentSpec]:
     raw = json.loads((root / "config" / "experiments.json").read_text(encoding="utf-8"))
     profile = active_profile()
+    # Value that applies when an experiment declares no envelope: fault polls use the global http_timeout_s, and the
+    # latency threshold is never below the guardrail floor. A profile may only go below these.
+    safety = json.loads((root / "config" / "safety.json").read_text(encoding="utf-8")) if profile else {}
+    implicit = {"fault_observer_timeout_s": safety.get("http_timeout_s"),
+                "fault_latency_p95_max_ms": safety.get("guardrails", {}).get("latency_p95_floor_ms",
+                                                                             Guardrails().latency_p95_floor_ms)}
     for name, over in _profile_file(root, profile, "experiments.json").items():
         if name.startswith("_"):
             continue
@@ -194,7 +200,9 @@ def load_experiment_catalog(root: Path = REPO_ROOT) -> dict[str, ExperimentSpec]
             raise ValueError(f"profile {profile}: {name}.expected_statuses may only be removed, not added")
         for k in ("fault_observer_timeout_s", "fault_latency_p95_max_ms"):
             if k in over:
-                _check_tightens(profile, name, k, base.get(k), over[k])
+                _check_tightens(profile, name, k, base.get(k) if base.get(k) is not None else implicit[k], over[k])
+        if "max_duration_s" in over:  # may only shorten the fault window
+            _check_tightens(profile, name, "max_duration_s", base.get("max_duration_s"), over["max_duration_s"])
         if "max_error_rate" in over:
             _check_tightens(profile, name, "max_error_rate", base.get("max_error_rate", 0.0), over["max_error_rate"])
         raw[name] = {**base, **over}

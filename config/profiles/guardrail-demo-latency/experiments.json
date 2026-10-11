@@ -1,0 +1,12 @@
+{
+  "_about": "GUARDRAIL-DEMO latency (not for normal use). Caps the fault-window latency p95 of telemetry_stall at 30 ms, below the normal poll latency on the test Mac (44-72 ms in run 20261011T000246Z-46ea3d), so the guard should trip on the first sample. Tighten-only: the implicit defaults are a 2 s poll timeout and a threshold never below 250 ms. Deliberately tight: this proves the abort-and-rollback path, not a real slowdown. max_duration_s lowered 30 -> 15 so duration + poll timeout stays within the 30 s hard cap.",
+  "telemetry_stall": {
+    "max_duration_s": 15,
+    "description": "GUARDRAIL-DEMO latency: telemetry_stall with a deliberately tight 30 ms latency cap.",
+    "fault_observer_timeout_s": 2.0,
+    "fault_latency_p95_max_ms": 30,
+    "expected_symptoms": [
+      "GUARDRAIL-DEMO: the first fault-window poll slower than 30 ms trips guardrail_latency and the run rolls back"
+    ]
+  }
+}
