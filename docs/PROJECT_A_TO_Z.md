@@ -150,10 +150,10 @@ Other important folders:
 | Folder | What is in it |
 |---|---|
 | `contracts/` | **JSON Schemas** (strict machine-readable rules for what a valid message looks like) for experiment requests, observations and run records |
-| `config/` | `safety.json` (limits), `experiments.json` (the allowlist of experiments), `dependency_map.json` (which container talks to which, with evidence), `ai.json` (AI settings) |
+| `config/` | `safety.json` (limits), `experiments.json` (the allowlist of experiments), `dependency_map.json` (which container talks to which, with evidence), `ai.json` (AI settings), `profiles/` (GUARDRAIL-DEMO overlays, see §7) |
 | `scripts/` | Start/stop the stack, check status, the **kill switch**, and the Day-1 demo |
 | `reports/` | Committed evidence from real runs (`day1/`, `day2/`) |
-| `backend/tests/` | 270 automated tests |
+| `backend/tests/` | 315 automated tests (318 with the live tests) |
 
 ---
 
@@ -251,7 +251,8 @@ Breaking things on purpose is only acceptable if it is safe. These rules are enf
 | **30-second cap** | A **watchdog** (an independent timer thread that forces a rollback when time runs out) enforces the limit, even if the main loop hangs. |
 | **Emergency stop** | Three ways: dashboard **Kill** button, `rp stop`, and `scripts/kill-switch.sh`, which works **even if our backend has crashed**. |
 | **Rollback always** | On completion, cancel, timeout, lost observation, any error, or a guardrail trip. |
-| **Guardrails** | Abort early on unexpected errors, slowness (latency above 5 times normal), or any change to a container outside the experiment's **blast radius** (the set of things an experiment is allowed to affect). |
+| **Guardrails** | Abort early on unexpected errors, slowness (latency above 5 times normal), or any change to a container outside the experiment's **blast radius** (the set of things an experiment is allowed to affect). The error-rate and blast-radius guards have each stopped a live run; the latency guard's live trip is recorded in PR #29, awaiting approval (§13). |
+| **Demo profiles** | `RP_CONFIG_PROFILE=guardrail-demo-…` loads a labelled overlay with deliberately tight thresholds, used only to show the guardrails firing live. Profiles are **tighten-only** (a value can only get stricter) and **CLI-only** (the dashboard refuses to start with one set). |
 | **Strict recovery** | Rollback confirmed by Docker **and** 3 fresh, advancing vehicle timestamps. HTTP 200 alone never counts. |
 | **Latch** | If rollback or recovery cannot be proven, the tool locks itself (LATCHED_UNSAFE) until a human checks and runs a logged reset. The reset itself requires fresh, advancing data (D-018). |
 | **Crash safety** | If the backend dies mid-fault, the next start-up undoes the fault and latches (D-011). |
@@ -285,7 +286,7 @@ dependency_failure 61.6.
 ## 9. The frontend (the live dashboard)
 
 Start it with `rp serve`, then open **http://127.0.0.1:8765/**. It is one HTML file
-(`backend/resiliencepilot/static/dashboard.html`, 264 lines) served by the local API.
+(`backend/resiliencepilot/static/dashboard.html`, 290 lines) served by the local API.
 
 ### 9.1 What is on the page
 
@@ -298,13 +299,13 @@ Start it with `rp serve`, then open **http://127.0.0.1:8765/**. It is one HTML f
 | **Latest observation** | `createdDateTime` vs `receivedDateTime` vs time observed: the problem in one table | Live poll |
 | **Phase timeline** | The run's steps lighting up: Precheck → Fault active → Stale detected → Rolling back → Recovered | Run state |
 | **60-second chart** | Data age over the last minute; red when stale | Live polls |
-| **Controls** | **Start** (with an "Approve and start?" confirmation), **Kill** (emergency stop), **Reset** (only allowed when blocked, with a warning) | `POST /api/run`, `/api/kill`, `/api/reset` |
+| **Controls (experiment picker)** | The planner's **ranked proposals**, each with *Why* (reasons), *Predicted* (expected symptoms) and *Risks*. You pick **one** experiment, type **your name**, and click **Approve & start** (a confirm dialog repeats the pick). Also **Kill** (emergency stop) and **Reset** (only when blocked, with a warning) | `GET /api/proposals`, `POST /api/run`, `/api/kill`, `/api/reset` |
 | **Last run card** | Rollback verified? Recovery verified? Timings | The run's evidence record |
 | **Source toggle** | Switch between "Local runs" and "Committed Day-2 evidence" | `GET /api/insights?source=...` |
 | **Resilience Score card** | Latest score with a bar for each part and the silent penalty | `scoring.py` |
 | **Score by experiment** | Median and range per experiment type | `scoring.py` |
 | **Recent runs** | The last 10 runs (experiment history) | Run records |
-| **Next experiments** | Planner proposals, as text only (no button to run them) | `planner.py` |
+| **Next experiments** | Planner proposals for the selected evidence source, as text (run one from Controls) | `planner.py` |
 | **Findings** | Ranked findings with human notes | `findings.py` |
 
 The page refreshes the live status every 0.5 s.
@@ -312,9 +313,12 @@ The page refreshes the live status every 0.5 s.
 ### 9.2 Why this frontend is genuinely good
 
 - **Real data only.** Every number comes from the live API or a stored run record. Nothing is mocked or simulated.
-- **It cannot bypass safety.** The Start button runs one fixed, pre-approved template (pause `fms-forwarder` for
-  12 s). If anyone sends extra parameters, the server refuses (HTTP 422). If an experiment is already running it
-  answers 409 (busy); if the tool is latched, 423 (locked). The page can only **ask**; the safety controller decides.
+- **It cannot bypass safety.** A run request carries exactly two things: an experiment ID from the catalogue and the
+  approver's typed name. The **server** picks the target and duration from the catalogue; any extra field, unknown ID
+  or blank name is refused (HTTP 422). If an experiment is already running it answers 409 (busy); if the tool is
+  latched, 423 (locked). The page can only **ask**; the safety controller decides.
+- **A real person approves.** The typed name is stored in the run record (no shared "dashboard-operator" account),
+  and what the approver saw (rank, reasons, predicted symptoms, risks) is saved next to the run.
 - **Private by default.** The server only listens on `127.0.0.1` (your own computer), so nobody on your network can
   reach it.
 - **Zero build, zero dependencies.** No **framework** (a large ready-made code library such as React), no **npm**
@@ -323,13 +327,14 @@ The page refreshes the live status every 0.5 s.
 - **Shows the story at a glance.** The green 200 chip next to a red stale gauge makes the silent failure obvious to a
   non-expert in seconds.
 - **Light and dark mode**, and checked at narrow widths with no sideways scrolling.
-- **Tested.** 17 API tests in `backend/tests/test_api.py`, plus a live end-to-end run started from the page.
+- **Tested.** 38 API test cases in `backend/tests/test_api.py`, plus live runs started through it (e.g.
+  `20261010T233453Z-958562`).
 
 ### 9.3 What the frontend does not do (yet)
 
 - No dependency-graph picture on the dashboard (it is available as `rp deps`, `rp discover` and in the `rp report`
   HTML page).
-- Only one experiment template can be started from the page; the other two run from the CLI.
+- Proposals on the page come from the rule-based planner; the AI ranking is only in `rp advise`.
 - AI advice and report export are CLI commands (`rp advise`, `rp findings`, `rp report`), not dashboard buttons.
 
 ---
@@ -345,6 +350,8 @@ The page refreshes the live status every 0.5 s.
 - **Settings** (`config/ai.json`): temperature 0 and a fixed seed (**temperature** controls randomness; 0 and a fixed
   seed make the answers repeatable), 240 s timeout.
 - **Command:** `rp advise` (or `rp advise --offline` for the rule-based answer with no AI).
+- **Logging:** every model call is saved with its exact prompts, the raw response, the model name and the validation
+  result (`data/ai_calls/<time>.json`; an example is committed in `reports/day2/ai_calls/`).
 
 ### 10.2 The two AI roles
 
@@ -369,9 +376,10 @@ The page refreshes the live status every 0.5 s.
 ### 10.4 How it actually helped (measured, not hoped)
 
 - **Planner:** always gave a valid order, the same as our rule-based planner. It confirms the ranking but adds little.
-- **Analyst:** 1 of 7 answers passed the grounding check (it correctly said "data loss is caused by `fms-consumer`
+- **Analyst:** in both recorded real calls, 1 of 7 answers passed the grounding check (it correctly said "data loss is caused by `fms-consumer`
   dropping writes"). The other 6 were rejected because they contradicted the evidence, for example by blaming DNS
   caching (DNS: the system that turns names into network addresses) as a fact when it was only a hypothesis.
+  (The name-resolution cause itself is also only a hypothesis: the container-log excerpts are not committed.)
 - The rejected answers became **regression tests** (tests that make sure a mistake that happened once is always
   caught in future).
 - A larger model (`qwen2.5-coder:14b`) was tried, but it timed out on a 16 GB laptop.
@@ -399,7 +407,7 @@ Separately from the AI inside the product, much of the code and documentation wa
 | **httpx** | Calling the API | Precise timeouts per request, needed for the response envelope | `requests`: less control over timeouts; no async option. |
 | **FastAPI + uvicorn** | The local web API and dashboard server | Small, typed, built-in validation, easy to test | Flask (less built-in validation), Django (far too large for a few endpoints). |
 | **Vanilla HTML/CSS/JS + SVG** | The dashboard | No build, no npm, no internet; one file to review | React, Vue or Angular: a build toolchain and many dependencies for a single page. Grafana: cannot show our safety state or controls. |
-| **pytest** | 270 automated tests | The Python standard for tests; simple fakes | unittest: more boilerplate. |
+| **pytest** | 315 automated tests (318 with live tests) | The Python standard for tests; simple fakes | unittest: more boilerplate. |
 | **Ollama + qwen2.5:7b** | Optional AI advisor | Free, runs offline on a laptop, no data leaves the machine, repeatable settings | Cloud LLM APIs (OpenAI, Anthropic, etc.): would send fleet data off the machine and need keys and internet; we wanted the AI fully local and replaceable. Training our own model: the brief says not to without a strong reason. |
 | **Container pause / stop as faults** | Fault injection | Real, reversible, verifiable with `docker inspect`, and on the verified data path | Chaos tools such as Chaos Mesh or LitmusChaos (built for Kubernetes), Toxiproxy (a proxy that would have to be inserted into the path, changing the system), Gremlin (commercial cloud service). Our own small adapters keep the safety controller in full control. |
 | **JSON files as the evidence store** | Run records | Human-readable, easy to commit as proof, no database to run | SQLite or PostgreSQL: unnecessary for tens of runs, and harder to review in Git. |
@@ -442,7 +450,7 @@ say so.
 - [x] Real telemetry observed
 - [x] Baseline contains real measurements
 - [x] Stale and non-advancing telemetry detected by tested logic
-- [x] Setup is reproducible (also verified on a fresh macOS install: all 8 containers, 270 tests passing)
+- [x] Setup is reproducible (fresh clone verified on macOS Apple Silicon on 2026-10-11 with images pulled from scratch: 8/8 containers, all tests, demo exit 0; Windows verified on Days 1–2)
 
 ### 12.4 Phase 2: Safety controller and first experiment
 
@@ -477,8 +485,8 @@ say so.
 
 - [ ] Service/dependency graph with confidence labels. **Partly:** available in the CLI and the `rp report` page, not on the dashboard.
 - [x] System readiness and live telemetry state
-- [ ] AI-ranked proposals. **Partly:** the dashboard shows rule-based proposals; the AI ranking is in the CLI.
-- [x] Human approval controls
+- [ ] AI-ranked proposals. **Partly:** the dashboard picker shows the rule-based ranking with reasons, predicted symptoms and risks; the AI ranking is in the CLI (`rp advise`).
+- [x] Human approval controls (pick one experiment, approve with your typed name; recorded with the run)
 - [x] Live experiment state and emergency stop
 - [x] Fault status, rollback status and recovery verification
 - [ ] Predicted vs observed comparison. **Partly** (see 12.1 step 10).
@@ -492,7 +500,7 @@ say so.
 - [x] Clean-setup run
 - [x] Each experiment run end to end on the live stack
 - [x] Rollback and recovery verified
-- [x] Unit tests (270) and live tests (`RP_LIVE=1`)
+- [x] Unit tests (315) and live tests (318 with `RP_LIVE=1`)
 - [x] Failure paths tested
 - [x] Documentation: installation, architecture, testing, limitations
 - [x] Demo script (`docs/demo/DAY2_DEMO_SCRIPT.md`)
@@ -510,7 +518,7 @@ say so.
 - [x] Maximum 30 s
 - [x] Watchdog independent of the AI and frontend
 - [x] Manual emergency stop
-- [x] Rollback on cancel, timeout, threshold violation and observer loss
+- [x] Rollback on cancel, timeout, threshold violation and observer loss (error-rate and blast-radius guards also proven live; latency live trip in PR #29, awaiting approval)
 - [x] Recovery from advancing telemetry, never HTTP 200 alone
 - [x] Latched unsafe state with a safe reset
 - [x] Cleanup robust against exceptions and crashes
@@ -554,6 +562,20 @@ From recorded live runs (`reports/day1/`, `reports/day2/`):
 3. **HTTP 200 while telemetry was stale** in every forwarder pause and crash.
 4. **Slow recovery** and **stored data lost** during database outages (no buffering).
 
+**Guardrails proven live** (`reports/guardrail-demo/`, deliberately tight demo profiles):
+
+| Guard | Run | Result |
+|---|---|---|
+| Blast radius | `20261010T182500Z-4aa9f7` | Tripped (deliberate Grafana restart), rollback, latch |
+| Error rate | `20261010T234226Z-e3e15c` | First attempt: guard not exercised (no answer within 8 s) |
+| Error rate | `20261010T234332Z-77b84c` | Guard tripped, then fail-closed latch on 30 s recovery |
+| Latency | `20261011T000246Z-46ea3d` | First attempt: armed, not tripped (polls 44–72 ms, threshold 76.84 ms) |
+| Latency | `20261011T002904Z-8ad2b8` | Guard tripped with a deliberately tight threshold (30.89 ms > 30 ms), rollback and recovery verified. **Evidence in PR #29, awaiting approval** |
+
+Every run record made from 2026-10-11 also stores the host platform (OS and CPU); `reports/day2/findings.md` shows
+it next to the statistics. All measurements so far come from one Windows laptop (Days 1–2) and one Apple Silicon Mac,
+where `fms-server` and `fms-consumer` run emulated; timings are not directly comparable across them.
+
 ---
 
 ## 14. Roadmap: what was built when, and what comes next
@@ -565,8 +587,9 @@ From recorded live runs (`reports/day1/`, `reports/day2/`):
 | 2 | Safety controller, first experiment, kill switch, verified recovery | Done (Day 1) |
 | 3 | More experiments (crash, dependency failure), guardrails, repeated runs | Done (Day 2), except network degradation |
 | 4 | AI planner and analyst, scoring, findings | Done (Day 2) |
-| 5 | Live dashboard with insights | Done (Day 1 and Day 2), with the gaps listed in 9.3 |
+| 5 | Live dashboard with insights and an experiment picker | Done (Days 1–3), with the gaps listed in 9.3 |
 | 6 | Clean setup, docs, demo script, submission pack | Done, except the demo video |
+| Fix list | Clean run on Apple Silicon, wording, picker, live guardrail evidence, privacy | Done (PRs #7, #22–#28); latency evidence in PR #29. Code frozen after this |
 
 **Sensible next steps:**
 - Record the demo video and fill in the team details.
@@ -587,19 +610,21 @@ From recorded live runs (`reports/day1/`, `reports/day2/`):
 Prerequisites: Docker Desktop (running), Python 3.13, Git.
 
 ```bash
-git clone --recurse-submodules https://github.com/Anshu-raj-co/ResiliencePilot.git
-cd ResiliencePilot
-chmod +x scripts/*.sh                                  # macOS/Linux: make scripts runnable
-./scripts/stack-up.sh && ./scripts/stack-status.sh     # starts 8 containers
+git clone https://github.com/Anshu-raj-co/ResiliencePilot.git && cd ResiliencePilot
+git -c core.longpaths=true submodule update --init    # long-paths flag avoids "Filename too long" on Windows
+./scripts/stack-up.sh && ./scripts/stack-status.sh     # starts 8 containers; status exits 1 if any is down
 cd backend
 python3.13 -m venv .venv                               # a private Python environment for this project
 .venv/bin/pip install -e ".[test]"
-.venv/bin/python -m pytest -q                          # expect 270 passed
+.venv/bin/python -m pytest -q                          # expect 315 passed, 11 skipped
 .venv/bin/rp status                                    # must say READY
 .venv/bin/rp serve                                     # dashboard at http://127.0.0.1:8765/
 ```
 
 Stop everything with `./scripts/stack-down.sh`. On Windows use `.venv/Scripts/` instead of `.venv/bin/`.
+
+Tested on Windows 11 (x86-64) and macOS on Apple Silicon. Free local ports needed: 8081, 8086, 3000, 7447 and 55557
+(the databroker; move it with `RP_DATABROKER_HOST_PORT`). On Apple Silicon two images run emulated as linux/amd64.
 
 ---
 
@@ -618,7 +643,7 @@ Stop everything with `./scripts/stack-down.sh`. On Windows use `.venv/Scripts/` 
 | `rp deps` / `rp discover` | Dependency map / re-discovered from Docker | No |
 | `rp advise [--offline]` | AI planner and analyst | No |
 | `rp report` | Standalone HTML explainer of a run | No |
-| `rp serve` | Dashboard and local API | Start runs one fixed template |
+| `rp serve` | Dashboard and local API | **Yes**: pick one experiment, approve with your typed name |
 
 ---
 
@@ -630,7 +655,10 @@ Stop everything with `./scripts/stack-down.sh`. On Windows use `.venv/Scripts/` 
 - Detection time is bounded below by the 5 s stale threshold; it partly measures our monitor, not only the stack.
 - The watchdog runs inside the backend process; if that process is killed hard, the fault stays until the kill
   switch or the next start-up undoes it.
-- The local 7B AI model adds little; most of its answers fail the evidence check.
+- The local 7B AI model adds little; 1 of 7 explanations passed the evidence check in both recorded calls.
+- The guardrail demos use deliberately tight thresholds: the latency trip proves the abort path on normal latency,
+  not a real slowdown.
+- Windows was not re-tested after the 2026-10-11 changes.
 - Not production software and not safety-certified.
 
 ---

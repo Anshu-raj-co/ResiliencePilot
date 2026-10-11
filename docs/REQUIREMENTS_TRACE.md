@@ -1,9 +1,9 @@
 # Requirements trace
 
-Verification of each Bosch requirement against evidence in the repository. Regenerated on 2026-10-11 after the fix
-list (PRs #7, #22–#26 merged; **PR #27 open**). State checked: `main` at `68b26e4`, plus PR #27 where noted.
-Host: macOS 27.0.1, Apple Silicon (arm64), Docker 29.7.2, Python 3.13. `pytest -q` on `main`: **288 passed, 11 skipped**
-(PR #27 branch: 315 passed, 11 skipped).
+Verification of each Bosch requirement against evidence in the repository. Final regeneration on 2026-10-11 (code
+frozen). State checked: `main` after PRs #7 and #22–#28, plus **PR #29 (open, awaiting the lead's approval)** where
+noted. Host: macOS 27.0.1, Apple Silicon (arm64), Docker 29.7.2, Python 3.13. On `main`: `pytest -q` **315 passed,
+11 skipped**; `RP_LIVE=1` **318 passed, 8 skipped**; `scripts/demo-day1.sh` exit 0 (42 s). PR #29 branch: 317 passed.
 
 Status meanings:
 - **DONE**: met, and the evidence is in the repo or was reproduced.
@@ -17,7 +17,7 @@ Status meanings:
 | 1 | AI planner ranks and selects experiments from the dependency map, with a reason each | PARTIAL | **PARTIAL** | The AI only reorders the rule-based ranking (same order as the rules in both logged calls); a human selects, by design |
 | 2 | 3+ failure types; errors, slowdowns, recovery time recorded | DONE | **DONE** | Slowdowns are measured, not injected |
 | 3 | AI explains, ranks by severity, recommends fixes, gives a resilience score; formula documented | PARTIAL | **PARTIAL** | Severity and score are deterministic (by design); 1 of 7 AI explanations passes validation |
-| 4 | Automatic stop on error rate, latency, blast radius, each tested live | PARTIAL | **PARTIAL** | Latency guard not yet tripped live; error-rate evidence is in PR #27 (not merged) |
+| 4 | Automatic stop on error rate, latency, blast radius, each tested live | PARTIAL | **PARTIAL → DONE when PR #29 merges** | Error rate and blast radius tripped live (on `main`); the latency live trip (`8ad2b8`) and the loader fix that allows it are in PR #29 |
 | 5 | Semi-automatic dependency mapping | DONE | **DONE** | — |
 | 6 | Kill switch | DONE | **DONE** | — |
 | 7 | Human approval before execution | DONE | **DONE** | Now with the approver's typed name on the dashboard |
@@ -62,12 +62,14 @@ Note: no failure type **injects** latency (no network-degradation experiment; D-
 
 | Guard | Unit-tested | Live |
 |---|---|---|
-| Error rate | `test_error_rate_trips_and_rolls_back`, `test_error_rate_guard_zero_tolerance_trips_on_first_error` | **Tripped** in `20261010T234332Z-77b84c` (profile `guardrail-demo-error-rate`): HTTP 500 at 1.93 s → `guardrail_error_rate`, rollback verified; then a fail-closed latch because recovery took just over 30 s. The first attempt, `20261010T234226Z-e3e15c`, did not exercise the guard. **Evidence and profiles are in PR #27 (open)** |
-| Latency | `test_latency_p95_trips_and_rolls_back`, `test_latency_guard_needs_min_samples_then_uses_rolling_p95` | **Not tripped.** `20261011T000246Z-46ea3d` (profile `guardrail-demo-latency`, PR #27): threshold 76.84 ms, all 22 fault polls 44–72 ms; guard armed, did not trip. Run once, as instructed |
+| Error rate | `test_error_rate_trips_and_rolls_back`, `test_error_rate_guard_zero_tolerance_trips_on_first_error` | **Tripped** (on `main`, PR #27). First attempt `20261010T234226Z-e3e15c`: *guard not exercised* (no answer within 8 s). Second attempt `20261010T234332Z-77b84c`: *guard tripped, then fail-closed latch on 30 s recovery* (HTTP 500 at 1.93 s → `guardrail_error_rate`, rollback verified; reset by Vaibhav after checking the stack) |
+| Latency | `test_latency_p95_trips_and_rolls_back`, `test_latency_guard_needs_min_samples_then_uses_rolling_p95` | First attempt `20261011T000246Z-46ea3d` (on `main`): *armed, not tripped* (threshold 76.84 ms; polls 44–72 ms). Second and final attempt `20261011T002904Z-8ad2b8`: ***guard tripped with a deliberately tight threshold*** (30 ms cap; first poll 30.89 ms → `guardrail_latency` at 1.88 s; rollback verified; recovery 2.33 s; no latch). **Evidence and the loader fix are in PR #29 (open)**; the margin was 0.89 ms, so it proves the abort path, not a real slowdown |
 | Blast radius | `test_blast_radius_breach_trips_rolls_back_and_latches` | **Tripped** in `20261010T182500Z-4aa9f7` (deliberate Grafana restart) |
 
-Demo profiles (PR #27) are tighten-only (enforced in `config.py`, `test_profile_*_only_tighten`) and CLI-only
-(`test_dashboard_refuses_to_run_with_a_config_profile`, `test_serve_with_a_profile_set_fails_before_binding`).
+Demo profiles (merged in PR #27) are tighten-only (enforced in `config.py`; `test_profile_experiment_overrides_only_tighten`,
+`test_profile_guardrail_overrides_only_tighten`) and CLI-only (`test_dashboard_refuses_to_run_with_a_config_profile`,
+`test_serve_with_a_profile_set_fails_before_binding`; also checked live: `rp serve` with a profile set raises and never
+binds port 8765). PR #27's `orchestrator.py` change is only the added `config_profile` field.
 
 ### 5. Semi-automatic dependency mapping: DONE
 
@@ -108,7 +110,7 @@ Fresh clone of the PR #23 branch into a new folder on 2026-10-11, after deleting
 | `./scripts/stack-up.sh` | OK, exit 0 in 16 s; both images pulled as linux/amd64 (D-023) |
 | `./scripts/stack-status.sh` | 8/8 running, exit 0; after `stack-down`: exit 1 naming all 8 services |
 | venv + `pip install -e ".[test]"` | OK |
-| `pytest -q` / `RP_LIVE=1 pytest tests/test_live.py` | 270 passed / 3 passed |
+| `pytest -q` / `RP_LIVE=1 pytest tests/test_live.py` | 270 passed / 3 passed (test count of that branch at the time) |
 | `rp status` | READY |
 | `./scripts/demo-day1.sh` | exit 0 in 42 s: stall COMPLETED (stale at 5.18 s with HTTP 200, recovery 3.51 s); kill-switch run ABORTED with recovery verified; next run refused until reset |
 | `rp serve` | HTTP 200 |
@@ -145,5 +147,5 @@ defaults (`CLAUDE.md:61`).
    intentional (safety rule 8).
 2. **Req 3:** severity and score are deterministic, not AI (intentional), and the 7B model passes 1 of 7
    explanations.
-3. **Req 4:** no live `guardrail_latency` trip yet, and the error-rate live evidence is in PR #27, not yet merged.
+3. **Req 4:** becomes DONE when PR #29 is merged (latency live trip + the tighten-only loader fix that permits it).
 4. **Req 9:** Windows clean run not repeated after the fixes.
