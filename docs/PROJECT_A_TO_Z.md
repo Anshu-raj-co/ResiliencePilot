@@ -153,7 +153,7 @@ Other important folders:
 | `config/` | `safety.json` (limits), `experiments.json` (the allowlist of experiments), `dependency_map.json` (which container talks to which, with evidence), `ai.json` (AI settings), `profiles/` (GUARDRAIL-DEMO overlays, see §7) |
 | `scripts/` | Start/stop the stack, check status, the **kill switch**, and the Day-1 demo |
 | `reports/` | Committed evidence from real runs (`day1/`, `day2/`) |
-| `backend/tests/` | 315 automated tests (318 with the live tests) |
+| `backend/tests/` | 317 automated tests (320 with the live tests) |
 
 ---
 
@@ -251,7 +251,7 @@ Breaking things on purpose is only acceptable if it is safe. These rules are enf
 | **30-second cap** | A **watchdog** (an independent timer thread that forces a rollback when time runs out) enforces the limit, even if the main loop hangs. |
 | **Emergency stop** | Three ways: dashboard **Kill** button, `rp stop`, and `scripts/kill-switch.sh`, which works **even if our backend has crashed**. |
 | **Rollback always** | On completion, cancel, timeout, lost observation, any error, or a guardrail trip. |
-| **Guardrails** | Abort early on unexpected errors, slowness (latency above 5 times normal), or any change to a container outside the experiment's **blast radius** (the set of things an experiment is allowed to affect). The error-rate and blast-radius guards have each stopped a live run; the latency guard's live trip is recorded in PR #29, awaiting approval (§13). |
+| **Guardrails** | Abort early on unexpected errors, slowness (latency above 5 times normal), or any change to a container outside the experiment's **blast radius** (the set of things an experiment is allowed to affect). All three guards (error rate, latency, blast radius) have each stopped a live run (§13). |
 | **Demo profiles** | `RP_CONFIG_PROFILE=guardrail-demo-…` loads a labelled overlay with deliberately tight thresholds, used only to show the guardrails firing live. Profiles are **tighten-only** (a value can only get stricter) and **CLI-only** (the dashboard refuses to start with one set). |
 | **Strict recovery** | Rollback confirmed by Docker **and** 3 fresh, advancing vehicle timestamps. HTTP 200 alone never counts. |
 | **Latch** | If rollback or recovery cannot be proven, the tool locks itself (LATCHED_UNSAFE) until a human checks and runs a logged reset. The reset itself requires fresh, advancing data (D-018). |
@@ -407,7 +407,7 @@ Separately from the AI inside the product, much of the code and documentation wa
 | **httpx** | Calling the API | Precise timeouts per request, needed for the response envelope | `requests`: less control over timeouts; no async option. |
 | **FastAPI + uvicorn** | The local web API and dashboard server | Small, typed, built-in validation, easy to test | Flask (less built-in validation), Django (far too large for a few endpoints). |
 | **Vanilla HTML/CSS/JS + SVG** | The dashboard | No build, no npm, no internet; one file to review | React, Vue or Angular: a build toolchain and many dependencies for a single page. Grafana: cannot show our safety state or controls. |
-| **pytest** | 315 automated tests (318 with live tests) | The Python standard for tests; simple fakes | unittest: more boilerplate. |
+| **pytest** | 317 automated tests (320 with live tests) | The Python standard for tests; simple fakes | unittest: more boilerplate. |
 | **Ollama + qwen2.5:7b** | Optional AI advisor | Free, runs offline on a laptop, no data leaves the machine, repeatable settings | Cloud LLM APIs (OpenAI, Anthropic, etc.): would send fleet data off the machine and need keys and internet; we wanted the AI fully local and replaceable. Training our own model: the brief says not to without a strong reason. |
 | **Container pause / stop as faults** | Fault injection | Real, reversible, verifiable with `docker inspect`, and on the verified data path | Chaos tools such as Chaos Mesh or LitmusChaos (built for Kubernetes), Toxiproxy (a proxy that would have to be inserted into the path, changing the system), Gremlin (commercial cloud service). Our own small adapters keep the safety controller in full control. |
 | **JSON files as the evidence store** | Run records | Human-readable, easy to commit as proof, no database to run | SQLite or PostgreSQL: unnecessary for tens of runs, and harder to review in Git. |
@@ -500,7 +500,7 @@ say so.
 - [x] Clean-setup run
 - [x] Each experiment run end to end on the live stack
 - [x] Rollback and recovery verified
-- [x] Unit tests (315) and live tests (318 with `RP_LIVE=1`)
+- [x] Unit tests (317) and live tests (320 with `RP_LIVE=1`)
 - [x] Failure paths tested
 - [x] Documentation: installation, architecture, testing, limitations
 - [x] Demo script (`docs/demo/DAY2_DEMO_SCRIPT.md`)
@@ -518,7 +518,7 @@ say so.
 - [x] Maximum 30 s
 - [x] Watchdog independent of the AI and frontend
 - [x] Manual emergency stop
-- [x] Rollback on cancel, timeout, threshold violation and observer loss (error-rate and blast-radius guards also proven live; latency live trip in PR #29, awaiting approval)
+- [x] Rollback on cancel, timeout, threshold violation and observer loss (all three guards also proven live: error rate, latency, blast radius)
 - [x] Recovery from advancing telemetry, never HTTP 200 alone
 - [x] Latched unsafe state with a safe reset
 - [x] Cleanup robust against exceptions and crashes
@@ -570,7 +570,7 @@ From recorded live runs (`reports/day1/`, `reports/day2/`):
 | Error rate | `20261010T234226Z-e3e15c` | First attempt: guard not exercised (no answer within 8 s) |
 | Error rate | `20261010T234332Z-77b84c` | Guard tripped, then fail-closed latch on 30 s recovery |
 | Latency | `20261011T000246Z-46ea3d` | First attempt: armed, not tripped (polls 44–72 ms, threshold 76.84 ms) |
-| Latency | `20261011T002904Z-8ad2b8` | Guard tripped with a deliberately tight threshold (30.89 ms > 30 ms), rollback and recovery verified. **Evidence in PR #29, awaiting approval** |
+| Latency | `20261011T002904Z-8ad2b8` | Guard tripped with a deliberately tight threshold (30.89 ms > 30 ms), rollback and recovery verified |
 
 Every run record made from 2026-10-11 also stores the host platform (OS and CPU); `reports/day2/findings.md` shows
 it next to the statistics. All measurements so far come from one Windows laptop (Days 1–2) and one Apple Silicon Mac,
@@ -589,7 +589,7 @@ where `fms-server` and `fms-consumer` run emulated; timings are not directly com
 | 4 | AI planner and analyst, scoring, findings | Done (Day 2) |
 | 5 | Live dashboard with insights and an experiment picker | Done (Days 1–3), with the gaps listed in 9.3 |
 | 6 | Clean setup, docs, demo script, submission pack | Done, except the demo video |
-| Fix list | Clean run on Apple Silicon, wording, picker, live guardrail evidence, privacy | Done (PRs #7, #22–#28); latency evidence in PR #29. Code frozen after this |
+| Fix list | Clean run on Apple Silicon, wording, picker, live guardrail evidence, privacy | Done (PRs #7, #22–#30). Code frozen |
 
 **Sensible next steps:**
 - Record the demo video and fill in the team details.
@@ -616,7 +616,7 @@ git -c core.longpaths=true submodule update --init    # long-paths flag avoids "
 cd backend
 python3.13 -m venv .venv                               # a private Python environment for this project
 .venv/bin/pip install -e ".[test]"
-.venv/bin/python -m pytest -q                          # expect 315 passed, 11 skipped
+.venv/bin/python -m pytest -q                          # expect 317 passed, 11 skipped
 .venv/bin/rp status                                    # must say READY
 .venv/bin/rp serve                                     # dashboard at http://127.0.0.1:8765/
 ```

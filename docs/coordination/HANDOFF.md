@@ -1,14 +1,12 @@
 # Handoff
 
-_Updated: 2026-10-11 ~06:15 IST. **Code frozen** (lead's instruction); docs only from here. `main` = PRs #7, #22–#28
-merged + this docs PR. **Open: PR #29** (latency guardrail demo: tighten-only check vs implicit defaults, profiles may
-shorten `max_duration_s`; live trip `20261011T002904Z-8ad2b8`), waiting for the lead. PR #8 still open (older)._
+_Updated: 2026-10-11. **Code frozen for the demo** (lead's instruction). `main`: PRs #7 and #22–#30 merged (PR #29
+approved by the lead) + the final count update. PR #8 still open (older)._
 
 ## RESUME HERE
 - Status: `docs/coordination/CURRENT_STATUS.md`; requirements: `docs/REQUIREMENTS_TRACE.md` (final); guide:
   `docs/PROJECT_A_TO_Z.md` (refreshed).
-- Tests on `main`: 315 passed, 11 skipped; `RP_LIVE=1`: 318 passed, 8 skipped; `demo-day1.sh` exit 0.
-- If PR #29 is merged: update the test counts to 317 / 320 and mark req 4 DONE in the trace.
+- Tests on `main`: 317 passed, 11 skipped; `RP_LIVE=1`: 320 passed, 8 skipped; `demo-day1.sh` exit 0.
 - Controller READY; local stack running.
 
 ## Earlier (before 2026-10-11 05:00 IST)

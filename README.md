@@ -73,7 +73,7 @@ git -c core.longpaths=true submodule update --init   # long-paths flag avoids "F
 ./scripts/stack-up.sh && ./scripts/stack-status.sh    # 8 containers; HTTP 200 with vehicle data; exits 1 if any is down
 cd backend && python3.13 -m venv .venv
 .venv/bin/pip install -e ".[test]"                    # Windows: .venv/Scripts/...
-.venv/bin/python -m pytest -q                         # 315 unit tests (RP_LIVE=1: 318, adds live read-only tests)
+.venv/bin/python -m pytest -q                         # 317 unit tests (RP_LIVE=1: 320, adds live read-only tests)
 .venv/bin/rp serve                                    # dashboard at http://127.0.0.1:8765/
 ```
 

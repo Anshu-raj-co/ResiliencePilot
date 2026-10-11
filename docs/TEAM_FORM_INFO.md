@@ -50,7 +50,7 @@ databroker, Eclipse Zenoh, InfluxDB, rFMS) · Ollama (`qwen2.5:7b`, local) · va
 - After an InfluxDB outage: stale data served as HTTP 200 for ~21–24 s after the database returned (2 runs); recovery
   20.5–24.2 s in the completed runs; stored-data gaps up to 30.7 s.
 - Resilience Score medians: telemetry_stall 62.2, service_crash 65.1, dependency_failure 61.6 (Day 2).
-- 315 unit tests (318 with live tests); 23 logged design decisions; independent safety reviews.
+- 317 unit tests (320 with live tests); 23 logged design decisions; independent safety reviews.
 
 ## Team
 
