@@ -3,14 +3,15 @@ name = "resiliencepilot"
 version = "0.1.0"
 description = "Resilience workbench for the Eclipse SDV Fleet Management Blueprint"
 requires-python = ">=3.12"
-dependencies = ["fastapi>=0.115,<0.116", "uvicorn>=0.32,<0.33", "httpx>=0.27,<0.28", "pydantic>=2.9,<3"]
+dependencies = ["fastapi>=0.115,<0.116", "uvicorn>=0.32,<0.33", "httpx>=0.27,<0.28", "pydantic>=2.9,<3",
+                "tzdata; sys_platform == 'win32'"]   # IANA zones for the data-quality normalizer on Windows
 
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["resiliencepilot"]   # explicit: backend/data/ holds runtime evidence, not code
+packages = ["resiliencepilot", "resiliencepilot.dq"]   # explicit: backend/data/ holds runtime evidence, not code
 
 [tool.setuptools.package-data]
 resiliencepilot = ["static/*.html"]
@@ -20,6 +21,7 @@ rp = "resiliencepilot.__main__:main"
 
 [project.optional-dependencies]
 test = ["pytest>=8,<9"]
+slides = ["python-pptx>=1.0,<2"]   # scripts/make_ppt.py
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
