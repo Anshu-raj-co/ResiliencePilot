@@ -372,3 +372,9 @@ def test_L1_completed_only_when_as_planned(env):
 def test_run_record_states_the_config_profile(env):
     *_, runner = env
     assert runner.run(GOOD)["config_profile"] == "default"
+
+
+def test_run_record_states_the_host_platform(env):
+    *_, runner = env
+    rec = runner.run(GOOD)
+    assert set(rec["platform"]) == {"os", "os_release", "cpu"} and rec["platform"]["cpu"]

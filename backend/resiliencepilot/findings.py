@@ -16,6 +16,7 @@ from __future__ import annotations
 import statistics
 from collections import defaultdict
 
+from .evidence import platform_label
 from .scoring import score_run
 
 SLOW_RECOVERY_S = 10.0
@@ -74,9 +75,28 @@ _TITLE = {
 }
 
 
-def render_markdown(runs: list[dict], plan_entries: list[dict], source: str, annotations: dict | None = None) -> str:
-    """`annotations` maps run_id -> a human note (e.g. "deliberate guard test"); shown beside that run, never scored."""
+def run_platform(run: dict, platforms: dict) -> str:
+    """Platform of one run: from the run record (newer runs), else from `platforms.json` (a documented label for older
+    runs), else "not recorded". Never guessed."""
+    if run.get("platform"):
+        return platform_label(run["platform"])
+    return platforms.get(run.get("run_id"), "not recorded")
+
+
+def _platforms(runs: list[dict], plat: dict) -> str:
+    counts: dict[str, int] = defaultdict(int)
+    for r in runs:
+        counts[run_platform(r, plat)] += 1
+    return "; ".join(f"{k} ×{n}" for k, n in sorted(counts.items())) or "n/a"
+
+
+def render_markdown(runs: list[dict], plan_entries: list[dict], source: str, annotations: dict | None = None,
+                    platforms: dict | None = None) -> str:
+    """`annotations` maps run_id -> a human note (e.g. "deliberate guard test"); shown beside that run, never scored.
+    `platforms` maps run_id -> a documented platform label for runs recorded before run records stored it."""
     notes = annotations or {}
+    plat = platforms or {}
+    run_by_id = {r.get("run_id"): r for r in runs}
     tag = lambda run: f" _(note: {notes[run]})_" if run in notes else ""  # noqa: E731
     scores = [score_run(r) for r in runs]
     by_type: dict[str, list[dict]] = defaultdict(list)
@@ -87,8 +107,8 @@ def render_markdown(runs: list[dict], plan_entries: list[dict], source: str, ann
          "read from a run record or its Resilience Score (`docs/SCORING.md`); nothing is estimated."
          + (f" Notes in _italics_ are human annotations from `annotations.json` ({len(notes)})." if notes else ""), "",
          "## Results by experiment", "",
-         "| Experiment | Runs | Full-window | Score median (range) | TTD | TTR | Silent polls | Not scorable / partial |",
-         "|---|---|---|---|---|---|---|---|"]
+         "| Experiment | Runs | Full-window | Score median (range) | TTD | TTR | Silent polls | Not scorable / partial | Platform (full-window runs) |",
+         "|---|---|---|---|---|---|---|---|---|"]
     for et, ss in sorted(by_type.items()):
         full = [s for s in ss if s["scorable"] and not s["partial"]]
         med = f"{statistics.median(s['score'] for s in full):.1f} ({_rng([s['score'] for s in full], '')})" if full else "n/a"
@@ -96,8 +116,11 @@ def render_markdown(runs: list[dict], plan_entries: list[dict], source: str, ann
                  f"{_rng([s['components']['detection']['ttd_s'] for s in full])} | "
                  f"{_rng([s['components']['recovery']['ttr_s'] for s in full])} | "
                  f"{_rng([s['silent']['silent_polls'] for s in full], '')} | "
-                 f"{sum(not s['scorable'] for s in ss)} / {sum(s['scorable'] and s['partial'] for s in ss)} |")
-    L += ["", "TTD, TTR and silent polls are over full-window runs only.", "", "## Findings (most severe first)", ""]
+                 f"{sum(not s['scorable'] for s in ss)} / {sum(s['scorable'] and s['partial'] for s in ss)} | "
+                 f"{_platforms([run_by_id.get(s['run_id'], {}) for s in full], plat)} |")
+    L += ["", "TTD, TTR and silent polls are over full-window runs only. Platform is the host OS (CPU) that ran "
+          "ResiliencePilot, with the number of runs; on Apple Silicon, fms-server and fms-consumer run as emulated "
+          "linux/amd64 images (D-023), so latency and timing are not directly comparable across platforms.", "", "## Findings (most severe first)", ""]
     findings = derive_findings(runs)
     if not findings:
         L.append("No rule fired.")

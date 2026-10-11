@@ -23,6 +23,14 @@ SUPPORTED_MECHANISMS = ("docker_pause", "docker_stop")
 CONFIG_PROFILES = ("guardrail-demo-error-rate", "guardrail-demo-latency")
 PROFILE_SPEC_KEYS = frozenset({"description", "expected_symptoms", "risks", "expected_statuses", "max_error_rate",
                                "fault_observer_timeout_s", "fault_latency_p95_max_ms"})
+# Tighten-only: each overridable guardrail number may only go DOWN (stricter / judged sooner) versus the default config.
+PROFILE_GUARDRAIL_KEYS = frozenset({"max_error_rate", "error_min_samples", "latency_p95_multiplier", "latency_p95_floor_ms",
+                                    "latency_min_samples", "blast_radius_interval_s", "blast_radius_max_snapshot_failures"})
+
+
+def _check_tightens(profile: str, what: str, key: str, base, new) -> None:
+    if base is None or new is None or new > base:
+        raise ValueError(f"profile {profile}: {what}.{key} may only be tightened (default {base!r}, profile {new!r})")
 
 
 def active_profile() -> str | None:
@@ -159,6 +167,11 @@ def load_safety_config(root: Path = REPO_ROOT) -> SafetyConfig:
     over = {k: v for k, v in _profile_file(root, profile, "safety.json").items() if not k.startswith("_")}
     if set(over) - {"guardrails"}:
         raise ValueError(f"profile {profile}: safety.json may only override 'guardrails', not {sorted(set(over) - {'guardrails'})}")
+    base_g = {f: getattr(Guardrails(), f) for f in Guardrails.__dataclass_fields__} | raw.get("guardrails", {})
+    for k, v in over.get("guardrails", {}).items():
+        if k not in PROFILE_GUARDRAIL_KEYS:
+            raise ValueError(f"profile {profile}: guardrails.{k} cannot be overridden by a profile")
+        _check_tightens(profile, "guardrails", k, base_g[k], v)
     data_dir = Path(raw.pop("data_dir"))
     guardrails = Guardrails(**{**raw.pop("guardrails", {}), **over.get("guardrails", {})})
     return SafetyConfig(data_dir=data_dir if data_dir.is_absolute() else root / data_dir, guardrails=guardrails,
@@ -176,7 +189,15 @@ def load_experiment_catalog(root: Path = REPO_ROOT) -> dict[str, ExperimentSpec]
         bad = set(over) - PROFILE_SPEC_KEYS
         if bad:
             raise ValueError(f"profile {profile}: {name} may not override {sorted(bad)}")
-        raw[name] = {**raw[name], **over}
+        base = raw[name]
+        if not set(over.get("expected_statuses", base.get("expected_statuses", []))) <= set(base.get("expected_statuses", [])):
+            raise ValueError(f"profile {profile}: {name}.expected_statuses may only be removed, not added")
+        for k in ("fault_observer_timeout_s", "fault_latency_p95_max_ms"):
+            if k in over:
+                _check_tightens(profile, name, k, base.get(k), over[k])
+        if "max_error_rate" in over:
+            _check_tightens(profile, name, "max_error_rate", base.get("max_error_rate", 0.0), over["max_error_rate"])
+        raw[name] = {**base, **over}
     return {
         name: ExperimentSpec(
             name=name,

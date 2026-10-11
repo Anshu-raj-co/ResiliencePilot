@@ -37,16 +37,18 @@ def test_unknown_profile_names_are_refused(monkeypatch, name):
 
 
 def test_committed_profiles_load_and_change_only_what_they_say(monkeypatch):
-    base = load_experiment_catalog()["dependency_failure"]
+    monkeypatch.delenv("RP_CONFIG_PROFILE", raising=False)
+    default_catalog = load_experiment_catalog()
+    base = default_catalog["dependency_failure"]
     monkeypatch.setenv("RP_CONFIG_PROFILE", "guardrail-demo-error-rate")
     err = load_experiment_catalog()["dependency_failure"]
     assert load_safety_config().profile == "guardrail-demo-error-rate"
     assert err.expected_statuses == () and err.allowed_targets == base.allowed_targets
     assert err.max_duration_s == base.max_duration_s and err.mechanism == base.mechanism
     monkeypatch.setenv("RP_CONFIG_PROFILE", "guardrail-demo-latency")
-    lat = load_experiment_catalog()["dependency_failure"]
-    assert lat.fault_latency_p95_max_ms == 1000 and lat.expected_statuses == (500,)
-    assert load_safety_config().guardrails.latency_min_samples == 1
+    assert load_experiment_catalog() == default_catalog         # latency demo changes guardrails only
+    g = load_safety_config().guardrails
+    assert (g.latency_p95_multiplier, g.latency_p95_floor_ms, g.latency_min_samples) == (1.0, 1, 1)
     assert set(CONFIG_PROFILES) == {p.name for p in (REPO_ROOT / "config" / "profiles").iterdir() if p.is_dir()}
 
 
@@ -77,3 +79,27 @@ def test_profile_safety_overlay_is_limited_to_bounded_guardrails(tmp_path, monke
     root = _root(tmp_path, CONFIG_PROFILES[0], safety=safety)
     with pytest.raises(ValueError, match=match):
         load_safety_config(root)
+
+
+@pytest.mark.parametrize("experiments, match", [
+    ({"dependency_failure": {"fault_observer_timeout_s": 8.0, "fault_latency_p95_max_ms": 7600}}, "only be tightened"),
+    ({"dependency_failure": {"expected_statuses": [500, 503]}}, "only be removed"),
+    ({"dependency_failure": {"max_error_rate": 0.2}}, "only be tightened"),
+    ({"service_crash": {"fault_observer_timeout_s": 1.0}}, "only be tightened"),   # no envelope by default
+])
+def test_profile_experiment_overrides_only_tighten(tmp_path, monkeypatch, experiments, match):
+    monkeypatch.setenv("RP_CONFIG_PROFILE", CONFIG_PROFILES[0])
+    with pytest.raises(ValueError, match=match):
+        load_experiment_catalog(_root(tmp_path, CONFIG_PROFILES[0], experiments=experiments))
+
+
+@pytest.mark.parametrize("guardrails, match", [
+    ({"max_error_rate": 0.1}, "only be tightened"),
+    ({"latency_p95_multiplier": 6.0}, "only be tightened"),
+    ({"latency_min_samples": 6}, "only be tightened"),
+    ({"latency_window": 30}, "cannot be overridden"),
+])
+def test_profile_guardrail_overrides_only_tighten(tmp_path, monkeypatch, guardrails, match):
+    monkeypatch.setenv("RP_CONFIG_PROFILE", CONFIG_PROFILES[0])
+    with pytest.raises(ValueError, match=match):
+        load_safety_config(_root(tmp_path, CONFIG_PROFILES[0], safety={"guardrails": guardrails}))

@@ -35,6 +35,21 @@
         "LATCHED_UNSAFE"
       ]
     },
+    "platform": {
+      "description": "Host running ResiliencePilot (added 2026-10-11; absent in older records)",
+      "type": "object",
+      "properties": {
+        "os": {
+          "type": "string"
+        },
+        "os_release": {
+          "type": "string"
+        },
+        "cpu": {
+          "type": "string"
+        }
+      }
+    },
     "timeline": {
       "type": "array",
       "items": {

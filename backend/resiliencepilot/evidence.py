@@ -3,8 +3,23 @@ from __future__ import annotations
 
 import json
 import os
+import platform
 import time
 from pathlib import Path
+
+
+def host_platform() -> dict:
+    """OS and CPU of the machine running ResiliencePilot, stored with each run so statistics can be compared fairly.
+    The Docker VM may differ (e.g. linux/amd64 images emulated on Apple Silicon, D-023)."""
+    system = platform.system()
+    release = platform.mac_ver()[0] if system == "Darwin" else platform.release()
+    return {"os": {"Darwin": "macOS"}.get(system, system), "os_release": release, "cpu": platform.machine()}
+
+
+def platform_label(p: dict | None) -> str:
+    if not p:
+        return "not recorded"
+    return " ".join(x for x in (p.get("os"), p.get("os_release")) if x) + (f" ({p['cpu']})" if p.get("cpu") else "")
 
 
 class EvidenceStore:
@@ -12,6 +27,21 @@ class EvidenceStore:
         self.data_dir = data_dir
         (data_dir / "runs").mkdir(parents=True, exist_ok=True)
         (data_dir / "baselines").mkdir(parents=True, exist_ok=True)
+
+    def save_proposal(self, run_id: str, payload: dict) -> Path:
+        """What the approver saw for a dashboard run (planner rank, reasons, predicted symptoms); next to the run."""
+        d = self.data_dir / "proposals"
+        d.mkdir(parents=True, exist_ok=True)
+        return self._write(d / f"{run_id}.json", payload)
+
+    def load_proposal(self, run_id: str) -> dict | None:
+        p = self.data_dir / "proposals" / f"{run_id}.json"
+        return json.loads(p.read_text(encoding="utf-8")) if p.is_file() else None
+
+    def save_ai_calls(self, stamp: str, payload: dict) -> Path:
+        d = self.data_dir / "ai_calls"
+        d.mkdir(parents=True, exist_ok=True)
+        return self._write(d / f"{stamp}.json", payload)
 
     def _write(self, path: Path, payload: dict) -> Path:
         tmp = path.with_suffix(path.suffix + ".tmp")

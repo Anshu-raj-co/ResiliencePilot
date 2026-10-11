@@ -4,9 +4,11 @@ It calls exactly the code paths the CLI uses:
   run   -> ExperimentRunner.start()        (validation, allowlist, one-experiment lock, watchdog)
   kill  -> SafetyController.emergency_stop()
   reset -> SafetyController.reset()
-It adds no safety logic of its own and cannot change the experiment: POST /api/run takes no parameters.
-GET /api/insights is read-only (scores, planner proposals, findings from stored run records); proposals are shown,
-never executed.
+It adds no safety logic of its own. POST /api/run takes exactly {"experiment_id", "approved_by"}: the id must be a key of
+the experiment catalogue and the approver a typed, non-blank name; target and duration are chosen here from the
+catalogue (never from the client), and the request then goes through the same validation, lock and watchdog as the
+CLI. GET /api/proposals lists the rule-based planner's ranking with reasons, predicted symptoms and risks.
+GET /api/insights is read-only (scores, planner proposals, findings from stored run records).
 """
 from __future__ import annotations
 
@@ -18,6 +20,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from .config import REPO_ROOT, ExperimentSpec, SafetyConfig
 from .evidence import EvidenceStore
@@ -28,13 +31,37 @@ from .telemetry import FreshnessTracker
 
 HOST = "127.0.0.1"  # never exposed beyond localhost
 DEFAULT_PORT = 8765
-DASHBOARD_TEMPLATE = {  # the single approved template; same hypothesis text as scripts/demo-day1.sh
-    "experiment_type": "telemetry_stall",
-    "target": "fms-forwarder",
-    "duration_s": 12,
-    "approved_by": "dashboard-operator",
-    "hypothesis": "Pausing fms-forwarder stalls createdDateTime while the rFMS API keeps returning HTTP 200",
-}
+DASHBOARD_DURATION_S = 12  # fault window for runs started from the dashboard (capped by catalogue and safety config)
+
+
+class DashboardRun(BaseModel):
+    """The only body POST /api/run accepts. No target, duration or any other parameter can be sent."""
+    model_config = ConfigDict(extra="forbid", strict=True)
+    experiment_id: str = Field(min_length=1, max_length=63)
+    approved_by: str = Field(min_length=1, max_length=80)
+
+    @field_validator("approved_by")
+    @classmethod
+    def _typed_name(cls, v: str) -> str:
+        v = " ".join(v.split())
+        if not v or not any(c.isalpha() for c in v):
+            raise ValueError("approved_by must be the approver's typed name")
+        return v
+
+
+def dashboard_request(experiment_id: str, approved_by: str, catalog: dict[str, ExperimentSpec], max_duration_s: int,
+                      proposal: dict | None = None, duration_s: int = DASHBOARD_DURATION_S) -> dict:
+    """Build the ExperimentRequest for a dashboard pick. Target and duration come from the catalogue, never the client."""
+    spec = catalog[experiment_id]
+    predicted = "; ".join(spec.expected_symptoms)
+    rank = f"planner rank {proposal['rank']}" if proposal else "not ranked"
+    return {
+        "experiment_type": experiment_id,
+        "target": spec.allowed_targets[0],
+        "duration_s": min(duration_s, spec.max_duration_s, max_duration_s),
+        "approved_by": approved_by,
+        "hypothesis": f"Dashboard pick ({rank}). Predicted: {predicted}"[:500],
+    }
 _STATIC = Path(__file__).parent / "static" / "dashboard.html"
 
 
@@ -116,11 +143,12 @@ def _run_summary(rec: dict | None) -> dict | None:
 
 
 def create_app(cfg: SafetyConfig, catalog: dict[str, ExperimentSpec], ctl: SafetyController, docker, observer,
-               store: EvidenceStore, *, run_template: dict | None = None, monitor: bool = True,
+               store: EvidenceStore, *, monitor: bool = True, dashboard_duration_s: int = DASHBOARD_DURATION_S,
                insight_sources: dict[str, Path] | None = None, dep_map_path: Path | None = None) -> FastAPI:
+    if cfg.profile != "default":  # GUARDRAIL-DEMO profiles are CLI-only; the dashboard never runs with one
+        raise ValueError(f"the dashboard does not run with config profile {cfg.profile!r}; unset RP_CONFIG_PROFILE")
     live = LiveState(cfg.stale_threshold_s)
     runner = ExperimentRunner(cfg, catalog, ctl, docker, observer, store, on_event=live.on_event)
-    template = dict(run_template or DASHBOARD_TEMPLATE)
     stop_monitor = threading.Event()
 
     def monitor_loop() -> None:
@@ -142,7 +170,7 @@ def create_app(cfg: SafetyConfig, catalog: dict[str, ExperimentSpec], ctl: Safet
         stop_monitor.set()
 
     app = FastAPI(title="ResiliencePilot dashboard API", docs_url=None, redoc_url=None, lifespan=lifespan)
-    app.state.runner, app.state.ctl, app.state.live, app.state.template = runner, ctl, live, template
+    app.state.runner, app.state.ctl, app.state.live = runner, ctl, live
 
     def _latest_record() -> dict | None:
         ids = store.list_runs()
@@ -190,7 +218,7 @@ def create_app(cfg: SafetyConfig, catalog: dict[str, ExperimentSpec], ctl: Safet
             "latched_reason": st["latched_reason"], "emergency_stop_engaged": st["emergency_stop_engaged"],
             "active_run": st["active_run"], "stale_threshold_s": cfg.stale_threshold_s,
             "poll_interval_s": cfg.poll_interval_s, "latest": latest, "recent": recent, "current_run": run,
-            "last_run": _run_summary(_latest_finished_record()), "template": template,
+            "last_run": _run_summary(_latest_finished_record()),
             "startup_recovery": getattr(app.state, "recovered", None),
         }
 
@@ -215,21 +243,66 @@ def create_app(cfg: SafetyConfig, catalog: dict[str, ExperimentSpec], ctl: Safet
             return JSONResponse({"detail": f"insights unavailable: {type(exc).__name__}: {exc}"}, status_code=500)
         return {"source": source, "sources": sorted(sources), **out}
 
+    def _proposals() -> list[dict]:
+        """Rule-based planner ranking over the local evidence store, plus each experiment's predicted symptoms."""
+        from .insights import catalog_dict
+        from .planner import plan
+        from .scoring import load_runs
+        runs_dir = store.data_dir / "runs"
+        runs = load_runs(runs_dir) if runs_dir.is_dir() else []
+        dep_map = json.loads(dep_map_file.read_text(encoding="utf-8"))
+        out = []
+        for e in plan(catalog_dict(catalog), dep_map, runs, cfg.max_duration_s):
+            spec = catalog[e["experiment_type"]]
+            req = dashboard_request(e["experiment_type"], "-", catalog, cfg.max_duration_s, e, dashboard_duration_s)
+            out.append({"experiment_id": e["experiment_type"], "rank": e["rank"], "priority": e["priority"],
+                        "information": e["information"], "risk": e["risk"], "rationale": e["rationale"],
+                        "target": req["target"], "duration_s": req["duration_s"], "mechanism": spec.mechanism,
+                        "predicted_symptoms": list(spec.expected_symptoms), "risks": list(spec.risks),
+                        "provider": "rule-based"})
+        return out
+
+    @app.get("/api/proposals")
+    def proposals():
+        try:
+            return {"catalog": sorted(catalog), "proposals": _proposals()}
+        except Exception as exc:  # noqa: BLE001 - display-only; never break the server or the controls
+            return JSONResponse({"detail": f"proposals unavailable: {type(exc).__name__}: {exc}"}, status_code=500)
+
     @app.post("/api/run", status_code=202)
     async def run(request: Request):
-        body = await request.body()
-        if request.query_params or body.strip() not in (b"", b"{}", b"null"):
-            return JSONResponse({"detail": "POST /api/run takes no parameters; it always runs the approved template"},
-                                status_code=422)
+        if request.query_params:
+            return JSONResponse({"detail": "POST /api/run takes no query parameters"}, status_code=422)
         try:
-            run_id = runner.start(dict(template))
+            pick = DashboardRun.model_validate(json.loads(await request.body() or b"null"))
+        except (ValueError, ValidationError) as exc:
+            return JSONResponse({"detail": 'body must be exactly {"experiment_id": <catalogue id>, '
+                                           f'"approved_by": <your name>}}: {exc}'[:600]}, status_code=422)
+        if pick.experiment_id not in catalog:
+            return JSONResponse({"detail": f"experiment_id must be one of {sorted(catalog)}"}, status_code=422)
+        try:
+            proposal = next((p for p in _proposals() if p["experiment_id"] == pick.experiment_id), None)
+        except Exception:  # noqa: BLE001 - the ranking is context, never a precondition for the safety path
+            proposal = None
+        req = dashboard_request(pick.experiment_id, pick.approved_by, catalog, cfg.max_duration_s, proposal,
+                                dashboard_duration_s)
+        try:
+            run_id = runner.start(req)
         except Busy as exc:
             return JSONResponse({"detail": str(exc)}, status_code=409)
         except Latched as exc:
             return JSONResponse({"detail": str(exc)}, status_code=423)
         except RequestRejected as exc:
             return JSONResponse({"detail": str(exc)}, status_code=422)
-        return {"run_id": run_id, "request": template}
+        try:  # what the approver saw when approving; stored next to the run record, never read by the safety path
+            store.save_proposal(run_id, {"run_id": run_id, "approved_by": pick.approved_by, "approved_via": "dashboard",
+                                         "approved_at": utcnow().isoformat(), "request": req, "proposal": proposal,
+                                         "model_calls": [], "note": "Dashboard proposals come from the rule-based "
+                                         "planner; no model is called when a run is started. Model calls made by "
+                                         "`rp advise` are logged in data/ai_calls/."})
+        except Exception:  # noqa: BLE001 - evidence for context only; the run is already under the safety controller
+            pass
+        return {"run_id": run_id, "request": req}
 
     @app.post("/api/kill")
     def kill() -> dict:

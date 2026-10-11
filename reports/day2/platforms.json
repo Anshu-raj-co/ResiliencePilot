@@ -1,0 +1,6 @@
+{
+  "_about": "Platform of runs recorded before run records stored it (added 2026-10-11). Only runs whose platform is stated in a committed document are listed; every other older run is reported as 'not recorded'. Source for the entries below: reports/day2/README.md section 'Milestone-2 top-up runs (2026-10-10 20:36-20:38 UTC, macOS ...)'; the CPU is not stated there.",
+  "20261010T203616Z-596e45": "macOS (CPU not recorded)",
+  "20261010T203712Z-08b9dd": "macOS (CPU not recorded)",
+  "20261010T203817Z-01d396": "macOS (CPU not recorded)"
+}
