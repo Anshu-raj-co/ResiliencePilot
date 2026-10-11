@@ -1,17 +1,15 @@
 # Handoff
 
-_Updated: 2026-10-11 ~05:45 IST. `main` = `68b26e4` + this PR. Fix list from the lead: items 1, 2, 3, 5 merged
-(PRs #23, #24, #25, #26; #7 and #22 also merged). **Open: PR #27 (item 4, GUARDRAIL-DEMO profiles + live evidence)
-waits for the lead's approval** (config loading + `orchestrator.py` field + `api.py` refusal). PR #8 still open._
+_Updated: 2026-10-11 ~06:15 IST. **Code frozen** (lead's instruction); docs only from here. `main` = PRs #7, #22–#28
+merged + this docs PR. **Open: PR #29** (latency guardrail demo: tighten-only check vs implicit defaults, profiles may
+shorten `max_duration_s`; live trip `20261011T002904Z-8ad2b8`), waiting for the lead. PR #8 still open (older)._
 
 ## RESUME HERE
-- Requirements status: `docs/REQUIREMENTS_TRACE.md` (regenerated). Still PARTIAL: req 1 (AI only reorders; human
-  selects by design), req 3 (severity/score deterministic by design; 1/7 AI explanations pass), req 4 (no live
-  latency-guard trip; error-rate evidence in PR #27), req 9 (Windows not re-tested).
-- Latency guard live attempt `20261011T000246Z-46ea3d`: armed at 76.84 ms, polls 44–72 ms, not tripped (run once, as
-  instructed). A trip needs either a stored baseline with a lower p95 or a real slowdown; ask the lead before retrying.
-- Controller: READY (latch from run `77b84c` reset by Vaibhav after checking the stack). Stack running locally.
-- Dashboard: `rp serve` refuses to start with `RP_CONFIG_PROFILE` set (PR #27).
+- Status: `docs/coordination/CURRENT_STATUS.md`; requirements: `docs/REQUIREMENTS_TRACE.md` (final); guide:
+  `docs/PROJECT_A_TO_Z.md` (refreshed).
+- Tests on `main`: 315 passed, 11 skipped; `RP_LIVE=1`: 318 passed, 8 skipped; `demo-day1.sh` exit 0.
+- If PR #29 is merged: update the test counts to 317 / 320 and mark req 4 DONE in the trace.
+- Controller READY; local stack running.
 
 ## Earlier (before 2026-10-11 05:00 IST)
 - **Submission pack (branch `docs/submission-pack`):** `README.md` (final, screenshot + scores),
