@@ -204,7 +204,13 @@ def ai_calls() -> list:
                     parsed = None
             elif isinstance(v, dict):
                 parsed = v
+            answer = None
+            try:  # the model's own JSON answer, as recorded (Ollama /api/chat envelope)
+                answer = json.loads(json.loads(c.get("raw_response") or "")["message"]["content"])
+            except (ValueError, KeyError, TypeError):
+                answer = None
             entry = {"index": idx, "role": role, "provider": c.get("provider"), "model": c.get("model"),
+                     "answer": answer,
                      "options": c.get("options"), "http_status": c.get("http_status"), "error": c.get("error"),
                      "validation_text": v if isinstance(v, str) and parsed is None else None}
             if parsed is not None:
@@ -307,7 +313,19 @@ def build() -> dict:
                              "The planner can only **reorder** the rule-based candidates.",
                              "Output is text for a human. Nothing in it is executed.",
                              "`ai.py` imports only `json`, `dataclasses`, `pathlib`, `urllib.parse` and `httpx`",
-                             "The Ollama URL must be loopback"]]},
+                             "The Ollama URL must be loopback"]],
+                         "roles": [{"text": q, "src": src("docs/AI_LAYER.md", line_of("docs/AI_LAYER.md", q))} for q in [
+                             "**AI Planner**: proposes an order for the allowlisted experiments, with a technical rationale.",
+                             "**AI Analyst**: maps each finding (`rp findings`) to a root cause and a ranked remediation playbook (verify, mitigate, fix)."]],
+                         "validator": [{"text": q, "src": src("docs/AI_LAYER.md", line_of("docs/AI_LAYER.md", q))} for q in [
+                             "Planner answer is an exact permutation of allowlisted candidate ids",
+                             "Analyst item: known finding id, cites only that finding's runs, valid confidence, 1–8 playbook steps of kind verify/mitigate/fix",
+                             "**Grounding**: the root cause names the component the verified evidence points to, does not blame a component the evidence rules out, hedges the unverified DNS-caching hypothesis, and respects operator annotations"]],
+                         "model_14b": [{"text": q, "src": src("docs/AI_LAYER.md", line_of("docs/AI_LAYER.md", q))} for q in [
+                             "### `qwen2.5-coder:14b` (2026-10-11, same Mac: Apple Mac16,12, 16 GB, Ollama 0.40.2, 21 committed runs)",
+                             "- **Planner:** valid permutation, same order as the rules; about 4 min for the planner call alone.",
+                             "- **Analyst:** timed out at 120 s and again at 300 s (an 8 min 22 s `rp advise` call). Both times every finding fell",
+                             "too slow for the analyst prompt, so `config/ai.json` stays on `qwen2.5:7b`."]]},
         "findings": findings,
         "scores": {"path": sc["path"], "summary": sc["summary"]},
         "runs": runs(annotations, findings, sc["by_run"]),
@@ -317,11 +335,12 @@ def build() -> dict:
 def verify_ai_boundary_text(data: dict) -> None:
     """The boundary rows above are copied from docs/AI_LAYER.md; fail loudly if the doc changed."""
     doc = read("docs/AI_LAYER.md")
-    for s in data["ai_layer_doc"]["gets"] + data["ai_layer_doc"]["never"] + [q["text"] for q in data["ai_layer_doc"]["quotes"]]:
+    for s in data["ai_layer_doc"]["gets"] + data["ai_layer_doc"]["never"] + [q["text"] for k in ("quotes", "roles", "validator", "model_14b") for q in data["ai_layer_doc"][k]]:
         if s not in doc:
             raise SystemExit(f"docs/AI_LAYER.md no longer contains: {s!r}; update build_scene_data.py")
 
 
+SVG_NS = "http://www.w3.org/2000/svg"  # XML namespace identifier for createElementNS; never fetched
 NET_APIS = ["fetch(", "XMLHttpRequest", "WebSocket", "EventSource", "sendBeacon", "importScripts", "import("]
 
 
@@ -343,7 +362,7 @@ def offline_check(page: str) -> list[str]:
     for api in NET_APIS:
         if api in code:
             problems.append(f"index.html: network API in page code: {api}")
-    if re.search(r"https?://", code, re.I):
+    if re.search(r"https?://", code.replace(SVG_NS, ""), re.I):
         problems.append("index.html: http(s):// string in page code outside the data block")
     scripts = re.findall(r"<script[^>]*\ssrc=[\"']([^\"']+)", code, re.I)
     if scripts != ["three.r160.min.js"]:
@@ -392,6 +411,8 @@ def main() -> int:
         hits = {api: lib.count(api) for api in ("fetch(", "XMLHttpRequest", "http://", "https://") if api in lib}
         print(f"note: vendored three.r160.min.js contains {hits} (library loader code and the upstream deprecation "
               "message; the page never calls a three.js loader)")
+        if SVG_NS in page:
+            print(f"note: page code uses the SVG namespace identifier {SVG_NS} (createElementNS; not a resource load)")
         urls = sorted(set(re.findall(r"https?://[^\s\"'<>]+", page[page.index(BEGIN):page.index(END)])))
         print(f"note: URLs appearing as text values in the embedded data (not loaded): {urls}")
         return rc or (1 if problems else 0)

@@ -1,6 +1,6 @@
 # Handoff
 
-_Updated: 2026-10-11 (07:55 IST, feat/scene-3d M2). **Code frozen for the demo** (lead's instruction). `main`: PRs #7 and #22–#30 merged (PR #29
+_Updated: 2026-10-11 (feat/scene-3d M3/M4). **Code frozen for the demo** (lead's instruction). `main`: PRs #7 and #22–#30 merged (PR #29
 approved by the lead) + the final count update. PR #8 still open (older)._
 
 ## Optional visualization: branch `feat/scene-3d` (in progress, NOT merged; merge only with the lead's approval)
@@ -25,7 +25,21 @@ approved by the lead) + the final count update. PR #8 still open (older)._
   checked in an iframe; fresh clone needs `git submodule update --init` only to REBUILD data, not to view the page.
   `git diff --stat main`: only docs/scene/, scripts/build_scene_data.py, docs/TEAM_FORM_INFO.md, this file.
   Tests unchanged: 317 passed, 11 skipped (macOS).
-- Next: STOP after M2 and report to the lead. M3/M4 only with explicit approval. PR open, do not merge without approval.
+- **Layout fix (after M2)**: CSS grid (sidebar(s) | 3D stage | timeline); canvas sized by CSS (Retina bug: it rendered at
+  2x and the city landed bottom-right), auto-fit camera for any aspect, canvas-relative picking; 1000x540 windows use a
+  two-column layout, phones stack.
+- **M3 + M4 + Day-1 Impact Graph (approved by the lead)**: Impact graph under the stage (data age vs time, fault window,
+  dashed stale threshold, cyan/coral dots, per-poll HTTP chips, playhead locked to the scrubber, click to seek);
+  guardrail gauges (data age, fault time vs caps, error rate, latency p95 vs armed threshold, recovery advances, blast
+  radius) computed live from the record; API contrast card; HUD tabs Events / Findings & Score / AI governance (recorded
+  planner order + analyst root causes and verify/mitigate/fix playbooks, validator verdicts, 14B note from
+  docs/AI_LAYER.md:52–56); AI drone (illustrative) with 1 green + 6 red verdict dots; 90 s guided tour (6 steps, camera
+  autopilot, captions built from recorded numbers; Space pause, 1–6 jump, ←/→, Esc).
+  Values that differ from the request and are shown as recorded: error-rate limit 0.0 (not 10 %); latency 7500 ms is
+  dependency_failure only (others use the armed threshold, e.g. 439.35 ms); 62.2 is the telemetry_stall median (run 21c920
+  scores 60.9); "N of M polls returned 200" is computed per run (29/29 for 21c920; 34/34 was a Day-1 run).
+  Screenshots `docs/scene/screenshots/m3-*`, `m4-*`. URL hash extras: `tab=ai|findings|events`, `tour=<1-6>&tourt=<s>&tourpause=1`.
+- Next: lead review of PR #33; merge only with approval.
 
 ## RESUME HERE
 - Status: `docs/coordination/CURRENT_STATUS.md`; requirements: `docs/REQUIREMENTS_TRACE.md` (final); guide:
