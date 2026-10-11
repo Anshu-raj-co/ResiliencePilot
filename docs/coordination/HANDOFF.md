@@ -1,7 +1,23 @@
 # Handoff
 
-_Updated: 2026-10-11 (feat/scene-3d M3/M4). **Code frozen for the demo** (lead's instruction). `main`: PRs #7 and #22–#30 merged (PR #29
+_Updated: 2026-10-11 (feat/data-quality; earlier: feat/scene-3d M3/M4). **Code frozen for the demo** (lead's instruction). `main`: PRs #7 and #22–#30 merged (PR #29
 approved by the lead) + the final count update. PR #8 still open (older)._
+
+## Data-quality gate + submission deck: branch `feat/data-quality` (PR open; main is code-frozen, merge only with the lead's approval)
+- Scope (instructor task): new isolated package `backend/resiliencepilot/dq/` (schema, normalizer, batch_engine, store,
+  generator, report, cli; `python -m resiliencepilot.dq generate|ingest|show-quarantine|report`), new
+  `backend/tests/test_dq.py` (79 tests), `scripts/make_ppt.py` -> `docs/submission/ResiliencePilot.pptx` (6 slides),
+  `docs/DATA_QUALITY.md`, `docs/demo/VIDEO_SCRIPT.md` (2 min, 20 s DQ section), sample `docs/dq/report.html`.
+  `backend/pyproject.toml`: package `resiliencepilot.dq`, `tzdata` on Windows, extra `slides` (python-pptx).
+  No change to safety/observer/telemetry/orchestrator or to existing tests.
+- Logistics fields are synthetic (documented); the gate is not wired into the experiment loop or the blueprint path.
+- Verified: `pytest -q` 396 passed, 11 skipped (317 existing + 79 new) on macOS; deck built and checked
+  (pptx structural validator PASS; text-fit check with Calibri/Cambria metrics, no overflow). Not rendered in
+  PowerPoint here (no LibreOffice); open it once before submitting.
+- Slide numbers are read from evidence at build time: 37 run records; median score **62.65** over the 10 full-window
+  Day-2 runs (the brief said 63.0, which is not in the records). Test counts are pinned in `scripts/make_ppt.py`.
+- Next: open the deck in PowerPoint for a visual pass; add the video URL with `make_ppt.py --video-url URL`;
+  record the video per `docs/demo/VIDEO_SCRIPT.md`; lead review of the PR.
 
 ## Optional visualization: branch `feat/scene-3d` (in progress, NOT merged; merge only with the lead's approval)
 - Scope: `docs/scene/` (page `index.html` + vendored `three.r160.min.js`, MIT licence at its top; `screenshots/`)
