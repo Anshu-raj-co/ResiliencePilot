@@ -3,6 +3,15 @@
 _Updated: 2026-10-11 (feat/data-quality; earlier: feat/scene-3d M3/M4). **Code frozen for the demo** (lead's instruction). `main`: PRs #7 and #22–#30 merged (PR #29
 approved by the lead) + the final count update. PR #8 still open (older)._
 
+## Judge deck: branch `feat/judge-deck` (PR open)
+- `scripts/make_ppt.py` now builds the 8-slide `docs/submission/ResiliencePilot_Presentation.pptx` (one slide per
+  submission-guideline section, aligned with the 2:56 narrated demo video in `reports/generated/demo-video/`); the old 6-slide
+  `ResiliencePilot.pptx` was removed. `--video-url URL` links the Drive video on slide 8.
+- Numbers checked against evidence; corrections vs the request: score weights are 0.25/0.30/0.20/0.25 (docs/SCORING.md);
+  the latency guard was a deliberately tight 30 ms cap that tripped at 1.88 s (not a 1.88 s cap); DNS cause is a
+  hypothesis; watchdog is a software thread; "100 % reproducible" not claimed.
+- Missing for the submission form: roll numbers (not in the repo); a LICENSE file (form says MIT, repo has none).
+
 ## Data-quality gate + submission deck: branch `feat/data-quality` (PR open; main is code-frozen, merge only with the lead's approval)
 - Scope (instructor task): new isolated package `backend/resiliencepilot/dq/` (schema, normalizer, batch_engine, store,
   generator, report, cli; `python -m resiliencepilot.dq generate|ingest|show-quarantine|report`), new
