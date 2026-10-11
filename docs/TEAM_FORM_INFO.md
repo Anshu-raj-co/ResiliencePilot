@@ -1,7 +1,7 @@
 # Submission form information
 
-Copy-ready answers for the Bosch Hackathon 2026 submission form. Fields marked **[TO FILL]** need information that is
-not in the repository; nothing here invents a teammate's identity.
+Copy-ready answers for the Bosch Hackathon 2026 submission form. Fields marked **[TO FILL]** still need information.
+The team roster and metadata below were provided by the team.
 
 ## Project
 
@@ -11,8 +11,8 @@ not in the repository; nothing here invents a teammate's identity.
 | Tagline | HTTP 200 is not recovery. Fresh data is. |
 | Repository | https://github.com/Anshu-raj-co/ResiliencePilot |
 | Demo video | **[TO FILL]** (script: `docs/demo/DAY2_DEMO_SCRIPT.md`) |
-| Category / track | **[TO FILL]** |
-| Licence | Our code: **[TO FILL]**. Vendored blueprint: Apache-2.0 (Eclipse SDV Fleet Management Blueprint) |
+| Category / track | AI-Driven Chaos Engineering for Cloud-Native Resilience |
+| Licence | Our code: MIT. Vendored blueprint: Apache-2.0 (Eclipse SDV Fleet Management Blueprint) |
 
 ## Short description (≈50 words)
 
@@ -54,21 +54,16 @@ databroker, Eclipse Zenoh, InfluxDB, rFMS) · Ollama (`qwen2.5:7b`, local) · va
 
 ## Team
 
-From the git history, GitHub accounts have committed to this repository; nothing beyond names and public GitHub handles
-is recorded here. **Do not commit personal contact details (email, phone) to the repository:** enter them only in
-the submission form itself.
+Only names and public GitHub handles are recorded here. **Do not commit personal contact details (email, phone) to the
+repository:** enter them only in the submission form itself.
 
 | # | Name | GitHub | Role / ownership |
 |---|---|---|---|
-| 1 | Anshu Raj (commit author name) | `Anshu-raj-co` | **[TO FILL]** |
-| 2 | **[TO FILL]** | `nishtrip14` | **[TO FILL]** |
-| 3 | **[TO FILL]** | **[TO FILL]** | **[TO FILL]** |
-| 4 | **[TO FILL]** | **[TO FILL]** | **[TO FILL]** |
-| 5 | **[TO FILL]** | **[TO FILL]** | **[TO FILL]** |
-
-Suggested ownership areas from the project brief, if useful for the form: engineering lead and integration; SDV
-integration and setup; safety controller and fault adapters; telemetry verification, baselines and evidence; AI
-analysis, dashboard and reporting.
+| 1 | Vaibhav Raghav | `Vaibhavraghav108` | Lead Architect & Core Engineering (Research lead, safety controller, hardware watchdog, integration) |
+| 2 | Anshu Raj | `Anshu-raj-co` | SDV Integration & Chaos Adapters (Blueprint setup, fault injection adapters, container orchestration) |
+| 3 | Nishant Tripathi | `nishtrip14` | Telemetry Verification & Scoring (rFMS observation, freshness tracking, Resilience Score engine) |
+| 4 | Jahnavi | `jahnavi` | AI Safety Governance & Validation (Hallucination guardrail, rule-based planner fallback, findings verification) |
+| 5 | Samhithaa | `samhithaa` | Digital Twin Visualization & Reporting (Dashboard, evidence records, findings & metrics documentation) |
 
 ## AI assistance disclosure
 
