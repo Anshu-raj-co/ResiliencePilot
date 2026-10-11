@@ -301,7 +301,12 @@ def build() -> dict:
                                   "A curated, labelled fact list from `reports/day2/README.md`"],
                          "never": ["Shell, Docker socket, `docker_cli`, fault adapters",
                                    "Safety controller, lock, latch or reset",
-                                   "Credentials, environment variables, raw inspect data"]},
+                                   "Credentials, environment variables, raw inspect data"],
+                         "quotes": [{"text": q, "src": src("docs/AI_LAYER.md", line_of("docs/AI_LAYER.md", q))} for q in [
+                             "The planner can only **reorder** the rule-based candidates.",
+                             "Output is text for a human. Nothing in it is executed.",
+                             "`ai.py` imports only `json`, `dataclasses`, `pathlib`, `urllib.parse` and `httpx`",
+                             "The Ollama URL must be loopback"]]},
         "findings": findings,
         "scores": {"path": sc["path"], "summary": sc["summary"]},
         "runs": runs(annotations, findings, sc["by_run"]),
@@ -311,7 +316,7 @@ def build() -> dict:
 def verify_ai_boundary_text(data: dict) -> None:
     """The boundary rows above are copied from docs/AI_LAYER.md; fail loudly if the doc changed."""
     doc = read("docs/AI_LAYER.md")
-    for s in data["ai_layer_doc"]["gets"] + data["ai_layer_doc"]["never"]:
+    for s in data["ai_layer_doc"]["gets"] + data["ai_layer_doc"]["never"] + [q["text"] for q in data["ai_layer_doc"]["quotes"]]:
         if s not in doc:
             raise SystemExit(f"docs/AI_LAYER.md no longer contains: {s!r}; update build_scene_data.py")
 

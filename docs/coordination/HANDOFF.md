@@ -13,8 +13,13 @@ approved by the lead) + the final count update. PR #8 still open (older)._
   records), ghost truck (illustrative), timeline (play/pause/restart, 1x/2x/4x, scrubber, event markers), run selector
   (37 runs: telemetry_stall / service_crash / dependency_failure / kill-switch run `6f6559` / guardrail-demo), safety
   booth with inspector (config/safety.json checks, approver from the run record). Screenshots `docs/scene/screenshots/m1-*`.
-- Next: M2 hover tooltip + click inspector for every building, road, packet, truck, booth; tolerance & AI panel.
-  Stop after M2 and report (M3/M4 only with explicit approval).
+- **M2 done (inspector)**: hover tooltip + click side panel for every building (container, image, ports, role, edges with
+  confidence, allowlist, blast radius, state at the replay moment), road (protocol, direction, evidence level, file:line),
+  packet (recorded observation fields; signal values "not recorded"), main/ghost truck, loop road, booth, and an
+  AI-advisory kiosk / "Tolerances & AI" panel (thresholds from config, AI boundary from docs/AI_LAYER.md, model and
+  validator counts from `reports/day2/ai_calls/20261010T233726Z.json`). Every fact shows `source: <path>`.
+  Screenshots `docs/scene/screenshots/m2-*`. URL hash for reproducible views: `#run=<id>&t=<s>&play=0&sel=building:fms-server&tip=road:2`.
+- Next: STOP after M2 and report to the lead. M3/M4 only with explicit approval. PR open, do not merge without approval.
 
 ## RESUME HERE
 - Status: `docs/coordination/CURRENT_STATUS.md`; requirements: `docs/REQUIREMENTS_TRACE.md` (final); guide:
