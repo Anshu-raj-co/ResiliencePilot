@@ -12,7 +12,8 @@ Sources (every value in the page is taken from one of these, with its path and, 
   Fleet Management/fleet-management/fms-blueprint-compose*.yaml, config/compose/resiliencepilot.override.yaml
 
 Usage: python3 scripts/build_scene_data.py [--check]
-  --check  exit 1 if the embedded data is out of date (does not write).
+  --check  does not write; exit 1 if the embedded data is out of date or the offline check fails
+           (http(s) resource loads, fetch/XMLHttpRequest/WebSocket/... in the page code).
 """
 from __future__ import annotations
 
@@ -321,6 +322,39 @@ def verify_ai_boundary_text(data: dict) -> None:
             raise SystemExit(f"docs/AI_LAYER.md no longer contains: {s!r}; update build_scene_data.py")
 
 
+NET_APIS = ["fetch(", "XMLHttpRequest", "WebSocket", "EventSource", "sendBeacon", "importScripts", "import("]
+
+
+def offline_check(page: str) -> list[str]:
+    """Static check that the page loads nothing over the network. Returns a list of problems (empty = pass)."""
+    problems = []
+    a = page.index(BEGIN)
+    b = page.index(END, a) + len(END)
+    code = page[:a] + page[b:]          # page markup + scripts, without the embedded JSON data block
+    for m in re.finditer(r"""(?:src|href|action|data|poster)\s*=\s*["']([^"']*)["']""", code, re.I):
+        url = m.group(1).strip()
+        if re.match(r"^(https?:)?//", url, re.I):
+            problems.append(f"index.html: network URL in attribute: {url}")
+    for m in re.finditer(r"""url\(\s*["']?([^"')]*)""", code, re.I):
+        if re.match(r"^(https?:)?//", m.group(1).strip(), re.I):
+            problems.append(f"index.html: network URL in CSS url(): {m.group(1)}")
+    if re.search(r"@import", code, re.I):
+        problems.append("index.html: CSS @import")
+    for api in NET_APIS:
+        if api in code:
+            problems.append(f"index.html: network API in page code: {api}")
+    if re.search(r"https?://", code, re.I):
+        problems.append("index.html: http(s):// string in page code outside the data block")
+    scripts = re.findall(r"<script[^>]*\ssrc=[\"']([^\"']+)", code, re.I)
+    if scripts != ["three.r160.min.js"]:
+        problems.append(f"index.html: unexpected external scripts: {scripts}")
+    if re.search(r"<(link|iframe|img|object|embed|audio|video|source)\b", code, re.I):
+        problems.append("index.html: element that can load a resource")
+    if not os.path.exists(os.path.join(os.path.dirname(PAGE), "three.r160.min.js")):
+        problems.append("three.r160.min.js missing")
+    return problems
+
+
 def main() -> int:
     data = build()
     verify_ai_boundary_text(data)
@@ -331,11 +365,25 @@ def main() -> int:
     b = page.index(END, a)
     new = page[:a] + blob + page[b:]
     if "--check" in sys.argv:
+        rc = 0
         if new != page:
             print("docs/scene/index.html: embedded data is out of date; run scripts/build_scene_data.py")
-            return 1
-        print("docs/scene/index.html: embedded data up to date")
-        return 0
+            rc = 1
+        else:
+            print("docs/scene/index.html: embedded data up to date")
+        problems = offline_check(page)
+        for p in problems:
+            print("OFFLINE CHECK FAIL:", p)
+        if not problems:
+            print("offline check: PASS (index.html: no http(s) resource loads, no fetch/XMLHttpRequest/WebSocket/"
+                  "EventSource/sendBeacon/import(); only script is ./three.r160.min.js)")
+        lib = open(os.path.join(os.path.dirname(PAGE), "three.r160.min.js"), encoding="utf-8").read()
+        hits = {api: lib.count(api) for api in ("fetch(", "XMLHttpRequest", "http://", "https://") if api in lib}
+        print(f"note: vendored three.r160.min.js contains {hits} (library loader code and the upstream deprecation "
+              "message; the page never calls a three.js loader)")
+        urls = sorted(set(re.findall(r"https?://[^\s\"'<>]+", page[page.index(BEGIN):page.index(END)])))
+        print(f"note: URLs appearing as text values in the embedded data (not loaded): {urls}")
+        return rc or (1 if problems else 0)
     with open(PAGE, "w", encoding="utf-8") as f:
         f.write(new)
     print(f"wrote {rel(PAGE)}: {len(data['runs'])} runs, {len(blob):,} bytes of data")

@@ -40,7 +40,9 @@ explains findings, with every AI root cause checked against the recorded evidenc
 ## Technologies
 
 Python 3.13 · FastAPI · httpx · pydantic · Docker / Docker Compose · Eclipse SDV Fleet Management Blueprint (KUKSA
-databroker, Eclipse Zenoh, InfluxDB, rFMS) · Ollama (`qwen2.5:7b`, local) · vanilla HTML/SVG dashboard · pytest.
+databroker, Eclipse Zenoh, InfluxDB, rFMS) · Ollama (`qwen2.5:7b`, local) · vanilla HTML/SVG dashboard · pytest ·
+Three.js r160 (MIT; vendored as `docs/scene/three.r160.min.js` with its licence, for the optional offline 3D
+visualization of recorded runs in `docs/scene/`).
 
 ## Key results (for the form's "results / impact" field)
 
