@@ -793,6 +793,9 @@ function boothPanel() {
     <div>${gr.triggered ? `<span class="mono">${esc(JSON.stringify(gr.triggered))}</span>` : (r.guardrails ? "none (guardrails.triggered is null)" : NR)}</div>${srcl(r.src + " → guardrails.triggered")}
     <h4>Recovery rule used (run record)</h4>
     <div>${val(r.recovery && r.recovery.criteria)}</div>${srcl(r.src + " → recovery.criteria")}
+    <h4>Findings & score for this run</h4>
+    ${r.findings.length ? r.findings.map((f) => `<div class="fact"><b>${esc(f.id)}</b> (${esc(f.level)}) ${esc(f.title)}: ${esc(f.text)}<div class="src">source: ${esc(f.src)}</div></div>`).join("") : `<div class="fact">No numbered finding (F1, F2, …) lists this run.<div class="src">source: ${esc(D.findings.path)}</div></div>`}
+    ${r.score ? `<div class="fact">Resilience Score: <b>${val(r.score.score)}</b> (scorable ${val(r.score.scorable)}, partial ${val(r.score.partial)})${r.score.not_measured && r.score.not_measured.length ? "; not measured: " + esc(r.score.not_measured.join(", ")) : ""}${r.score.reason ? "; " + esc(r.score.reason) : ""}<div class="src">source: ${esc(r.score.src)}</div></div>` : `<div class="fact">Score: ${NR} (${esc(D.scores.path)} covers ${esc("reports/day2")} runs only)</div>`}
     <h4>Tolerances & AI</h4><div class="fact"><button class="close" style="float:none" id="openTol">Open the Tolerances & AI panel</button></div>`;
 }
 function loopPanel() {

@@ -1,6 +1,6 @@
 # Handoff
 
-_Updated: 2026-10-11. **Code frozen for the demo** (lead's instruction). `main`: PRs #7 and #22–#30 merged (PR #29
+_Updated: 2026-10-11 (07:55 IST, feat/scene-3d M2). **Code frozen for the demo** (lead's instruction). `main`: PRs #7 and #22–#30 merged (PR #29
 approved by the lead) + the final count update. PR #8 still open (older)._
 
 ## Optional visualization: branch `feat/scene-3d` (in progress, NOT merged; merge only with the lead's approval)
@@ -19,6 +19,12 @@ approved by the lead) + the final count update. PR #8 still open (older)._
   AI-advisory kiosk / "Tolerances & AI" panel (thresholds from config, AI boundary from docs/AI_LAYER.md, model and
   validator counts from `reports/day2/ai_calls/20261010T233726Z.json`). Every fact shows `source: <path>`.
   Screenshots `docs/scene/screenshots/m2-*`. URL hash for reproducible views: `#run=<id>&t=<s>&play=0&sel=building:fms-server&tip=road:2`.
+- Checks done: `python3 scripts/build_scene_data.py --check` (data current + static offline scan: PASS; negative-tested
+  with injected fetch/XHR/CDN script/CSS url); Chrome net-log while loading from a fresh clone: only browser-internal
+  requests (initiator "not an origin"), none from the page; WebGL-off fallback shows the explainer link; 390 px layout
+  checked in an iframe; fresh clone needs `git submodule update --init` only to REBUILD data, not to view the page.
+  `git diff --stat main`: only docs/scene/, scripts/build_scene_data.py, docs/TEAM_FORM_INFO.md, this file.
+  Tests unchanged: 317 passed, 11 skipped (macOS).
 - Next: STOP after M2 and report to the lead. M3/M4 only with explicit approval. PR open, do not merge without approval.
 
 ## RESUME HERE
