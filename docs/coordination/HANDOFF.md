@@ -1,24 +1,17 @@
 # Handoff
 
-_Updated: 2026-10-11 ~05:20 IST. `main` = `b133630` (PR #7 merged: scripts executable, databroker host port 55557).
-Open: PR #22 (A-to-Z guide + requirements trace), PR "clean run" (branch `fix/clean-run`), PR #8._
+_Updated: 2026-10-11 ~05:45 IST. `main` = `68b26e4` + this PR. Fix list from the lead: items 1, 2, 3, 5 merged
+(PRs #23, #24, #25, #26; #7 and #22 also merged). **Open: PR #27 (item 4, GUARDRAIL-DEMO profiles + live evidence)
+waits for the lead's approval** (config loading + `orchestrator.py` field + `api.py` refusal). PR #8 still open._
 
-## RESUME HERE (fix list from the lead, 2026-10-11; one PR per item; ask the lead before merging anything that touches safety or abort logic)
-1. **Clean run (branch `fix/clean-run`, PR open):** amd64 platform pin for fms-server/fms-consumer (D-023);
-   `stack-status.sh` exits 1 and names missing services; README/PROJECT_EXPLAINED prerequisites (port 55557, platforms,
-   long paths); run records now store `platform` (host OS/CPU; `orchestrator.py` adds one metadata field, no logic
-   change); `rp findings` shows platform per experiment (`reports/day2/platforms.json` labels only documented runs).
-   Fresh clone on macOS arm64 with fms-server/fms-consumer images deleted first: pulled as amd64, 8/8 running,
-   `stack-status` exit 0 (exit 1 after stack-down), 270 unit + 3 live tests pass, `demo-day1.sh` exit 0 (42 s), `rp serve` 200.
-2. Wording: DONE, PR #24 merged.
-3. **Experiment picker: PR #25 open, waits for the lead** (changes the API run path). Live run
-   `20261010T233453Z-958562` via the picker; real `rp advise` call logged (`reports/day2/ai_calls/`).
-4. **Guardrail demo: branch `feat/guardrail-demo` (pushed, PR not opened yet).** Allowlisted overlay profiles
-   (`RP_CONFIG_PROFILE`, `config/profiles/`). Live: `guardrail_error_rate` tripped in run `20261010T234332Z-77b84c`,
-   rollback verified, recovery not verified in 30 s → **controller LATCHED_UNSAFE (not reset; needs the lead)**. Stack
-   checked afterwards: 8/8 running, telemetry FRESH and advancing. Latency demo not run yet.
-5. Privacy: DONE, PR #26 merged. Personal emails remain only in old commit metadata (history rewrite forbidden).
-Then regenerate `docs/REQUIREMENTS_TRACE.md`.
+## RESUME HERE
+- Requirements status: `docs/REQUIREMENTS_TRACE.md` (regenerated). Still PARTIAL: req 1 (AI only reorders; human
+  selects by design), req 3 (severity/score deterministic by design; 1/7 AI explanations pass), req 4 (no live
+  latency-guard trip; error-rate evidence in PR #27), req 9 (Windows not re-tested).
+- Latency guard live attempt `20261011T000246Z-46ea3d`: armed at 76.84 ms, polls 44–72 ms, not tripped (run once, as
+  instructed). A trip needs either a stored baseline with a lower p95 or a real slowdown; ask the lead before retrying.
+- Controller: READY (latch from run `77b84c` reset by Vaibhav after checking the stack). Stack running locally.
+- Dashboard: `rp serve` refuses to start with `RP_CONFIG_PROFILE` set (PR #27).
 
 ## Earlier (before 2026-10-11 05:00 IST)
 - **Submission pack (branch `docs/submission-pack`):** `README.md` (final, screenshot + scores),
