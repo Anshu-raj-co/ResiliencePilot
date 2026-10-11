@@ -46,7 +46,12 @@ def test_committed_profiles_load_and_change_only_what_they_say(monkeypatch):
     assert err.expected_statuses == () and err.allowed_targets == base.allowed_targets
     assert err.max_duration_s == base.max_duration_s and err.mechanism == base.mechanism
     monkeypatch.setenv("RP_CONFIG_PROFILE", "guardrail-demo-latency")
-    assert load_experiment_catalog() == default_catalog         # latency demo changes guardrails only
+    lat = load_experiment_catalog()
+    assert {k: v for k, v in lat.items() if k != "telemetry_stall"} == {
+        k: v for k, v in default_catalog.items() if k != "telemetry_stall"}
+    ts, ts0 = lat["telemetry_stall"], default_catalog["telemetry_stall"]
+    assert (ts.max_duration_s, ts.fault_observer_timeout_s, ts.fault_latency_p95_max_ms) == (15, 2.0, 30)
+    assert (ts.allowed_targets, ts.mechanism, ts.blast_radius) == (ts0.allowed_targets, ts0.mechanism, ts0.blast_radius)
     g = load_safety_config().guardrails
     assert (g.latency_p95_multiplier, g.latency_p95_floor_ms, g.latency_min_samples) == (1.0, 1, 1)
     assert set(CONFIG_PROFILES) == {p.name for p in (REPO_ROOT / "config" / "profiles").iterdir() if p.is_dir()}
@@ -54,7 +59,7 @@ def test_committed_profiles_load_and_change_only_what_they_say(monkeypatch):
 
 @pytest.mark.parametrize("experiments, match", [
     ({"dependency_failure": {"allowed_targets": ["fms-server"]}}, "may not override"),
-    ({"dependency_failure": {"max_duration_s": 30}}, "may not override"),
+    ({"dependency_failure": {"max_duration_s": 30}}, "only be tightened"),       # may only shorten (default 15)
     ({"dependency_failure": {"mechanism": "docker_pause"}}, "may not override"),
     ({"dependency_failure": {"blast_radius": ["influxDB", "grafana"]}}, "may not override"),
     ({"network_partition": {"description": "x"}}, "cannot add"),
@@ -85,7 +90,9 @@ def test_profile_safety_overlay_is_limited_to_bounded_guardrails(tmp_path, monke
     ({"dependency_failure": {"fault_observer_timeout_s": 8.0, "fault_latency_p95_max_ms": 7600}}, "only be tightened"),
     ({"dependency_failure": {"expected_statuses": [500, 503]}}, "only be removed"),
     ({"dependency_failure": {"max_error_rate": 0.2}}, "only be tightened"),
-    ({"service_crash": {"fault_observer_timeout_s": 1.0}}, "only be tightened"),   # no envelope by default
+    ({"service_crash": {"fault_observer_timeout_s": 3.0}}, "only be tightened"),   # implicit default: 2 s
+    ({"telemetry_stall": {"max_duration_s": 15, "fault_observer_timeout_s": 2.0, "fault_latency_p95_max_ms": 300}},
+     "only be tightened"),                                                        # implicit floor: 250 ms
 ])
 def test_profile_experiment_overrides_only_tighten(tmp_path, monkeypatch, experiments, match):
     monkeypatch.setenv("RP_CONFIG_PROFILE", CONFIG_PROFILES[0])
@@ -103,3 +110,12 @@ def test_profile_guardrail_overrides_only_tighten(tmp_path, monkeypatch, guardra
     monkeypatch.setenv("RP_CONFIG_PROFILE", CONFIG_PROFILES[0])
     with pytest.raises(ValueError, match=match):
         load_safety_config(_root(tmp_path, CONFIG_PROFILES[0], safety={"guardrails": guardrails}))
+
+
+def test_profile_may_add_a_tighter_envelope_than_the_implicit_default(tmp_path, monkeypatch):
+    monkeypatch.setenv("RP_CONFIG_PROFILE", CONFIG_PROFILES[1])
+    root = _root(tmp_path, CONFIG_PROFILES[1],
+                 experiments={"telemetry_stall": {"max_duration_s": 15, "fault_observer_timeout_s": 2.0,
+                                                   "fault_latency_p95_max_ms": 30}})
+    spec = load_experiment_catalog(root)["telemetry_stall"]
+    assert (spec.fault_observer_timeout_s, spec.fault_latency_p95_max_ms) == (2.0, 30)
