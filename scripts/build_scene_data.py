@@ -356,17 +356,28 @@ def offline_check(page: str) -> list[str]:
 
 
 def main() -> int:
-    data = build()
-    verify_ai_boundary_text(data)
-    blob = json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
     with open(PAGE, encoding="utf-8") as f:
         page = f.read()
-    a = page.index(BEGIN) + len(BEGIN)
-    b = page.index(END, a)
-    new = page[:a] + blob + page[b:]
+    try:
+        data = build()
+    except FileNotFoundError as e:
+        print(f"cannot rebuild the embedded data: missing {rel(e.filename)}. On a fresh clone run "
+              "`git submodule update --init` first (the page itself does not need it).")
+        if "--check" not in sys.argv:
+            return 2
+        data = None
+    if data is not None:
+        verify_ai_boundary_text(data)
+        blob = json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+        a = page.index(BEGIN) + len(BEGIN)
+        b = page.index(END, a)
+        new = page[:a] + blob + page[b:]
     if "--check" in sys.argv:
         rc = 0
-        if new != page:
+        if data is None:
+            print("docs/scene/index.html: embedded data NOT verified (sources missing, see above)")
+            rc = 2
+        elif new != page:
             print("docs/scene/index.html: embedded data is out of date; run scripts/build_scene_data.py")
             rc = 1
         else:
