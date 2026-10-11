@@ -1,0 +1,4 @@
+{
+  "_about": "GUARDRAIL-DEMO latency (not for normal use). Tightest latency guard the bounds allow: threshold = max(1.0 x baseline p95, 1 ms), judged from the first fault-window sample. Any poll slower than the baseline p95 trips guardrail_latency. This demonstrates the abort-and-rollback path on normal latency jitter; it is not a real slowdown. Use with telemetry_stall (pause/unpause, fast recovery).",
+  "guardrails": {"latency_p95_multiplier": 1.0, "latency_p95_floor_ms": 1, "latency_min_samples": 1}
+}

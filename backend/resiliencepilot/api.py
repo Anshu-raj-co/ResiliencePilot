@@ -145,6 +145,8 @@ def _run_summary(rec: dict | None) -> dict | None:
 def create_app(cfg: SafetyConfig, catalog: dict[str, ExperimentSpec], ctl: SafetyController, docker, observer,
                store: EvidenceStore, *, monitor: bool = True, dashboard_duration_s: int = DASHBOARD_DURATION_S,
                insight_sources: dict[str, Path] | None = None, dep_map_path: Path | None = None) -> FastAPI:
+    if cfg.profile != "default":  # GUARDRAIL-DEMO profiles are CLI-only; the dashboard never runs with one
+        raise ValueError(f"the dashboard does not run with config profile {cfg.profile!r}; unset RP_CONFIG_PROFILE")
     live = LiveState(cfg.stale_threshold_s)
     runner = ExperimentRunner(cfg, catalog, ctl, docker, observer, store, on_event=live.on_event)
     stop_monitor = threading.Event()

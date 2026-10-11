@@ -1,0 +1,12 @@
+{
+  "_about": "GUARDRAIL-DEMO (not for normal use). Overlay on config/experiments.json, selected with RP_CONFIG_PROFILE=guardrail-demo-error-rate. Removes the declared expected HTTP 500 from dependency_failure, so the first 500 while InfluxDB is down counts as an error and the zero-tolerance error-rate guard must abort and roll back. Targets, mechanism and durations are unchanged. Poll timeout lowered to 2 s (latency cap 1.9 s, must stay below it) so several polls fit in the window: in run 20261010T234226Z-e3e15c the single 8 s poll got no answer at all, so there was no response to judge.",
+  "dependency_failure": {
+    "description": "GUARDRAIL-DEMO error rate: stop influxDB with no expected status declared; the first HTTP 500 must trip the error-rate guard.",
+    "expected_statuses": [],
+    "expected_symptoms": [
+      "GUARDRAIL-DEMO: the first non-200 response trips guardrail_error_rate (max_error_rate 0.0) and the run rolls back"
+    ],
+    "fault_observer_timeout_s": 2.0,
+    "fault_latency_p95_max_ms": 1900
+  }
+}

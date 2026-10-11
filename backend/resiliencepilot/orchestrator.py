@@ -77,7 +77,8 @@ class ExperimentRunner:
         mono0 = time.monotonic()
         rec_lock = threading.Lock()
         rec: dict = {
-            "run_id": run_id, "request": req.model_dump(), "state": "VALIDATED", "platform": host_platform(),
+            "run_id": run_id, "request": req.model_dump(), "state": "VALIDATED", "config_profile": cfg.profile,
+            "platform": host_platform(),
             "spec": {"mechanism": spec.mechanism, "expected_symptoms": list(spec.expected_symptoms), "risks": list(spec.risks)},
             "limits": {"stale_threshold_s": cfg.stale_threshold_s, "poll_interval_s": cfg.poll_interval_s,
                        "watchdog_grace_s": cfg.watchdog_grace_s, "recovery_timeout_s": cfg.recovery_timeout_s},

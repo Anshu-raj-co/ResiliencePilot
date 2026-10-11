@@ -1,0 +1,13 @@
+# GUARDRAIL-DEMO live evidence
+
+Runs made with the deliberately tight overlay profiles in `config/profiles/` (see its README: CLI-only, tighten-only).
+Each record stores `config_profile` (and, from run `46ea3d` on, `platform`). Host: macOS 27.0.1 on Apple Silicon
+(arm64); fms-server and fms-consumer run as emulated linux/amd64 images (D-023). UTC times.
+
+| Run | Profile | Label | What happened |
+|---|---|---|---|
+| `20261010T234226Z-e3e15c` | `guardrail-demo-error-rate` (first version: 8 s poll timeout) | **First attempt: guard not exercised** | COMPLETED, `duration_elapsed`. One fault-window poll, no answer within 8 s (`ReadTimeout`); with < 8 s left no further poll started. A missing answer is not an error (the observer-loss rule handles it), so the error-rate guard had nothing to judge. Recovery verified 21.1 s after rollback. |
+| `20261010T234332Z-77b84c` | `guardrail-demo-error-rate` (2 s poll timeout) | **Second attempt: guard tripped, then fail-closed latch on 30 s recovery** | First fault poll at 1.93 s: HTTP 500 in 4.75 ms → error rate 1/1 > 0.0 → `guardrail_error_rate`, rollback verified (InfluxDB started, same container id). Recovery criteria were not met within 30 s (1 advance; first fresh at 30.0 s), so the controller latched (LATCHED_UNSAFE) as designed. Telemetry was fresh and advancing within seconds after; reset by Vaibhav after checking the stack. |
+| `20261011T000246Z-46ea3d` | `guardrail-demo-latency` (threshold = 1.0 × baseline p95, judged per sample), `telemetry_stall` 12 s | **Latency guard armed, not tripped** | Threshold 76.84 ms (p95 of the 3 precheck polls; no stored baseline). All 22 fault-window polls answered HTTP 200 in 44.4–71.8 ms, below the threshold, so the guard did not trip. COMPLETED, recovery verified 3.49 s after rollback. Run once, as instructed. |
+
+Not yet shown live: a `guardrail_latency` trip. Unit/integration tests cover it (`test_latency_p95_trips_and_rolls_back`).
