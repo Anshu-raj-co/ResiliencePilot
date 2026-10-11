@@ -71,12 +71,12 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
 #nogl a { color: var(--accent); }
 @media (max-width: 900px) {
   #legend, #events { display: none; }
-  #api { top: auto; bottom: 128px; left: 12px; right: 12px; width: auto; }
+  #api { top: auto; bottom: 172px; left: 12px; right: 12px; width: auto; }
   #api .kv, #api .src { display: none; }
   #api .big { font-size: 20px; }
   #top .sub, #runmeta .src { display: none; }
   #tl { grid-template-columns: 1fr; gap: 4px; }
-  #panel { bottom: 128px; }
+  #panel { bottom: 172px; }
 }
 </style>
 </head>
@@ -405,6 +405,7 @@ function applyCam() {
   camera.position.set(cam.target.x + cam.r * Math.sin(cam.phi) * Math.sin(cam.theta), cam.r * Math.cos(cam.phi),
     cam.target.z + cam.r * Math.sin(cam.phi) * Math.cos(cam.theta));
   camera.lookAt(cam.target);
+  scene.fog.near = cam.r + 20; scene.fog.far = cam.r + 130;
 }
 let drag = null;
 canvas.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY, moved: false }; });
@@ -419,7 +420,7 @@ window.addEventListener("pointermove", (e) => {
 canvas.addEventListener("wheel", (e) => { e.preventDefault(); cam.r *= e.deltaY > 0 ? 1.08 : 0.93; applyCam(); }, { passive: false });
 function resize() {
   const w = window.innerWidth, h = window.innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h;
-  if (w < 700) cam.r = Math.max(cam.r, 160);
+  if (w / h < 1.4) cam.r = Math.max(cam.r, Math.min(220, 108 * 1.5 / (w / h)));
   camera.updateProjectionMatrix(); applyCam();
 }
 window.addEventListener("resize", resize);
