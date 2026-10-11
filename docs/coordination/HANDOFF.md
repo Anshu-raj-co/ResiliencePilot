@@ -5,7 +5,7 @@ approved by the lead) + the final count update. PR #8 still open (older)._
 
 ## Judge deck: branch `feat/judge-deck` (PR open)
 - `scripts/make_ppt.py` now builds the 8-slide `docs/submission/ResiliencePilot_Presentation.pptx` (one slide per
-  submission-guideline section, aligned with the 2:40 demo video in `reports/generated/demo-video/`); the old 6-slide
+  submission-guideline section, aligned with the 2:56 narrated demo video in `reports/generated/demo-video/`); the old 6-slide
   `ResiliencePilot.pptx` was removed. `--video-url URL` links the Drive video on slide 8.
 - Numbers checked against evidence; corrections vs the request: score weights are 0.25/0.30/0.20/0.25 (docs/SCORING.md);
   the latency guard was a deliberately tight 30 ms cap that tripped at 1.88 s (not a 1.88 s cap); DNS cause is a

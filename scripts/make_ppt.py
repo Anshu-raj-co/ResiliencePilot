@@ -45,14 +45,14 @@ GUARDS = [("Error rate", "77b84c", "first non-200 aborts; then fail-closed latch
           ("Blast radius", "4aa9f7", "neighbour container changed; rollback + latch")]
 # Live run recorded in the demo video (backend/data/runs/20261011T082839Z-2b1f95.json)
 VIDEO_RUN = dict(id="2b1f95", ttd=4.99, rec=3.78, max_age=11.84, score=47.6, approver="Nishant Tripathi")
-# Demo video chapters (reports/generated/demo-video/ResiliencePilot_demo_voiceover.md), total 2:40
-VIDEO_LEN = "2:40"
+# Demo video chapters (reports/generated/demo-video/ResiliencePilot_demo_voiceover.md), total 2:56, narrated
+VIDEO_LEN = "2:56"
 VIDEO_CHAPTERS = [("0:00", "Team, architecture, our sandbox, healthy live dashboard"),
-                  ("0:33", "Live telemetry_stall: human approval, HTTP 200 while data freezes"),
-                  ("1:01", "Verified recovery (3 advancing timestamps), metrics, Resilience Score"),
-                  ("1:22", "Findings + 3D replay of the InfluxDB outage that latched"),
-                  ("1:47", "AI analysis: 1 of 7 answers accepted; safety controls, kill switch"),
-                  ("2:20", "Data-quality gate (2/100 committed vs 10/100 rolled back), results")]
+                  ("0:38", "Live telemetry_stall: human approval, HTTP 200 while data freezes"),
+                  ("1:07", "Verified recovery (3 advancing timestamps), metrics, Resilience Score"),
+                  ("1:31", "Findings + 3D replay of the InfluxDB outage that latched"),
+                  ("1:57", "AI analysis: 1 of 7 answers accepted; safety controls, kill switch"),
+                  ("2:34", "Data-quality gate (2/100 committed vs 10/100 rolled back), results")]
 REPO_URL = "https://github.com/Anshu-raj-co/ResiliencePilot"
 SHOT = {
     "hero": "docs/scene/screenshots/layout-retina-2x-1280x800.png",
